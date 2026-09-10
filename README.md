@@ -4,8 +4,6 @@ Minimalny klient REST w stylu Postmana: jeden plik binarny, bez instalacji, bez 
 bez zależności. Interfejs działa w przeglądarce, ale zapytania HTTP wykonuje sam program,
 więc nie obowiązują ograniczenia CORS przeglądarki.
 
-Pobieranie: https://mysttic.github.io/Mysttic/simple-rest/
-
 ![simple-rest: kolekcja po lewej, odpowiedź JSON na całe okno](site/simple-rest/img/promo.png)
 
 ## Uruchomienie
