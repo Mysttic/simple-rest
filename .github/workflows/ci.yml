@@ -1,0 +1,93 @@
+# Runs on every pull request into develop or master (and on pushes to
+# develop). A pull request into master also gets a preview of what merging
+# it publishes. The Release workflow reuses the test job through workflow_call.
+name: CI
+
+on:
+  pull_request:
+    branches: [master, develop]
+  push:
+    branches: [develop]
+  workflow_call:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: gofmt and go vet
+        run: |
+          unformatted=$(gofmt -l .)
+          if [ -n "$unformatted" ]; then
+            echo "::error::gofmt wants to change: $unformatted"
+            exit 1
+          fi
+          go vet ./...
+
+      - name: Go tests
+        run: go test ./... -count=1
+
+      - name: UI tests
+        run: node --test "tests/**/*.test.mjs"
+
+      - name: Build every platform
+        run: sh build.sh
+
+      - name: Keep the build for review
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+          retention-days: 7
+
+  e2e:
+    name: Update path end to end
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: false
+      - name: A 0.9.0 copy updates itself from a fake hub
+        run: sh scripts/e2e-update.sh
+
+  release-preview:
+    name: Release preview
+    if: github.event_name == 'pull_request' && github.base_ref == 'master'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Compare VERSION.md with the newest tag
+        id: v
+        run: |
+          set -o pipefail
+          sh scripts/release-version.sh | tee -a "$GITHUB_OUTPUT"
+
+      - name: What merging does
+        env:
+          VERSION: ${{ steps.v.outputs.version }}
+          PREVIOUS: ${{ steps.v.outputs.previous }}
+          PUBLISHING: ${{ steps.v.outputs.publishing }}
+        run: |
+          if [ "$PUBLISHING" = "true" ]; then
+            echo "Merging this PR publishes **v$VERSION** (newest release so far: $PREVIOUS) and copies it to the site." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "VERSION.md holds $VERSION, the same as the newest release: merging publishes nothing." >> "$GITHUB_STEP_SUMMARY"
+          fi

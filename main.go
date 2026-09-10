@@ -24,6 +24,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -34,10 +35,34 @@ import (
 //go:embed ui.html
 var uiHTML []byte
 
-const (
-	version = "1.0.0"
-	maxBody = 64 << 20 // 64 MB cap for request and response bodies
-)
+// VERSION.md is the single place the version number lives; the release
+// workflow reads the same file.
+//
+//go:embed VERSION.md
+var versionFile string
+
+// versionOverride lets a build report another number, which is how the update
+// path is walked end to end: go build -ldflags "-X main.versionOverride=0.9.0".
+var versionOverride string
+
+var version = readVersion(versionFile, versionOverride)
+
+const maxBody = 64 << 20 // 64 MB cap for request and response bodies
+
+// readVersion takes the first non-empty line of VERSION.md, without a leading
+// "v" or markdown heading marks.
+func readVersion(file, override string) string {
+	if strings.TrimSpace(override) != "" {
+		return strings.TrimPrefix(strings.TrimSpace(override), "v")
+	}
+	for _, line := range strings.Split(file, "\n") {
+		line = strings.TrimSpace(strings.TrimLeft(strings.TrimSpace(line), "#"))
+		if line != "" {
+			return strings.TrimPrefix(line, "v")
+		}
+	}
+	return "0.0.0"
+}
 
 type kv struct {
 	Name  string `json:"name"`
@@ -137,7 +162,7 @@ func (a *app) send(ctx context.Context, in sendRequest) sendResponse {
 		req.Header.Add(name, h.Value)
 	}
 	if _, ok := req.Header["User-Agent"]; !ok {
-		req.Header.Set("User-Agent", "simple-rest/"+version)
+		req.Header.Set("User-Agent", projectName+"/"+version)
 	}
 
 	client := &http.Client{Transport: a.secure}
@@ -217,7 +242,8 @@ func (a *app) handleIndex(w http.ResponseWriter, r *http.Request) {
 
 func (a *app) handleInfo(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{
-		"mode": "server", "version": version, "os": runtime.GOOS, "arch": runtime.GOARCH, "dataPath": a.dataPath,
+		"mode": "server", "project": projectName, "version": version,
+		"os": runtime.GOOS, "arch": runtime.GOARCH, "dataPath": a.dataPath,
 	})
 }
 
@@ -307,6 +333,21 @@ func (a *app) guard(next http.Handler) http.Handler {
 	})
 }
 
+// routes wires every handler; u may be nil when the updater is not wanted.
+func routes(a *app, u *updater) http.Handler {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/", a.handleIndex)
+	mux.HandleFunc("/api/info", a.handleInfo)
+	mux.HandleFunc("/api/send", a.handleSend)
+	mux.HandleFunc("/api/state", a.handleState)
+	mux.HandleFunc("/api/cookies", a.handleCookies)
+	if u != nil {
+		mux.HandleFunc("/api/update", u.handle)
+		mux.HandleFunc("/api/update/", u.handle)
+	}
+	return a.guard(mux)
+}
+
 func hostOnly(hostport string) string {
 	if h, _, err := net.SplitHostPort(hostport); err == nil {
 		return h
@@ -324,15 +365,23 @@ func isLoopbackHost(h string) bool {
 
 // ---- startup -------------------------------------------------------------------
 
-func defaultDataPath() string {
+func executablePath() string {
 	exe, err := os.Executable()
 	if err != nil {
-		return "simple-rest-data.json"
+		return ""
 	}
 	if real, err := filepath.EvalSymlinks(exe); err == nil {
 		exe = real
 	}
-	return filepath.Join(filepath.Dir(exe), "simple-rest-data.json")
+	return exe
+}
+
+func defaultDataPath() string {
+	exe := executablePath()
+	if exe == "" {
+		return projectName + "-data.json"
+	}
+	return filepath.Join(filepath.Dir(exe), projectName+"-data.json")
 }
 
 func openBrowser(u string) {
@@ -352,18 +401,44 @@ func openBrowser(u string) {
 	}
 }
 
+// restartProcess closes the server so the port is free, starts the new
+// executable with the same arguments and exits. The pause lets the last
+// status answer reach the UI, which then waits for the new version to come up.
+func restartProcess(srv *http.Server, exe string) {
+	time.Sleep(700 * time.Millisecond)
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	_ = srv.Shutdown(ctx)
+	args := os.Args[1:]
+	if !slices.Contains(args, "-no-browser") && !slices.Contains(args, "--no-browser") {
+		args = append(args, "-no-browser")
+	}
+	if err := relaunch(exe, args); err != nil {
+		log.Printf("restart failed: %v. Start %s by hand.", err, exe)
+		os.Exit(1)
+	}
+	os.Exit(0)
+}
+
 func main() {
 	listen := flag.String("listen", "127.0.0.1:8787", "listen address; use 0.0.0.0:8787 to reach the UI from other devices (e.g. a phone)")
 	dataPath := flag.String("data", "", "data file (default: simple-rest-data.json next to the executable)")
 	noBrowser := flag.Bool("no-browser", false, "do not open the browser automatically")
+	showVersion := flag.Bool("version", false, "print the version and exit")
+	updateURL := flag.String("update-url", hubAPI, "where the updater asks for releases (a testing aid, see scripts/e2e-update.sh)")
 	flag.Parse()
 
+	if *showVersion {
+		fmt.Printf("%s %s (%s/%s)\n", projectName, version, runtime.GOOS, runtime.GOARCH)
+		return
+	}
 	if *dataPath == "" {
 		*dataPath = defaultDataPath()
 	}
 	if abs, err := filepath.Abs(*dataPath); err == nil {
 		*dataPath = abs
 	}
+	exePath := executablePath()
 
 	ln, err := net.Listen("tcp", *listen)
 	if err != nil {
@@ -385,13 +460,14 @@ func main() {
 	uiURL := fmt.Sprintf("http://%s/", net.JoinHostPort(displayHost, fmt.Sprint(addr.Port)))
 
 	a := newApp(*dataPath, loopbackOnly)
-	mux := http.NewServeMux()
-	mux.HandleFunc("/", a.handleIndex)
-	mux.HandleFunc("/api/info", a.handleInfo)
-	mux.HandleFunc("/api/send", a.handleSend)
-	mux.HandleFunc("/api/state", a.handleState)
-	mux.HandleFunc("/api/cookies", a.handleCookies)
-	srv := &http.Server{Handler: a.guard(mux), ReadHeaderTimeout: 10 * time.Second}
+	u := newUpdater(version, exePath, filepath.Join(filepath.Dir(*dataPath), projectName+"-update.json"))
+	u.logf = log.Printf
+	if *updateURL != hubAPI {
+		u.apiURL = *updateURL
+		log.Printf("update checks go to %s", *updateURL)
+	}
+	srv := &http.Server{Handler: routes(a, u), ReadHeaderTimeout: 10 * time.Second}
+	u.restart = func() { restartProcess(srv, exePath) }
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer stop()
@@ -401,8 +477,12 @@ func main() {
 		defer cancel()
 		_ = srv.Shutdown(shutdownCtx)
 	}()
+	go u.loop(ctx)
+	if exePath != "" {
+		go removeOldExecutable(exePath)
+	}
 
-	log.Printf("simple-rest %s (%s/%s)", version, runtime.GOOS, runtime.GOARCH)
+	log.Printf("%s %s (%s/%s)", projectName, version, runtime.GOOS, runtime.GOARCH)
 	log.Printf("UI:   %s", uiURL)
 	log.Printf("data: %s", *dataPath)
 	if !loopbackOnly {
@@ -413,5 +493,8 @@ func main() {
 	}
 	if err := srv.Serve(ln); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		log.Fatal(err)
+	}
+	if u.isRestarting() {
+		select {} // restartProcess ends the process once the new one is started
 	}
 }
