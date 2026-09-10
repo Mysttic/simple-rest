@@ -17,10 +17,10 @@ goos=$(go env GOOS)
 goarch=$(go env GOARCH)
 ext=""
 case "$goos/$goarch" in
-  windows/*) suffix="$goos-$goarch.exe"; ext=.exe ;;
-  darwin/*)  suffix="macos-$goarch" ;;
-  linux/arm) suffix="linux-armv6" ;;
-  *)         suffix="$goos-$goarch" ;;
+  windows/amd64) suffix="windows-amd64.exe"; ext=.exe ;;
+  linux/amd64)   suffix="linux-amd64" ;;
+  linux/arm64)   suffix="linux-arm64" ;;
+  *) echo "no release build for $goos/$goarch, nothing to walk here"; exit 0 ;;
 esac
 asset="$project-$version-$suffix"
 sums="$project-$version-checksums.txt"

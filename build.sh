@@ -1,8 +1,9 @@
 #!/bin/sh
-# Cross-compiles simple-rest into dist/ as one static file per platform, named
-# <project>-<version>-<platform>[.exe], plus a sha256 checksums file. The names
-# are a contract: the updater inside the app and the hub page read them, so
-# they change only together with a release that reads the new names.
+# Cross-compiles simple-rest into dist/ as one static file per system, named
+# <project>-<version>-<platform>[.exe], plus a sha256 checksums file. One build
+# per system: Windows x64, Linux x64 and 64-bit ARM for the Raspberry Pi.
+# The names are a contract: the updater inside the app and the hub page read
+# them, so they change only together with a release that reads the new names.
 # Requires only the Go toolchain (https://go.dev/dl/). Run: sh build.sh
 set -eu
 cd "$(dirname "$0")"
@@ -14,18 +15,13 @@ mkdir -p dist
 build() {
   out="dist/$project-$version-$3"
   echo "  $1/$2 -> $out"
-  CGO_ENABLED=0 GOOS=$1 GOARCH=$2 GOARM=${4:-} go build -trimpath -ldflags "-s -w" -o "$out" .
+  CGO_ENABLED=0 GOOS=$1 GOARCH=$2 go build -trimpath -ldflags "-s -w" -o "$out" .
 }
 
 echo "building $project $version:"
 build windows amd64 windows-amd64.exe
-build windows arm64 windows-arm64.exe
 build linux   amd64 linux-amd64
 build linux   arm64 linux-arm64            # Raspberry Pi 3/4/5 with a 64-bit OS
-build linux   arm   linux-armv6 6          # Raspberry Pi Zero/1/2 and 32-bit OS
-build darwin  arm64 macos-arm64
-build darwin  amd64 macos-amd64
-build android arm64 android-arm64          # runs inside Termux
 
 sums="$project-$version-checksums.txt"
 (

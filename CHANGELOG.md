@@ -22,5 +22,7 @@ release powstaje po merge do `master`, gdy ten numer jest wyższy od ostatniego 
 - Automatyczna aktualizacja z aplikacji: sprawdzanie raz dziennie (domyślnie wyłączone),
   pobranie pliku dla platformy z weryfikacją rozmiaru i SHA-256, podmiana binarki
   i restart.
+- Wydanie to jeden plik na system: Windows x64, Linux x64 i Raspberry Pi 64-bit, plus
+  plik z sumami SHA-256.
 - Proces wydawania: testy Go i JS w CI na każdym PR, release po merge do `master` gdy
   `VERSION.md` rośnie, kopia paczek do repozytorium Mysttic/Mysttic.

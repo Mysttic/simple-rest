@@ -88,8 +88,8 @@ jobs:
         run: |
           set -euo pipefail
           count=$(ls -1 dist | wc -l)
-          if [ "$count" -ne 9 ]; then
-            echo "::error::Expected 9 files in dist (8 binaries and the checksums), got $count."
+          if [ "$count" -ne 4 ]; then
+            echo "::error::Expected 4 files in dist (3 binaries and the checksums), got $count."
             exit 1
           fi
           gh release create "$TAG" dist/* \
@@ -133,8 +133,8 @@ jobs:
           gh release download "$TAG" --repo "$GITHUB_REPOSITORY" \
             --dir copy --pattern "$PROJECT-*"
           ls -la copy
-          if [ "$(ls -1 copy | wc -l)" -ne 9 ]; then
-            echo "::error::Expected nine files in release $TAG."
+          if [ "$(ls -1 copy | wc -l)" -ne 4 ]; then
+            echo "::error::Expected four files in release $TAG."
             exit 1
           fi
 
