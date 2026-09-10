@@ -50,17 +50,28 @@ EOF
 
 $py -m http.server "$hubport" --bind 127.0.0.1 --directory "$root/hub" > "$root/hub.log" 2>&1 &
 hubpid=$!
-"$exe" -no-browser -listen "127.0.0.1:$appport" -data "$root/app/data.json" \
-  -update-url "http://127.0.0.1:$hubport/releases" > "$root/app.log" 2>&1 &
-apppid=$!
+apppid=""
 
 cleanup() {
   kill "$hubpid" 2>/dev/null || true
-  kill "$apppid" 2>/dev/null || true
+  [ -n "$apppid" ] && kill "$apppid" 2>/dev/null || true
   if [ "$goos" = windows ]; then taskkill //F //IM "$project-e2e.exe" >/dev/null 2>&1 || true
   else pkill -f "$project-e2e" 2>/dev/null || true; fi
 }
 trap cleanup EXIT
+fail() { echo "FAIL: $*"; echo "--- app.log"; cat "$root/app.log" 2>/dev/null; echo "--- hub.log"; cat "$root/hub.log"; exit 1; }
+
+tries=60
+until curl -s -o /dev/null "http://127.0.0.1:$hubport/releases"; do
+  tries=$((tries - 1))
+  [ "$tries" -gt 0 ] || fail "the fake hub did not start on port $hubport"
+  sleep 0.25
+done
+echo "fake hub is up"
+
+"$exe" -no-browser -listen "127.0.0.1:$appport" -data "$root/app/data.json" \
+  -update-url "http://127.0.0.1:$hubport/releases" > "$root/app.log" 2>&1 &
+apppid=$!
 
 api="http://127.0.0.1:$appport/api"
 wait_for_version() {
@@ -72,7 +83,6 @@ wait_for_version() {
   done
   return 1
 }
-fail() { echo "FAIL: $*"; echo "--- app.log"; cat "$root/app.log"; echo "--- hub.log"; cat "$root/hub.log"; exit 1; }
 
 wait_for_version 0.9.0 30 || fail "the 0.9.0 copy did not start on port $appport"
 echo "0.9.0 is up"
