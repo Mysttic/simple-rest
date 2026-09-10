@@ -391,8 +391,6 @@ func openBrowser(u string) {
 		cmd = exec.Command("rundll32", "url.dll,FileProtocolHandler", u)
 	case "darwin":
 		cmd = exec.Command("open", u)
-	case "android":
-		cmd = exec.Command("termux-open-url", u)
 	default:
 		cmd = exec.Command("xdg-open", u)
 	}

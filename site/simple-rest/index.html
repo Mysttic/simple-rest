@@ -53,16 +53,10 @@
     </div>
 
     <div class="tile">
-      <h3>Windows on ARM</h3>
-      <p class="what">For Snapdragon laptops and other ARM64 machines.</p>
-      <a class="button" id="download-winarm" href="#" aria-disabled="true">Download for Windows ARM64</a>
-      <span class="size" id="size-winarm"></span>
-    </div>
-
-    <div class="tile">
       <h3>Linux</h3>
       <p class="what">
-        A static binary for any distribution. <code>chmod +x</code>, run, done.
+        A static binary for any distribution, nothing to install.
+        <code>chmod +x</code>, run, done.
       </p>
       <a class="button" id="download-linux" href="#" aria-disabled="true">Download for Linux x64</a>
       <span class="size" id="size-linux"></span>
@@ -71,38 +65,19 @@
     <div class="tile">
       <h3>Raspberry Pi</h3>
       <p class="what">
-        64-bit build for Pi 3, 4 and 5 on a 64-bit OS; the 32-bit build runs on
-        every Pi, the Zero included.
+        For a Pi 3, 4 or 5 running a 64-bit system. Start it there and reach the
+        UI from any machine on the network.
       </p>
-      <a class="button" id="download-rpi64" href="#" aria-disabled="true">Download for Pi (64-bit)</a>
-      <span class="size" id="size-rpi64"></span>
-      <a class="button" id="download-rpi32" href="#" aria-disabled="true">Download for Pi (32-bit)</a>
-      <span class="size" id="size-rpi32"></span>
-    </div>
-
-    <div class="tile">
-      <h3>macOS</h3>
-      <p class="what">Apple Silicon or Intel. Not notarised, so allow it once in System Settings.</p>
-      <a class="button" id="download-macarm" href="#" aria-disabled="true">Download for Apple Silicon</a>
-      <span class="size" id="size-macarm"></span>
-      <a class="button" id="download-macintel" href="#" aria-disabled="true">Download for Intel</a>
-      <span class="size" id="size-macintel"></span>
-    </div>
-
-    <div class="tile">
-      <h3>Android</h3>
-      <p class="what">
-        Runs inside Termux: copy the file into the Termux home directory,
-        <code>chmod +x</code>, start it and open <code>http://127.0.0.1:8787/</code>
-        in Chrome.
-      </p>
-      <a class="button" id="download-android" href="#" aria-disabled="true">Download for Android (Termux)</a>
-      <span class="size" id="size-android"></span>
+      <a class="button" id="download-rpi" href="#" aria-disabled="true">Download for Raspberry Pi (64-bit)</a>
+      <span class="size" id="size-rpi"></span>
     </div>
 
     <div class="tile">
       <h3>Checksums</h3>
-      <p class="what">SHA-256 of every file above, the same list the updater inside the app verifies against.</p>
+      <p class="what">
+        SHA-256 of the three files above, the same list the updater inside the
+        app verifies a download against.
+      </p>
       <a class="button" id="download-sums" href="#" aria-disabled="true">Download checksums</a>
       <span class="size" id="size-sums"></span>
     </div>
@@ -206,7 +181,7 @@
 <footer>
   <div class="wrap">
     <span>simple-rest, MIT licence</span>
-    <span>Windows 10 or 11, Linux, Raspberry Pi, macOS, Android with Termux</span>
+    <span>Windows 10 or 11, Linux, Raspberry Pi with a 64-bit system</span>
     <a href="../">More projects by Mysttic</a>
   </div>
 </footer>
@@ -219,13 +194,8 @@ initDownloads({
   tagPrefix: 'simple-rest-v',
   files: [
     { id: 'win', match: /-windows-amd64\.exe$/ },
-    { id: 'winarm', match: /-windows-arm64\.exe$/ },
     { id: 'linux', match: /-linux-amd64$/ },
-    { id: 'rpi64', match: /-linux-arm64$/ },
-    { id: 'rpi32', match: /-linux-armv6$/ },
-    { id: 'macarm', match: /-macos-arm64$/ },
-    { id: 'macintel', match: /-macos-amd64$/ },
-    { id: 'android', match: /-android-arm64$/ },
+    { id: 'rpi', match: /-linux-arm64$/ },
     { id: 'sums', match: /-checksums\.txt$/ }
   ]
 });

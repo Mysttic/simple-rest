@@ -109,25 +109,17 @@ func isNewer(candidate, running string) bool {
 // ---- platform and file names ------------------------------------------------------
 
 // platformSuffix maps GOOS/GOARCH to the platform part of a release file name.
-// The names are a contract shared with build.sh and the hub page.
+// The names are a contract shared with build.sh and the hub page. One build per
+// system, so anything else (macOS, 32-bit ARM, a self-built copy) gets an empty
+// suffix and is told there is no release file for it.
 func platformSuffix(goos, goarch string) string {
 	switch goos + "/" + goarch {
 	case "windows/amd64":
 		return "windows-amd64.exe"
-	case "windows/arm64":
-		return "windows-arm64.exe"
 	case "linux/amd64":
 		return "linux-amd64"
 	case "linux/arm64":
 		return "linux-arm64"
-	case "linux/arm":
-		return "linux-armv6"
-	case "darwin/arm64":
-		return "macos-arm64"
-	case "darwin/amd64":
-		return "macos-amd64"
-	case "android/arm64":
-		return "android-arm64"
 	}
 	return ""
 }

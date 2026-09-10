@@ -8,19 +8,22 @@ Pobieranie: https://mysttic.github.io/Mysttic/simple-rest/
 
 ## Uruchomienie
 
-Program otwiera przeglądarkę pod adresem `http://127.0.0.1:8787/`. Pliki nazywają się
-`simple-rest-<wersja>-<platforma>`.
+Program otwiera przeglądarkę pod adresem `http://127.0.0.1:8787/`. Jedno wydanie to trzy
+pliki, po jednym na system, plus sumy kontrolne.
 
 | System | Plik | Jak |
 |---|---|---|
-| Windows | `simple-rest-<wersja>-windows-amd64.exe` | dwuklik lub z konsoli |
-| Windows na ARM | `...-windows-arm64.exe` | jak wyżej |
-| Linux x64 | `...-linux-amd64` | `chmod +x plik && ./plik` |
-| Raspberry Pi (64-bit OS) | `...-linux-arm64` | jak wyżej |
-| Raspberry Pi (32-bit OS, Zero, Pi 1/2) | `...-linux-armv6` | jak wyżej |
-| macOS | `...-macos-arm64` / `...-macos-amd64` | jak wyżej |
-| Android (Termux) | `...-android-arm64` | skopiować do `~/` w Termuxie, `chmod +x`, uruchomić, otworzyć `http://127.0.0.1:8787/` w Chrome |
-| Android bez Termuxa | dowolna binarka na PC | uruchomić na PC z `-listen 0.0.0.0:8787`, na telefonie otworzyć `http://<ip-pc>:8787/` |
+| Windows x64 | `simple-rest-<wersja>-windows-amd64.exe` | dwuklik lub z konsoli |
+| Linux x64 | `simple-rest-<wersja>-linux-amd64` | `chmod +x plik && ./plik` |
+| Raspberry Pi (system 64-bit) | `simple-rest-<wersja>-linux-arm64` | jak wyżej |
+
+Z innego urządzenia w sieci (telefon, tablet, druga maszyna) wystarczy uruchomić program
+z `-listen 0.0.0.0:8787` i wejść na `http://<ip-maszyny>:8787/`. Interfejs jest zwykłą
+stroną, więc działa na każdym systemie z przeglądarką, także tam, gdzie nie ma binarki.
+
+Inne systemy (macOS, Windows na ARM, 32-bitowe Raspberry Pi) nie mają gotowego pliku, ale
+budują się jedną komendą, patrz „Budowanie”. Taka kopia mówi w ustawieniach, że nie ma dla
+niej pliku wydania, i nie próbuje się aktualizować.
 
 Flagi:
 
@@ -66,7 +69,8 @@ Ustawienia (ikona koła zębatego), sekcja Updates:
   na tym samym porcie. Strona w przeglądarce czeka na nową wersję i sama się przeładowuje.
   Na Windows stary plik zostaje chwilowo jako `.exe.old` i jest usuwany przy starcie.
 - Kopia, która nie może się zaktualizować (katalog bez prawa zapisu, uruchomienie przez
-  `go run`, brak pliku dla platformy), mówi to wprost i linkuje do strony pobierania.
+  `go run`, brak pliku wydania dla tego systemu), mówi to wprost i linkuje do strony
+  pobierania.
 - Stan updatera trzymany jest w `simple-rest-update.json` obok pliku danych.
 
 Pełne przejście ścieżki na prawdziwej binarce (kopia 0.9.0, fałszywy hub, podmiana,
@@ -87,11 +91,17 @@ wersji jest wkompilowany z `VERSION.md`.
 go build -ldflags "-s -w" -o simple-rest.exe .
 ```
 
-Wszystkie platformy naraz do `dist/` (osiem binarek i plik z sumami SHA-256):
+Całe wydanie do `dist/` (trzy binarki i plik z sumami SHA-256):
 
 ```
 sh build.sh        # Linux/macOS/Git Bash
 build.cmd          # Windows cmd
+```
+
+Dla systemu spoza tej trójki wystarczy podać cel Go, na przykład macOS na Apple Silicon:
+
+```
+CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build -ldflags "-s -w" -o simple-rest .
 ```
 
 Kopia zgłaszająca inny numer, do testów updatera:
@@ -142,7 +152,7 @@ Strona projektu na hubie leży gotowa w `site/simple-rest/`; jak ją podpiąć o
 
 ## Tryb bez binarki
 
-`ui.html` otwarty bezpośrednio w przeglądarce (także na Androidzie) też działa, ale wtedy
+`ui.html` otwarty bezpośrednio w przeglądarce też działa, ale wtedy
 zapytania wysyła przeglądarka: serwer docelowy musi zezwalać na CORS, opcje TLS i cookies
 są ignorowane, dane trzymane są w localStorage tej przeglądarki, a sekcja aktualizacji
 jest ukryta.

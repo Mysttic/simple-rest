@@ -71,10 +71,12 @@ func TestIsNewer(t *testing.T) {
 
 func TestPlatformSuffix(t *testing.T) {
 	cases := map[string]string{
-		"windows/amd64": "windows-amd64.exe", "windows/arm64": "windows-arm64.exe",
-		"linux/amd64": "linux-amd64", "linux/arm64": "linux-arm64", "linux/arm": "linux-armv6",
-		"darwin/arm64": "macos-arm64", "darwin/amd64": "macos-amd64", "android/arm64": "android-arm64",
-		"plan9/386": "", "linux/riscv64": "",
+		"windows/amd64": "windows-amd64.exe",
+		"linux/amd64":   "linux-amd64",
+		"linux/arm64":   "linux-arm64",
+		// One build per system: everything else has no release file.
+		"windows/arm64": "", "linux/arm": "", "darwin/arm64": "", "darwin/amd64": "",
+		"android/arm64": "", "plan9/386": "", "linux/riscv64": "",
 	}
 	for in, want := range cases {
 		goos, goarch, _ := strings.Cut(in, "/")
@@ -133,7 +135,9 @@ func TestPickRelease(t *testing.T) {
 		t.Errorf("notes not trimmed: %q", got.Notes)
 	}
 
-	other, err := pickRelease(releases, "linux-armv6")
+	// A system whose file is not in this release: the version, the notes and the
+	// page still come back, only the asset is missing.
+	other, err := pickRelease(releases, "linux-arm64")
 	if err != nil || other.Version != "1.1.0" || other.AssetName != "" {
 		t.Errorf("a platform without a file should still yield the version: %+v, %v", other, err)
 	}

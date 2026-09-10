@@ -25,8 +25,6 @@ Podpięcie (jednorazowo, w repozytorium Mysttic/Mysttic):
         <span>Windows</span>
         <span>Linux</span>
         <span>Raspberry Pi</span>
-        <span>macOS</span>
-        <span>Android</span>
       </div>
       <span class="go">See it and download →</span>
     </a>

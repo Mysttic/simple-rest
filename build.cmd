@@ -1,5 +1,5 @@
 @echo off
-rem Cross-compiles simple-rest into dist\ as one static file per platform
+rem Cross-compiles simple-rest into dist\ as one static file per system
 rem (Windows host), named <project>-<version>-<platform>[.exe], plus a sha256
 rem checksums file in sha256sum format. Same output as build.sh.
 setlocal
@@ -12,15 +12,8 @@ mkdir dist
 set CGO_ENABLED=0
 echo building %PROJECT% %VERSION%:
 call :build windows amd64 windows-amd64.exe
-call :build windows arm64 windows-arm64.exe
 call :build linux   amd64 linux-amd64
 call :build linux   arm64 linux-arm64
-set GOARM=6
-call :build linux   arm   linux-armv6
-set GOARM=
-call :build darwin  arm64 macos-arm64
-call :build darwin  amd64 macos-amd64
-call :build android arm64 android-arm64
 powershell -NoProfile -Command "Get-ChildItem 'dist\%PROJECT%-*' | Where-Object { $_.Name -notlike '*-checksums.txt' } | ForEach-Object { (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLower() + '  ' + $_.Name } | Set-Content -Encoding ascii 'dist\%PROJECT%-%VERSION%-checksums.txt'"
 echo   checksums -^> dist\%PROJECT%-%VERSION%-checksums.txt
 dir dist
