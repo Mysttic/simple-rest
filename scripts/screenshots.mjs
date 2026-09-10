@@ -1,0 +1,289 @@
+// Captures the screenshots used by the project page in site/simple-rest/.
+//
+// It builds the app, starts two copies with prepared data (one current, one
+// reporting 0.9.0 against a fake hub so the update card has something to show),
+// drives a headless Edge or Chrome over the DevTools protocol and writes the
+// PNGs. No dependencies: Node's own WebSocket talks to the browser.
+//
+// Run: node scripts/screenshots.mjs        (needs Go and Edge or Chrome)
+import { spawn, spawnSync } from 'node:child_process';
+import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync } from 'node:fs';
+import { createServer } from 'node:http';
+import { setTimeout as sleep } from 'node:timers/promises';
+import { fileURLToPath } from 'node:url';
+import path from 'node:path';
+
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const work = path.join(root, '.e2e', 'shots');
+const outDir = path.join(root, 'site', 'simple-rest', 'img');
+const APP_PORT = 8795, OLD_PORT = 8796, HUB_PORT = 8797, CDP_PORT = 9333;
+const WIDTH = 1600, HEIGHT = 1000;
+const exe = n => (process.platform === 'win32' ? n + '.exe' : n);
+
+const BROWSERS = [
+  'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe',
+  'C:/Program Files/Google/Chrome/Application/chrome.exe',
+  'C:/Program Files (x86)/Google/Chrome/Application/chrome.exe',
+  '/usr/bin/google-chrome', '/usr/bin/chromium', '/usr/bin/microsoft-edge',
+  '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
+];
+
+// ---- the state the screenshots show ------------------------------------------------
+const ENV_ID = 'env-github';
+const req = (id, name, method, url, over = {}) => ({ id, name, method, url, ...over });
+const demoData = {
+  version: 1,
+  activeEnv: ENV_ID,
+  envs: [
+    { id: ENV_ID, name: 'github', vars: [
+      { enabled: true, name: 'base', value: 'https://api.github.com' },
+      { enabled: true, name: 'owner', value: 'Mysttic' },
+      { enabled: true, name: 'repo', value: 'Mysttic' },
+      { enabled: true, name: 'token', value: 'ghp_tu_wklej_swoj_token' },
+      { enabled: false, name: 'base', value: 'http://localhost:3000' },
+    ] },
+    { id: 'env-local', name: 'local', vars: [
+      { enabled: true, name: 'base', value: 'http://localhost:3000' },
+      { enabled: true, name: 'owner', value: 'me' },
+    ] },
+  ],
+  collections: [
+    { id: 'c1', name: 'GitHub API', open: true, requests: [
+      req('r1', 'Repository', 'GET', '{{base}}/repos/{{owner}}/{{repo}}'),
+      req('r2', 'Releases', 'GET', '{{base}}/repos/{{owner}}/{{repo}}/releases?per_page=30'),
+      req('r3', 'Create issue', 'POST', '{{base}}/repos/{{owner}}/{{repo}}/issues', {
+        body: { mode: 'raw', rawType: 'json', form: [], raw: '{\n  "title": "Nie da sie zapisac kolekcji",\n  "labels": ["bug"]\n}' },
+        auth: { type: 'bearer', token: '{{token}}', username: '', password: '', keyName: '', keyValue: '', keyIn: 'header' },
+        headers: [{ enabled: true, name: 'Accept', value: 'application/vnd.github+json' }],
+      }),
+      req('r4', 'Update issue', 'PATCH', '{{base}}/repos/{{owner}}/{{repo}}/issues/7'),
+      req('r5', 'Close issue', 'DELETE', '{{base}}/repos/{{owner}}/{{repo}}/issues/7/labels/bug'),
+    ] },
+    { id: 'c2', name: 'Local API', open: false, requests: [
+      req('r6', 'Health', 'GET', '{{base}}/health'),
+      req('r7', 'Login', 'POST', '{{base}}/auth/login'),
+    ] },
+  ],
+  history: [],
+  settings: { timeoutMs: 30000, followRedirects: true, verifyTls: true, cookies: true, history: true },
+};
+
+// ---- a hub with one release, for the update card ---------------------------------------
+function fakeHub() {
+  const version = '1.1.0';
+  const asset = `simple-rest-${version}-${process.platform === 'win32' ? 'windows-amd64.exe' : 'linux-amd64'}`;
+  const body = JSON.stringify([{
+    tag_name: `simple-rest-v${version}`, draft: false, prerelease: false,
+    published_at: new Date().toISOString(), html_url: 'https://example.invalid/release',
+    body: `simple-rest ${version}\n\nhttps://mysttic.github.io/Mysttic/simple-rest/`,
+    assets: [
+      { name: asset, size: 7159296, browser_download_url: `http://127.0.0.1:${HUB_PORT}/dl/${asset}` },
+      { name: `simple-rest-${version}-checksums.txt`, size: 294, browser_download_url: `http://127.0.0.1:${HUB_PORT}/dl/sums` },
+    ],
+  }]);
+  const srv = createServer((r, w) => {
+    w.writeHead(r.url.startsWith('/releases') ? 200 : 404, { 'Content-Type': 'application/json' });
+    w.end(r.url.startsWith('/releases') ? body : '[]');
+  });
+  return new Promise(res => srv.listen(HUB_PORT, '127.0.0.1', () => res(srv)));
+}
+
+// ---- a small DevTools protocol client ------------------------------------------------------
+class CDP {
+  constructor(ws) {
+    this.ws = ws; this.next = 1; this.waiting = new Map(); this.listeners = new Set();
+    ws.addEventListener('message', e => {
+      const msg = JSON.parse(e.data);
+      if (msg.id && this.waiting.has(msg.id)) {
+        const { resolve, reject } = this.waiting.get(msg.id);
+        this.waiting.delete(msg.id);
+        msg.error ? reject(new Error(msg.error.message)) : resolve(msg.result);
+      } else if (msg.method) {
+        for (const fn of this.listeners) fn(msg);
+      }
+    });
+  }
+  static async open(url) {
+    const ws = new WebSocket(url);
+    await new Promise((res, rej) => { ws.addEventListener('open', res); ws.addEventListener('error', () => rej(new Error('cannot reach ' + url))); });
+    return new CDP(ws);
+  }
+  send(method, params = {}, sessionId) {
+    const id = this.next++;
+    return new Promise((resolve, reject) => {
+      this.waiting.set(id, { resolve, reject });
+      this.ws.send(JSON.stringify({ id, method, params, ...(sessionId ? { sessionId } : {}) }));
+    });
+  }
+  once(method) {
+    return new Promise(res => {
+      const fn = m => { if (m.method === method) { this.listeners.delete(fn); res(m.params); } };
+      this.listeners.add(fn);
+    });
+  }
+}
+
+class Page {
+  constructor(cdp, sessionId) { this.cdp = cdp; this.sid = sessionId; }
+  cmd(method, params) { return this.cdp.send(method, params, this.sid); }
+  async goto(url) {
+    const loaded = this.cdp.once('Page.loadEventFired');
+    await this.cmd('Page.navigate', { url });
+    await loaded;
+  }
+  async eval(expression) {
+    const r = await this.cmd('Runtime.evaluate', { expression, awaitPromise: true, returnByValue: true });
+    if (r.exceptionDetails) throw new Error(r.exceptionDetails.exception?.description || 'evaluate failed');
+    return r.result.value;
+  }
+  async until(expression, what, tries = 100) {
+    for (let i = 0; i < tries; i++) {
+      if (await this.eval(`!!(${expression})`)) return;
+      await sleep(100);
+    }
+    throw new Error('timed out waiting for ' + what);
+  }
+  // shot writes a PNG. With `clip` it crops to that element plus `pad`; with
+  // `fromTop` it keeps the full width from the top of the window down to the
+  // bottom of the element, which is how the toolbar stays in the picture.
+  async shot(file, { clip: selector, pad = 24, padTop = null, fromTop = false } = {}) {
+    let clip;
+    if (selector) {
+      const top = padTop ?? pad;
+      const b = await this.eval(`(() => { const b = document.querySelector(${JSON.stringify(selector)}).getBoundingClientRect();
+        return { x: b.x, y: b.y, width: b.width, height: b.height, bottom: b.bottom }; })()`);
+      clip = fromTop
+        ? { x: 0, y: 0, width: WIDTH, height: Math.ceil(b.bottom) + 8, scale: 1 }
+        : { x: Math.max(0, b.x - pad), y: Math.max(0, b.y - top), width: b.width + pad * 2, height: b.height + top + pad, scale: 1 };
+    }
+    const { data } = await this.cmd('Page.captureScreenshot', { format: 'png', ...(clip ? { clip } : {}) });
+    writeFileSync(file, Buffer.from(data, 'base64'));
+    console.log('  ' + path.relative(root, file));
+  }
+}
+
+// ---- running things ------------------------------------------------------------------------------
+const children = [];
+function start(cmd, args, name) {
+  const p = spawn(cmd, args, { cwd: root, stdio: ['ignore', 'pipe', 'pipe'] });
+  p.stderr.on('data', d => process.env.VERBOSE && console.log(`[${name}] ${d}`));
+  children.push(p);
+  return p;
+}
+async function waitForHTTP(url, what) {
+  for (let i = 0; i < 120; i++) {
+    try { const r = await fetch(url); if (r.ok) return await r.json().catch(() => ({})); } catch {}
+    await sleep(250);
+  }
+  throw new Error(what + ' did not come up: ' + url);
+}
+function cleanup() {
+  for (const p of children) { try { p.kill(); } catch {} }
+  if (process.platform === 'win32') {
+    for (const n of ['simple-rest-shots.exe', 'simple-rest-shots-old.exe']) {
+      spawnSync('taskkill', ['/F', '/IM', n], { stdio: 'ignore' });
+    }
+  }
+}
+
+async function main() {
+  const browser = BROWSERS.find(existsSync);
+  if (!browser) throw new Error('no Edge or Chrome found, add its path to BROWSERS');
+
+  rmSync(work, { recursive: true, force: true });
+  mkdirSync(work, { recursive: true });
+  mkdirSync(outDir, { recursive: true });
+
+  console.log('building');
+  for (const [out, flags] of [[exe('simple-rest-shots'), []], [exe('simple-rest-shots-old'), ['-ldflags', '-X main.versionOverride=0.9.0']]]) {
+    const r = spawnSync('go', ['build', ...flags, '-o', path.join(work, out), '.'], { cwd: root, stdio: 'inherit' });
+    if (r.status !== 0) throw new Error('go build failed');
+  }
+  const dataFile = path.join(work, 'app-data.json');
+  writeFileSync(dataFile, JSON.stringify(demoData));
+
+  console.log('starting the app, an older copy and a fake hub');
+  const hub = await fakeHub();
+  start(path.join(work, exe('simple-rest-shots')), ['-no-browser', '-listen', `127.0.0.1:${APP_PORT}`, '-data', dataFile], 'app');
+  start(path.join(work, exe('simple-rest-shots-old')), ['-no-browser', '-listen', `127.0.0.1:${OLD_PORT}`,
+    '-data', path.join(work, 'old-data.json'), '-update-url', `http://127.0.0.1:${HUB_PORT}/releases`], 'old');
+  await waitForHTTP(`http://127.0.0.1:${APP_PORT}/api/info`, 'the app');
+  await waitForHTTP(`http://127.0.0.1:${OLD_PORT}/api/info`, 'the older copy');
+
+  const profile = path.join(work, 'browser-profile');
+  start(browser, ['--headless=new', `--remote-debugging-port=${CDP_PORT}`, `--user-data-dir=${profile}`,
+    '--no-first-run', '--no-default-browser-check', '--disable-gpu', '--hide-scrollbars',
+    `--window-size=${WIDTH},${HEIGHT}`, 'about:blank'], 'browser');
+  const version = await waitForHTTP(`http://127.0.0.1:${CDP_PORT}/json/version`, 'the browser');
+  const cdp = await CDP.open(version.webSocketDebuggerUrl);
+  const { targetId } = await cdp.send('Target.createTarget', { url: 'about:blank' });
+  const { sessionId } = await cdp.send('Target.attachToTarget', { targetId, flatten: true });
+  const page = new Page(cdp, sessionId);
+  await page.cmd('Page.enable');
+  await page.cmd('Runtime.enable');
+  await page.cmd('Emulation.setDeviceMetricsOverride', { width: WIDTH, height: HEIGHT, deviceScaleFactor: 1, mobile: false });
+
+  console.log('capturing');
+
+  // 1. The main view: collections, an environment, a real answer with coloured JSON.
+  await page.goto(`http://127.0.0.1:${APP_PORT}/`);
+  await page.until(`document.querySelector('#url')`, 'the UI');
+  await page.eval(`(() => {
+    const items = [...document.querySelectorAll('#collList .item')];
+    items.find(i => i.textContent.includes('Repository')).click();
+  })()`);
+  await page.until(`document.querySelector('#url').value.includes('repos')`, 'the request to load');
+  await page.eval(`document.querySelector('#sendBtn').click()`);
+  await page.until(`/^\\d/.test(document.querySelector('#respStatus').textContent)`, 'the response', 200);
+  const status = await page.eval(`document.querySelector('#respStatus').textContent`);
+  if (!status.startsWith('200')) throw new Error('the demo request answered ' + status + ' (network?)');
+  // Give the answer most of the window, the way anyone reading a response would.
+  await page.eval(`document.documentElement.style.setProperty('--req-h', '250px')`);
+  await sleep(300);
+  await page.shot(path.join(outDir, 'promo.png'));
+
+  // 2. The request editor: body, variables, auth. Cropped to the editor, so no
+  // answer to the previous request hangs underneath it.
+  await page.eval(`(() => {
+    [...document.querySelectorAll('#collList .item')].find(i => i.textContent.includes('Create issue')).click();
+  })()`);
+  await page.until(`document.querySelector('#method').value === 'POST'`, 'the POST request');
+  await page.eval(`document.querySelector('[data-tab="body"]').click()`);
+  await page.eval(`document.documentElement.style.setProperty('--req-h', '430px')`);
+  await sleep(250);
+  await page.shot(path.join(outDir, 'request.png'), { clip: '.request', fromTop: true });
+
+  // 3. Environments with their variables.
+  await page.eval(`document.querySelector('#envBtn').click()`);
+  await page.until(`document.querySelector('#envModal.open')`, 'the environments window');
+  await sleep(250);
+  await page.shot(path.join(outDir, 'environments.png'), { clip: '#envModal .modal' });
+  await page.eval(`document.querySelector('#envModal [data-close]').click()`);
+
+  // 4. The update card, on the copy that reports 0.9.0.
+  await page.goto(`http://127.0.0.1:${OLD_PORT}/`);
+  await page.until(`document.querySelector('#settingsBtn')`, 'the older copy');
+  await page.eval(`document.querySelector('#settingsBtn').click()`);
+  await page.until(`document.querySelector('#settingsModal.open')`, 'the settings window');
+  await page.eval(`document.querySelector('#updCheckBtn').click()`);
+  await page.until(`document.querySelector('#updInstallBtn')`, 'the update card');
+  await sleep(250);
+  // Only the Updates part: the rest of the dialog carries this machine's paths.
+  await page.shot(path.join(outDir, 'update.png'), { clip: '#updSection', pad: 20, padTop: 2 });
+
+  hub.close();
+  console.log('done');
+}
+
+process.on('exit', cleanup);
+process.on('SIGINT', () => { cleanup(); process.exit(130); });
+try {
+  await main();
+  cleanup();
+  process.exit(0);
+} catch (e) {
+  console.error('FAIL: ' + e.message);
+  cleanup();
+  process.exit(1);
+}

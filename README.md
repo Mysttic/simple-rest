@@ -4,7 +4,7 @@ Minimalny klient REST w stylu Postmana: jeden plik binarny, bez instalacji, bez 
 bez zależności. Interfejs działa w przeglądarce, ale zapytania HTTP wykonuje sam program,
 więc nie obowiązują ograniczenia CORS przeglądarki.
 
-Pobieranie: https://mysttic.github.io/Mysttic/simple-rest/
+![simple-rest: kolekcja po lewej, odpowiedź JSON na całe okno](site/simple-rest/img/promo.png)
 
 ## Uruchomienie
 
@@ -116,7 +116,12 @@ CI musi przejść.
 go test ./... -count=1                 # serwer, proxy, guard, updater (z fałszywym hubem)
 node --test "tests/**/*.test.mjs"      # czyste funkcje UI: params/URL, zmienne, auth, import Postman, cURL
 sh scripts/e2e-update.sh               # ścieżka aktualizacji end to end na prawdziwej binarce
+node scripts/screenshots.mjs           # zrzuty do site/simple-rest/img/ (Edge albo Chrome)
 ```
+
+`scripts/screenshots.mjs` buduje aplikację, uruchamia ją z przykładową kolekcją i drugą
+kopią zgłaszającą starszą wersję, po czym robi zrzuty przez protokół DevTools. Dzięki temu
+obrazki na stronie są prawdziwe i odtwarzalne po każdej zmianie interfejsu.
 
 Workflow `CI` (`.github/workflows/ci.yml`) uruchamia to wszystko na każdym PR do `develop`
 i `master` oraz przy push do `develop`, do tego `gofmt`, `go vet` i build wszystkich
