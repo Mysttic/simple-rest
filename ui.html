@@ -1,0 +1,1073 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>simple-rest</title>
+<style>
+:root {
+  --bg: #1b1c1f; --bg2: #232428; --bg3: #2b2d32; --bg4: #34373d; --line: #3b3e45;
+  --fg: #e8e8ea; --fg2: #9a9ea8; --acc: #4f8cff; --acc2: #3a6fd8;
+  --ok: #3fb950; --warn: #d29922; --err: #f85149; --info: #58a6ff; --purple: #b083f0;
+  --mono: ui-monospace, "Cascadia Mono", Consolas, Menlo, monospace;
+  --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --sidebar-w: 280px;
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; }
+body {
+  background: var(--bg); color: var(--fg); font: 13px/1.4 var(--sans);
+  display: grid; grid-template-rows: 44px 1fr; grid-template-columns: var(--sidebar-w) 1fr; height: 100vh; overflow: hidden;
+}
+button, input, select, textarea { font: inherit; color: inherit; }
+button {
+  background: var(--bg3); border: 1px solid var(--line); border-radius: 5px; padding: 5px 10px; cursor: pointer; white-space: nowrap;
+}
+button:hover { background: var(--bg4); }
+button.primary { background: var(--acc); border-color: var(--acc); color: #fff; font-weight: 600; }
+button.primary:hover { background: var(--acc2); }
+button.danger:hover { background: var(--err); border-color: var(--err); color: #fff; }
+button.icon { padding: 3px 7px; background: transparent; border-color: transparent; color: var(--fg2); }
+button.icon:hover { color: var(--fg); background: var(--bg4); }
+button:disabled { opacity: .5; cursor: default; }
+input[type=text], input[type=password], input[type=number], select, textarea {
+  background: var(--bg2); border: 1px solid var(--line); border-radius: 5px; padding: 5px 8px; outline: none; min-width: 0;
+}
+input:focus, select:focus, textarea:focus { border-color: var(--acc); }
+textarea { font-family: var(--mono); resize: vertical; }
+a { color: var(--info); }
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-thumb { background: var(--bg4); border-radius: 5px; }
+
+/* top bar */
+.topbar {
+  grid-column: 1 / -1; display: flex; align-items: center; gap: 8px; padding: 0 12px;
+  background: var(--bg2); border-bottom: 1px solid var(--line);
+}
+.topbar .brand { font-weight: 700; letter-spacing: .3px; margin-right: 6px; }
+.topbar .brand span { color: var(--acc); }
+.topbar .spacer { flex: 1; }
+.badge { font-size: 11px; padding: 2px 7px; border-radius: 10px; background: var(--bg4); color: var(--fg2); }
+.badge.warn { background: #4a3a10; color: var(--warn); }
+#menuBtn { display: none; }
+
+/* sidebar */
+.sidebar { background: var(--bg2); border-right: 1px solid var(--line); display: flex; flex-direction: column; min-height: 0; }
+.sidebar .tabs { display: flex; border-bottom: 1px solid var(--line); }
+.tabs button {
+  background: transparent; border: 0; border-bottom: 2px solid transparent; border-radius: 0; padding: 8px 12px; color: var(--fg2);
+}
+.tabs button.active { color: var(--fg); border-bottom-color: var(--acc); }
+.sidebar .search { padding: 8px; border-bottom: 1px solid var(--line); display: flex; gap: 6px; }
+.sidebar .search input { flex: 1; }
+.sidebar .list { flex: 1; overflow: auto; padding: 4px 0; }
+.coll { user-select: none; }
+.coll > .row { padding: 6px 10px; font-weight: 600; display: flex; align-items: center; gap: 6px; cursor: pointer; }
+.coll > .row .caret { color: var(--fg2); width: 12px; display: inline-block; font-size: 10px; }
+.coll.closed .items { display: none; }
+.item { padding: 5px 10px 5px 26px; display: flex; align-items: center; gap: 8px; cursor: pointer; }
+.item:hover, .coll > .row:hover { background: var(--bg3); }
+.item.active { background: var(--bg4); }
+.item .name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.item .url { color: var(--fg2); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.row .actions, .item .actions { display: none; gap: 2px; }
+.row:hover .actions, .item:hover .actions { display: flex; }
+.method { font-family: var(--mono); font-size: 10px; font-weight: 700; width: 46px; text-align: center; flex: none; }
+.m-GET { color: var(--ok); } .m-POST { color: var(--warn); } .m-PUT { color: var(--info); }
+.m-PATCH { color: var(--purple); } .m-DELETE { color: var(--err); } .m-HEAD, .m-OPTIONS { color: var(--fg2); }
+.empty { color: var(--fg2); padding: 20px; text-align: center; }
+.hist .item { padding-left: 10px; flex-wrap: wrap; }
+.hist .item .when { color: var(--fg2); font-size: 11px; flex: none; }
+
+/* work area */
+.work { display: flex; flex-direction: column; min-height: 0; min-width: 0; }
+.request { height: var(--req-h, 46%); min-height: 120px; display: flex; flex-direction: column; overflow: hidden; }
+.splitter { height: 6px; background: var(--bg2); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); cursor: row-resize; flex: none; }
+.response { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.bar { display: flex; align-items: center; gap: 8px; padding: 8px 12px; }
+.bar.name { padding-bottom: 0; }
+#reqName { flex: 1; background: transparent; border-color: transparent; font-weight: 600; font-size: 14px; }
+#reqName:hover, #reqName:focus { border-color: var(--line); background: var(--bg2); }
+#dirty { color: var(--warn); font-size: 18px; line-height: 1; visibility: hidden; }
+#dirty.on { visibility: visible; }
+#method { width: 100px; font-family: var(--mono); font-weight: 700; }
+#url { flex: 1; font-family: var(--mono); }
+.tabs.inner { padding: 0 12px; border-bottom: 1px solid var(--line); }
+.tabs .count { color: var(--acc); font-size: 11px; margin-left: 3px; }
+.panel { display: none; overflow: auto; flex: 1; padding: 8px 12px; }
+.panel.active { display: block; }
+.panel.stretch.active { display: flex; flex-direction: column; }
+
+/* key/value tables */
+table.kv { width: 100%; border-collapse: collapse; }
+table.kv td { padding: 2px 3px; border-bottom: 1px solid var(--line); }
+table.kv td:first-child { width: 26px; text-align: center; }
+table.kv td:last-child { width: 30px; text-align: center; }
+table.kv input[type=text] { width: 100%; background: transparent; border-color: transparent; padding: 4px 6px; font-family: var(--mono); font-size: 12px; }
+table.kv input[type=text]:focus { background: var(--bg2); border-color: var(--acc); }
+table.kv tr.off input[type=text] { color: var(--fg2); text-decoration: line-through; }
+table.kv th { text-align: left; font-weight: 500; color: var(--fg2); font-size: 11px; padding: 2px 9px; }
+.opts { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin-bottom: 8px; }
+.opts label { display: flex; align-items: center; gap: 5px; }
+.grid { display: grid; grid-template-columns: 140px 1fr; gap: 8px 12px; align-items: center; max-width: 620px; }
+#bodyRaw { flex: 1; min-height: 100px; width: 100%; font-size: 12px; }
+.hint { color: var(--fg2); font-size: 12px; }
+
+/* response */
+.status { display: flex; gap: 14px; align-items: center; padding: 8px 12px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+.status .code { font-weight: 700; font-family: var(--mono); }
+.status .meta { color: var(--fg2); font-family: var(--mono); font-size: 12px; }
+.c2 { color: var(--ok); } .c3 { color: var(--info); } .c4 { color: var(--warn); } .c5, .cX { color: var(--err); }
+.resptabs { display: flex; align-items: center; border-bottom: 1px solid var(--line); padding-right: 8px; }
+.resptabs .tabs { flex: 1; }
+.resptabs .sub { display: flex; gap: 2px; margin-right: 8px; }
+.resptabs .sub button { padding: 2px 8px; font-size: 12px; background: transparent; border-color: transparent; color: var(--fg2); }
+.resptabs .sub button.active { background: var(--bg4); color: var(--fg); }
+.respbody { flex: 1; overflow: auto; min-height: 0; }
+pre.out { margin: 0; padding: 10px 12px; font: 12px/1.5 var(--mono); white-space: pre; tab-size: 2; }
+pre.out.wrap { white-space: pre-wrap; word-break: break-all; }
+pre.out .k { color: #7dcfff; } pre.out .s { color: #9ece6a; } pre.out .n { color: #ff9e64; }
+pre.out .b { color: #bb9af7; } pre.out .x { color: #f7768e; }
+.err { color: var(--err); padding: 12px; font-family: var(--mono); white-space: pre-wrap; }
+table.hdrs { border-collapse: collapse; width: 100%; font: 12px var(--mono); }
+table.hdrs td { padding: 4px 12px; border-bottom: 1px solid var(--line); vertical-align: top; word-break: break-all; }
+table.hdrs td:first-child { color: var(--info); white-space: nowrap; width: 1%; }
+iframe.preview { width: 100%; height: 100%; border: 0; background: #fff; }
+img.preview { max-width: 100%; padding: 12px; }
+
+/* modals */
+.modal-bg { position: fixed; inset: 0; background: rgba(0,0,0,.55); display: none; align-items: center; justify-content: center; z-index: 10; }
+.modal-bg.open { display: flex; }
+.modal { background: var(--bg2); border: 1px solid var(--line); border-radius: 8px; width: min(760px, 94vw); max-height: 90vh; display: flex; flex-direction: column; }
+.modal header { display: flex; align-items: center; gap: 8px; padding: 10px 14px; border-bottom: 1px solid var(--line); font-weight: 600; }
+.modal header .spacer { flex: 1; }
+.modal .body { padding: 12px 14px; overflow: auto; }
+.modal footer { padding: 10px 14px; border-top: 1px solid var(--line); display: flex; gap: 8px; justify-content: flex-end; }
+.envlayout { display: grid; grid-template-columns: 200px 1fr; gap: 12px; min-height: 300px; }
+.envlist { border-right: 1px solid var(--line); padding-right: 8px; }
+.envlist .item { padding-left: 8px; }
+.toast { position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%); background: var(--bg4); border: 1px solid var(--line); padding: 8px 14px; border-radius: 6px; opacity: 0; transition: opacity .2s; pointer-events: none; z-index: 20; }
+.toast.show { opacity: 1; }
+.spin { display: inline-block; width: 12px; height: 12px; border: 2px solid #fff; border-right-color: transparent; border-radius: 50%; animation: spin .7s linear infinite; vertical-align: -2px; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+@media (max-width: 800px) {
+  body { grid-template-columns: 1fr; }
+  .sidebar { position: fixed; top: 44px; bottom: 0; left: 0; width: min(320px, 85vw); z-index: 5; transform: translateX(-100%); transition: transform .15s; }
+  .sidebar.open { transform: none; box-shadow: 0 0 30px rgba(0,0,0,.6); }
+  #menuBtn { display: inline-block; }
+  .topbar .hide-sm { display: none; }
+  .envlayout { grid-template-columns: 1fr; }
+  .envlist { border: 0; padding: 0; }
+}
+</style>
+</head>
+<body>
+<header class="topbar">
+  <button id="menuBtn" class="icon" title="Collections">&#9776;</button>
+  <div class="brand">simple<span>-rest</span></div>
+  <span id="modeBadge" class="badge">...</span>
+  <div class="spacer"></div>
+  <select id="envSelect" title="Active environment"><option value="">No environment</option></select>
+  <button id="envBtn" title="Manage environments">Environments</button>
+  <button id="importBtn" class="hide-sm" title="Import collections / environments (own JSON or Postman v2.1)">Import</button>
+  <button id="exportBtn" class="hide-sm" title="Export collections and environments to JSON">Export</button>
+  <button id="settingsBtn" class="icon" title="Settings">&#9881;</button>
+  <input type="file" id="importFile" accept=".json,application/json" multiple hidden>
+</header>
+
+<aside class="sidebar" id="sidebar">
+  <div class="tabs">
+    <button data-side="coll" class="active">Collections</button>
+    <button data-side="hist">History</button>
+  </div>
+  <div class="search">
+    <input type="text" id="sideSearch" placeholder="Filter...">
+    <button id="addCollBtn" title="New collection">+</button>
+    <button id="clearHistBtn" class="danger" title="Clear history" hidden>Clear</button>
+  </div>
+  <div class="list" id="collList"></div>
+  <div class="list hist" id="histList" hidden></div>
+</aside>
+
+<main class="work">
+  <section class="request">
+    <div class="bar name">
+      <span id="dirty" title="Unsaved changes">&#9679;</span>
+      <input type="text" id="reqName" placeholder="Untitled request">
+      <button id="newBtn" title="New request (clears the editor)">New</button>
+      <button id="saveBtn" title="Save (Ctrl+S)">Save</button>
+      <button id="saveAsBtn" title="Save as a new request in a collection">Save as</button>
+    </div>
+    <div class="bar">
+      <select id="method">
+        <option>GET</option><option>POST</option><option>PUT</option><option>PATCH</option>
+        <option>DELETE</option><option>HEAD</option><option>OPTIONS</option>
+      </select>
+      <input type="text" id="url" placeholder="https://api.example.com/users?page=1   ({{var}} from the active environment)" spellcheck="false">
+      <button id="sendBtn" class="primary" title="Send (Ctrl+Enter)">Send</button>
+      <button id="curlBtn" title="Copy as cURL">cURL</button>
+    </div>
+    <div class="tabs inner">
+      <button data-tab="params" class="active">Params<span class="count" id="cntParams"></span></button>
+      <button data-tab="headers">Headers<span class="count" id="cntHeaders"></span></button>
+      <button data-tab="body">Body<span class="count" id="cntBody"></span></button>
+      <button data-tab="auth">Auth<span class="count" id="cntAuth"></span></button>
+      <button data-tab="options">Options</button>
+    </div>
+    <div class="panel active" id="panel-params"><table class="kv" id="paramsTable"></table></div>
+    <div class="panel" id="panel-headers"><table class="kv" id="headersTable"></table></div>
+    <div class="panel stretch" id="panel-body">
+      <div class="opts">
+        <label><input type="radio" name="bodyMode" value="none"> none</label>
+        <label><input type="radio" name="bodyMode" value="raw"> raw</label>
+        <label><input type="radio" name="bodyMode" value="form"> x-www-form-urlencoded</label>
+        <select id="rawType">
+          <option value="json">JSON</option><option value="text">Text</option><option value="xml">XML</option>
+          <option value="html">HTML</option><option value="js">JavaScript</option>
+        </select>
+        <button id="beautifyBtn" title="Format JSON">Beautify</button>
+      </div>
+      <textarea id="bodyRaw" placeholder='{ "hello": "world" }' spellcheck="false"></textarea>
+      <table class="kv" id="formTable"></table>
+      <div class="hint" id="bodyNone">This request has no body.</div>
+    </div>
+    <div class="panel" id="panel-auth">
+      <div class="grid">
+        <label for="authType">Type</label>
+        <select id="authType">
+          <option value="none">No auth</option><option value="basic">Basic</option>
+          <option value="bearer">Bearer token</option><option value="apikey">API key</option>
+        </select>
+        <label class="a-basic" for="authUser">Username</label><input class="a-basic" type="text" id="authUser">
+        <label class="a-basic" for="authPass">Password</label><input class="a-basic" type="password" id="authPass">
+        <label class="a-bearer" for="authToken">Token</label><input class="a-bearer" type="text" id="authToken" spellcheck="false">
+        <label class="a-apikey" for="authKeyName">Key</label><input class="a-apikey" type="text" id="authKeyName" placeholder="X-API-Key">
+        <label class="a-apikey" for="authKeyValue">Value</label><input class="a-apikey" type="text" id="authKeyValue" spellcheck="false">
+        <label class="a-apikey" for="authKeyIn">Add to</label>
+        <select class="a-apikey" id="authKeyIn"><option value="header">Header</option><option value="query">Query params</option></select>
+      </div>
+      <p class="hint">Values may use {{variables}}.</p>
+    </div>
+    <div class="panel" id="panel-options">
+      <div class="grid">
+        <label for="optTimeout">Timeout (ms)</label><input type="number" id="optTimeout" min="0" step="1000">
+        <label>Redirects</label><label><input type="checkbox" id="optRedirects"> follow redirects</label>
+        <label>TLS</label><label><input type="checkbox" id="optTls"> verify certificates</label>
+        <label>Cookies</label><label><input type="checkbox" id="optCookies"> use the cookie jar (kept until the program exits)</label>
+      </div>
+    </div>
+  </section>
+
+  <div class="splitter" id="splitter"></div>
+
+  <section class="response">
+    <div class="status">
+      <span id="respStatus" class="code">Ready</span>
+      <span id="respMeta" class="meta"></span>
+      <span id="respUrl" class="meta"></span>
+    </div>
+    <div class="resptabs">
+      <div class="tabs">
+        <button data-rtab="body" class="active">Body</button>
+        <button data-rtab="headers">Headers<span class="count" id="cntRespHeaders"></span></button>
+      </div>
+      <div class="sub" id="viewSub">
+        <button data-view="pretty" class="active">Pretty</button>
+        <button data-view="raw">Raw</button>
+        <button data-view="preview">Preview</button>
+      </div>
+      <button id="wrapBtn" class="icon" title="Toggle line wrap">Wrap</button>
+      <button id="copyRespBtn" class="icon" title="Copy body">Copy</button>
+      <button id="dlRespBtn" class="icon" title="Download body">Save</button>
+    </div>
+    <div class="respbody">
+      <pre class="out" id="respOut">Send a request to see the response here.</pre>
+      <div id="respHeaders" hidden></div>
+      <div id="respPreview" hidden style="height:100%"></div>
+    </div>
+  </section>
+</main>
+
+<div class="modal-bg" id="envModal">
+  <div class="modal">
+    <header>Environments <div class="spacer"></div><button class="icon" data-close>&#10005;</button></header>
+    <div class="body envlayout">
+      <div class="envlist">
+        <div id="envList"></div>
+        <button id="addEnvBtn" style="margin-top:8px">+ Environment</button>
+      </div>
+      <div id="envEditor">
+        <div class="bar" style="padding:0 0 8px">
+          <input type="text" id="envName" placeholder="Environment name" style="flex:1">
+          <button id="delEnvBtn" class="danger">Delete</button>
+        </div>
+        <table class="kv" id="envVarsTable"></table>
+        <p class="hint">Use as {{name}} in URL, params, headers, body and auth.</p>
+      </div>
+    </div>
+    <footer><button class="primary" data-close>Close</button></footer>
+  </div>
+</div>
+
+<div class="modal-bg" id="settingsModal">
+  <div class="modal" style="width:min(520px,94vw)">
+    <header>Settings <div class="spacer"></div><button class="icon" data-close>&#10005;</button></header>
+    <div class="body">
+      <p class="hint">Defaults for new requests. Existing requests keep their own values (Options tab).</p>
+      <div class="grid">
+        <label for="setTimeout">Timeout (ms)</label><input type="number" id="setTimeout" min="0" step="1000">
+        <label>Redirects</label><label><input type="checkbox" id="setRedirects"> follow redirects</label>
+        <label>TLS</label><label><input type="checkbox" id="setTls"> verify certificates</label>
+        <label>Cookies</label><label><input type="checkbox" id="setCookies"> use the cookie jar</label>
+        <label>Cookie jar</label><div><button id="clearCookiesBtn">Clear cookies</button></div>
+        <label>History</label><label><input type="checkbox" id="setHistory"> record history</label>
+        <label>Data file</label><div class="hint" id="dataPathInfo" style="word-break:break-all"></div>
+      </div>
+    </div>
+    <footer><button class="primary" data-close>Close</button></footer>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+<script>
+(() => {
+'use strict';
+const $ = s => document.querySelector(s);
+const $$ = s => Array.from(document.querySelectorAll(s));
+const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const clone = o => JSON.parse(JSON.stringify(o));
+const RAW_TYPES = { json: 'application/json', text: 'text/plain', xml: 'application/xml', html: 'text/html', js: 'application/javascript' };
+const DEFAULT_SETTINGS = { timeoutMs: 30000, followRedirects: true, verifyTls: true, cookies: true, history: true };
+
+// ---------------------------------------------------------------- state
+let state = { version: 1, collections: [], history: [], envs: [], activeEnv: '', settings: { ...DEFAULT_SETTINGS } };
+let MODE = 'standalone'; // 'server' when served by the Go binary
+let info = {};
+let cur = null;            // request being edited (working copy)
+let curCollId = null;      // collection id of the saved original, if any
+let savedSnapshot = '';
+let lastResponse = null;
+let sideTab = 'coll';
+let respView = 'pretty';
+
+const newRow = () => ({ enabled: true, name: '', value: '' });
+function newRequest() {
+  const s = state.settings;
+  return {
+    id: uid(), name: '', method: 'GET', url: '', params: [], headers: [],
+    body: { mode: 'none', raw: '', rawType: 'json', form: [] },
+    auth: { type: 'none', username: '', password: '', token: '', keyName: '', keyValue: '', keyIn: 'header' },
+    options: { timeoutMs: s.timeoutMs, followRedirects: s.followRedirects, verifyTls: s.verifyTls, cookies: s.cookies },
+  };
+}
+function normalizeRequest(r) {
+  const d = newRequest();
+  const options = Object.assign({}, d.options, (r && r.options) || {});
+  r = Object.assign(d, r || {});
+  r.body = Object.assign({ mode: 'none', raw: '', rawType: 'json', form: [] }, r.body || {});
+  r.auth = Object.assign({ type: 'none', username: '', password: '', token: '', keyName: '', keyValue: '', keyIn: 'header' }, r.auth || {});
+  r.options = options;
+  r.params = (r.params || []).map(x => Object.assign(newRow(), x));
+  r.headers = (r.headers || []).map(x => Object.assign(newRow(), x));
+  r.body.form = (r.body.form || []).map(x => Object.assign(newRow(), x));
+  r.method = String(r.method || 'GET').toUpperCase();
+  return r;
+}
+
+// ---------------------------------------------------------------- persistence
+let saveTimer = null;
+function persist() { clearTimeout(saveTimer); saveTimer = setTimeout(persistNow, 400); }
+async function persistNow() {
+  const data = JSON.stringify(state);
+  if (MODE === 'server') {
+    try {
+      const r = await fetch('/api/state', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: data });
+      if (!r.ok) throw new Error(await r.text());
+    } catch (e) { toast('Save failed: ' + e.message); }
+  } else {
+    try { localStorage.setItem('simple-rest', data); } catch (e) { toast('Save failed: ' + e.message); }
+  }
+}
+async function loadState() {
+  let data = null;
+  try {
+    if (MODE === 'server') data = await (await fetch('/api/state')).json();
+    else data = JSON.parse(localStorage.getItem('simple-rest') || 'null');
+  } catch (e) { toast('Could not load saved data: ' + e.message); }
+  if (!data || typeof data !== 'object') return;
+  state.settings = Object.assign({ ...DEFAULT_SETTINGS }, data.settings || {});
+  state.collections = (data.collections || []).map(c => ({
+    id: c.id || uid(), name: c.name || 'Collection', open: c.open !== false,
+    requests: (c.requests || []).map(normalizeRequest),
+  }));
+  state.envs = (data.envs || []).map(e => ({ id: e.id || uid(), name: e.name || 'env', vars: (e.vars || []).map(v => Object.assign(newRow(), v)) }));
+  state.activeEnv = state.envs.some(e => e.id === data.activeEnv) ? data.activeEnv : '';
+  state.history = (data.history || []).slice(0, 200);
+}
+async function detectMode() {
+  if (location.protocol.startsWith('http')) {
+    try {
+      const r = await fetch('/api/info', { cache: 'no-store' });
+      if (r.ok) { info = await r.json(); if (info.mode === 'server') MODE = 'server'; }
+    } catch (e) { /* plain static hosting: stay standalone */ }
+  }
+  const b = $('#modeBadge');
+  if (MODE === 'server') {
+    b.textContent = 'v' + info.version + ' ' + info.os + '/' + info.arch;
+    b.title = 'Requests are sent by the simple-rest binary (no CORS limits)';
+  } else {
+    b.textContent = 'browser only (CORS)';
+    b.className = 'badge warn';
+    b.title = 'Opened without the simple-rest binary: requests go straight from the browser, so the target server must allow CORS. TLS and cookie options are ignored.';
+  }
+}
+
+let toastTimer;
+function toast(msg) {
+  const t = $('#toast'); t.textContent = msg; t.classList.add('show');
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+// ---------------------------------------------------------------- variables
+function activeVars() {
+  const env = state.envs.find(e => e.id === state.activeEnv);
+  const m = {};
+  if (env) for (const v of env.vars) if (v.enabled && v.name) m[v.name] = v.value;
+  return m;
+}
+const subst = (s, vars) => String(s ?? '').replace(/\{\{\s*([\w.\-]+)\s*\}\}/g, (m, k) => (k in vars ? vars[k] : m));
+
+// ---------------------------------------------------------------- key/value editor
+function kvTable(table, rows, opts = {}) {
+  const ph = opts.placeholders || ['Key', 'Value'];
+  const changed = () => opts.onChange && opts.onChange();
+  function addRow(row) {
+    const tr = table.insertRow();
+    const ghost = !row;
+    tr.innerHTML = `<td><input type="checkbox"${ghost ? ' disabled' : ''}${row && row.enabled ? ' checked' : ''}></td>
+      <td><input type="text" placeholder="${esc(ph[0])}" spellcheck="false" autocomplete="off"></td>
+      <td><input type="text" placeholder="${esc(ph[1])}" spellcheck="false" autocomplete="off"></td>
+      <td><button class="icon" title="Remove"${ghost ? ' hidden' : ''}>&#10005;</button></td>`;
+    const [cb, nameIn, valIn] = tr.querySelectorAll('input');
+    const del = tr.querySelector('button');
+    if (row) { nameIn.value = row.name; valIn.value = row.value; if (!row.enabled) tr.className = 'off'; }
+    const ensure = () => {
+      if (row) return;
+      row = newRow(); rows.push(row);
+      cb.disabled = false; cb.checked = true; del.hidden = false;
+      addRow(null);
+    };
+    nameIn.addEventListener('input', () => { ensure(); row.name = nameIn.value; changed(); });
+    valIn.addEventListener('input', () => { ensure(); row.value = valIn.value; changed(); });
+    cb.addEventListener('change', () => { if (!row) return; row.enabled = cb.checked; tr.className = row.enabled ? '' : 'off'; changed(); });
+    del.addEventListener('click', () => { const i = rows.indexOf(row); if (i >= 0) rows.splice(i, 1); tr.remove(); changed(); });
+  }
+  table.innerHTML = `<tr><th></th><th>${esc(ph[0])}</th><th>${esc(ph[1])}</th><th></th></tr>`;
+  rows.forEach(r => addRow(r));
+  addRow(null);
+}
+
+// ---------------------------------------------------------------- URL <-> params sync
+const splitUrl = u => { const i = u.indexOf('?'); return i < 0 ? [u, ''] : [u.slice(0, i), u.slice(i + 1)]; };
+const dec = s => { try { return decodeURIComponent(s); } catch (e) { return s; } };
+const encName = s => s.replace(/[ #&=%]/g, c => '%' + c.charCodeAt(0).toString(16).toUpperCase());
+const encValue = s => s.replace(/[ #&]/g, c => '%' + c.charCodeAt(0).toString(16).toUpperCase());
+function parseQuery(q) {
+  return q.split('&').filter(p => p !== '').map(p => {
+    const i = p.indexOf('=');
+    const [n, v] = i < 0 ? [p, ''] : [p.slice(0, i), p.slice(i + 1)];
+    return { enabled: true, name: dec(n), value: dec(v) };
+  });
+}
+function syncParamsFromUrl() {
+  const q = splitUrl(cur.url)[1];
+  const disabled = cur.params.filter(p => !p.enabled);
+  cur.params = parseQuery(q).concat(disabled);
+  renderKv('params');
+}
+function syncUrlFromParams() {
+  const base = splitUrl(cur.url)[0];
+  const q = cur.params.filter(p => p.enabled && (p.name || p.value))
+    .map(p => encName(p.name) + '=' + encValue(p.value)).join('&');
+  cur.url = q ? base + '?' + q : base;
+  $('#url').value = cur.url;
+}
+
+// ---------------------------------------------------------------- editor rendering
+function renderKv(kind) {
+  if (kind === 'params') kvTable($('#paramsTable'), cur.params, { onChange: () => { syncUrlFromParams(); changed(); } });
+  else if (kind === 'headers') kvTable($('#headersTable'), cur.headers, { placeholders: ['Header', 'Value'], onChange: changed });
+  else if (kind === 'form') kvTable($('#formTable'), cur.body.form, { onChange: changed });
+}
+function changed() { updateCounts(); markDirty(); }
+function markDirty() { $('#dirty').classList.toggle('on', JSON.stringify(cur) !== savedSnapshot); }
+function updateCounts() {
+  const n = rows => rows.filter(r => r.enabled && r.name).length || '';
+  $('#cntParams').textContent = n(cur.params);
+  $('#cntHeaders').textContent = n(cur.headers);
+  $('#cntBody').textContent = cur.body.mode === 'none' ? '' : '•';
+  $('#cntAuth').textContent = cur.auth.type === 'none' ? '' : '•';
+}
+function renderBodyMode() {
+  const m = cur.body.mode;
+  $$('input[name=bodyMode]').forEach(r => { r.checked = r.value === m; });
+  $('#bodyRaw').style.display = m === 'raw' ? '' : 'none';
+  $('#rawType').style.display = m === 'raw' ? '' : 'none';
+  $('#beautifyBtn').style.display = m === 'raw' && cur.body.rawType === 'json' ? '' : 'none';
+  $('#formTable').style.display = m === 'form' ? '' : 'none';
+  $('#bodyNone').style.display = m === 'none' ? '' : 'none';
+}
+function renderAuthType() {
+  const t = cur.auth.type;
+  for (const k of ['basic', 'bearer', 'apikey']) $$('.a-' + k).forEach(el => { el.style.display = t === k ? '' : 'none'; });
+}
+function renderEditor() {
+  $('#reqName').value = cur.name;
+  $('#method').value = cur.method;
+  $('#url').value = cur.url;
+  renderKv('params'); renderKv('headers'); renderKv('form');
+  $('#rawType').value = cur.body.rawType;
+  $('#bodyRaw').value = cur.body.raw;
+  renderBodyMode();
+  const a = cur.auth;
+  $('#authType').value = a.type; $('#authUser').value = a.username; $('#authPass').value = a.password;
+  $('#authToken').value = a.token; $('#authKeyName').value = a.keyName; $('#authKeyValue').value = a.keyValue; $('#authKeyIn').value = a.keyIn;
+  renderAuthType();
+  const o = cur.options;
+  $('#optTimeout').value = o.timeoutMs; $('#optRedirects').checked = !!o.followRedirects;
+  $('#optTls').checked = !!o.verifyTls; $('#optCookies').checked = !!o.cookies;
+  updateCounts(); markDirty();
+  renderCollections();
+}
+function loadRequest(req, collId) {
+  cur = normalizeRequest(clone(req));
+  curCollId = collId || null;
+  savedSnapshot = JSON.stringify(cur);
+  renderEditor();
+}
+
+// ---------------------------------------------------------------- building the effective request
+const b64 = s => btoa(unescape(encodeURIComponent(s)));
+function buildEffective(r) {
+  const vars = activeVars();
+  const s = x => subst(x, vars);
+  let url = s(r.url.trim());
+  let headers = r.headers.filter(h => h.enabled && h.name.trim()).map(h => ({ name: s(h.name.trim()), value: s(h.value) }));
+  const has = n => headers.some(h => h.name.toLowerCase() === n);
+  const a = r.auth;
+  if (a.type !== 'none') headers = headers.filter(h => h.name.toLowerCase() !== 'authorization');
+  if (a.type === 'basic') headers.push({ name: 'Authorization', value: 'Basic ' + b64(s(a.username) + ':' + s(a.password)) });
+  else if (a.type === 'bearer') headers.push({ name: 'Authorization', value: 'Bearer ' + s(a.token) });
+  else if (a.type === 'apikey' && a.keyName.trim()) {
+    if (a.keyIn === 'query') url += (url.includes('?') ? '&' : '?') + encName(s(a.keyName.trim())) + '=' + encValue(s(a.keyValue));
+    else headers.push({ name: s(a.keyName.trim()), value: s(a.keyValue) });
+  }
+  let body = '';
+  const b = r.body;
+  if (b.mode === 'raw') {
+    body = s(b.raw);
+    if (!has('content-type')) headers.push({ name: 'Content-Type', value: RAW_TYPES[b.rawType] || 'text/plain' });
+  } else if (b.mode === 'form') {
+    body = b.form.filter(f => f.enabled && f.name).map(f => encodeURIComponent(s(f.name)) + '=' + encodeURIComponent(s(f.value))).join('&');
+    if (!has('content-type')) headers.push({ name: 'Content-Type', value: 'application/x-www-form-urlencoded' });
+  }
+  const o = r.options;
+  return {
+    method: r.method, url, headers, body, bodyBase64: false,
+    timeoutMs: Math.max(0, +o.timeoutMs || 0) || 30000,
+    followRedirects: !!o.followRedirects, verifyTls: !!o.verifyTls, cookies: !!o.cookies,
+  };
+}
+
+// ---------------------------------------------------------------- sending
+let sending = false;
+async function sendRequest() {
+  if (sending) return;
+  const eff = buildEffective(cur);
+  if (!eff.url) { toast('URL is empty'); $('#url').focus(); return; }
+  sending = true;
+  const btn = $('#sendBtn'); btn.innerHTML = '<span class="spin"></span>'; btn.disabled = true;
+  setStatus('Sending…', '', '');
+  const t0 = performance.now();
+  let res;
+  try {
+    if (MODE === 'server') {
+      const r = await fetch('/api/send', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(eff) });
+      if (!r.ok) throw new Error('proxy error ' + r.status + ': ' + (await r.text()));
+      res = await r.json();
+    } else {
+      res = await sendDirect(eff, t0);
+    }
+  } catch (e) {
+    res = { error: e.name === 'TimeoutError' ? 'timeout after ' + eff.timeoutMs + ' ms' : e.message, timeMs: performance.now() - t0, headers: [] };
+  }
+  sending = false; btn.textContent = 'Send'; btn.disabled = false;
+  lastResponse = res;
+  renderResponse(res);
+  addHistory();
+}
+async function sendDirect(eff, t0) {
+  const h = new Headers();
+  for (const x of eff.headers) { try { h.append(x.name, x.value); } catch (e) { /* forbidden header name in browsers */ } }
+  const init = { method: eff.method, headers: h, redirect: eff.followRedirects ? 'follow' : 'manual', cache: 'no-store', signal: AbortSignal.timeout(eff.timeoutMs) };
+  if (eff.body && !['GET', 'HEAD'].includes(eff.method)) init.body = eff.body;
+  const r = await fetch(eff.url, init);
+  const bytes = new Uint8Array(await r.arrayBuffer());
+  const headers = []; r.headers.forEach((v, k) => headers.push({ name: k, value: v }));
+  let body, bodyBase64 = false;
+  try {
+    body = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+    if (body.includes('\0')) throw new Error('binary');
+  } catch (e) {
+    let bin = ''; for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+    body = btoa(bin); bodyBase64 = true;
+  }
+  return { status: r.status, statusText: r.statusText, proto: '', headers, body, bodyBase64, size: bytes.length, timeMs: performance.now() - t0, finalUrl: r.url };
+}
+function addHistory() {
+  if (!state.settings.history) return;
+  const snap = clone(cur); snap.id = uid();
+  state.history.unshift({ id: uid(), at: Date.now(), req: snap });
+  if (state.history.length > 200) state.history.length = 200;
+  renderHistory(); persist();
+}
+// ---------------------------------------------------------------- response rendering
+let respTab = 'body';
+function setStatus(code, cls, meta) {
+  const el = $('#respStatus'); el.textContent = code; el.className = 'code ' + (cls || '');
+  $('#respMeta').textContent = meta || ''; $('#respUrl').textContent = '';
+}
+const fmtSize = n => n < 1024 ? n + ' B' : n < 1048576 ? (n / 1024).toFixed(1) + ' KB' : (n / 1048576).toFixed(2) + ' MB';
+const fmtMs = ms => ms < 1000 ? Math.round(ms) + ' ms' : (ms / 1000).toFixed(2) + ' s';
+function contentType(res) {
+  const h = (res.headers || []).find(x => x.name.toLowerCase() === 'content-type');
+  return h ? h.value.toLowerCase() : '';
+}
+function highlightJSON(text) {
+  const re = /("(?:\\.|[^"\\])*")(\s*:)?|\b(?:true|false|null)\b|-?\b\d+(?:\.\d+)?(?:[eE][+-]?\d+)?\b/g;
+  let out = '', last = 0, m;
+  while ((m = re.exec(text))) {
+    out += esc(text.slice(last, m.index));
+    const cls = m[1] !== undefined ? (m[2] ? 'k' : 's') : m[0] === 'null' ? 'x' : (m[0] === 'true' || m[0] === 'false') ? 'b' : 'n';
+    out += `<span class="${cls}">${esc(m[0])}</span>`;
+    last = re.lastIndex;
+  }
+  return out + esc(text.slice(last));
+}
+function renderResponse(res) {
+  const out = $('#respOut');
+  $('#respHeaders').innerHTML = '';
+  $('#cntRespHeaders').textContent = '';
+  if (res.error && !res.status) {
+    setStatus('Error', 'cX', res.timeMs != null ? fmtMs(res.timeMs) : '');
+    showRespTab('body');
+    out.hidden = false; $('#respPreview').hidden = true;
+    out.innerHTML = `<span class="x">${esc(res.error)}</span>`;
+    return;
+  }
+  const cls = 'c' + String(res.status)[0];
+  setStatus(res.status + ' ' + (res.statusText || ''), cls, fmtMs(res.timeMs) + ' · ' + fmtSize(res.size) + (res.proto ? ' · ' + res.proto : ''));
+  const sentUrl = buildEffective(cur).url.replace(/ /g, '%20');
+  if (res.finalUrl && res.finalUrl !== sentUrl) $('#respUrl').textContent = '→ ' + res.finalUrl;
+  if (res.error) toast(res.error);
+  $('#respHeaders').innerHTML = '<table class="hdrs">' + res.headers.map(h => `<tr><td>${esc(h.name)}</td><td>${esc(h.value)}</td></tr>`).join('') + '</table>';
+  $('#cntRespHeaders').textContent = res.headers.length || '';
+  showRespTab(respTab);
+}
+function showRespTab(t) {
+  respTab = t;
+  $$('[data-rtab]').forEach(b => b.classList.toggle('active', b.dataset.rtab === t));
+  $('#respHeaders').hidden = t !== 'headers';
+  $('#viewSub').style.visibility = t === 'body' ? '' : 'hidden';
+  if (t === 'headers') { $('#respOut').hidden = true; $('#respPreview').hidden = true; }
+  else renderBody();
+}
+function renderBody() {
+  const res = lastResponse, out = $('#respOut'), prev = $('#respPreview');
+  out.hidden = respView === 'preview'; prev.hidden = respView !== 'preview';
+  if (!res) { out.hidden = false; prev.hidden = true; return; }
+  const ct = contentType(res);
+  if (respView === 'preview') {
+    prev.innerHTML = '';
+    if (res.bodyBase64 && ct.startsWith('image/')) {
+      const img = document.createElement('img'); img.className = 'preview'; img.src = `data:${ct.split(';')[0]};base64,${res.body}`; prev.appendChild(img);
+    } else if (!res.bodyBase64 && (ct.includes('html') || /^\s*<(!doctype|html)/i.test(res.body))) {
+      const f = document.createElement('iframe'); f.className = 'preview'; f.setAttribute('sandbox', ''); f.srcdoc = res.body; prev.appendChild(f);
+    } else prev.innerHTML = '<div class="hint" style="padding:12px">No preview for this content type.</div>';
+    return;
+  }
+  if (res.bodyBase64) { out.textContent = `[binary body: ${fmtSize(res.size)}, ${ct || 'unknown type'}]  Use Save to download it.`; return; }
+  const text = res.body;
+  if (respView === 'pretty' && text.length < 3 * 1048576) {
+    const t = text.trim();
+    if (t.startsWith('{') || t.startsWith('[')) {
+      try { out.innerHTML = highlightJSON(JSON.stringify(JSON.parse(text), null, 2)); return; } catch (e) { /* not JSON */ }
+    }
+  }
+  const LIMIT = 5 * 1048576;
+  out.textContent = text.length > LIMIT ? text.slice(0, LIMIT) + '\n… (view truncated, use Save for the full body)' : text;
+}
+function downloadResponse() {
+  const res = lastResponse; if (!res || res.body == null) return;
+  const ct = contentType(res).split(';')[0];
+  const map = { 'application/json': 'json', 'text/html': 'html', 'text/plain': 'txt', 'application/xml': 'xml', 'text/xml': 'xml', 'image/png': 'png', 'image/jpeg': 'jpg', 'image/gif': 'gif', 'image/svg+xml': 'svg', 'application/pdf': 'pdf', 'text/csv': 'csv', 'application/javascript': 'js' };
+  const ext = map[ct] || (res.bodyBase64 ? 'bin' : (/^\s*[\[{]/.test(res.body) ? 'json' : 'txt'));
+  const bytes = res.bodyBase64 ? Uint8Array.from(atob(res.body), c => c.charCodeAt(0)) : new TextEncoder().encode(res.body);
+  download('response.' + ext, new Blob([bytes], { type: ct || 'application/octet-stream' }));
+}
+
+// ---------------------------------------------------------------- sidebar
+function renderCollections() {
+  const list = $('#collList'), filter = $('#sideSearch').value.trim().toLowerCase();
+  list.innerHTML = '';
+  if (!state.collections.length) { list.innerHTML = '<div class="empty">No collections yet.<br>Save a request or press +.</div>'; return; }
+  for (const c of state.collections) {
+    const reqs = c.requests.filter(r => !filter || (r.name + ' ' + r.url).toLowerCase().includes(filter));
+    if (filter && !reqs.length) continue;
+    const open = c.open || !!filter;
+    const div = document.createElement('div'); div.className = 'coll' + (open ? '' : ' closed');
+    div.innerHTML = `<div class="row"><span class="caret">${open ? '&#9660;' : '&#9654;'}</span><span class="name" style="flex:1">${esc(c.name)}</span><span class="badge">${c.requests.length}</span>
+      <span class="actions"><button class="icon" data-act="add" title="Save the current request here">+</button><button class="icon" data-act="rename" title="Rename">&#9998;</button><button class="icon" data-act="delete" title="Delete collection">&#10005;</button></span></div><div class="items"></div>`;
+    div.querySelector('.row').addEventListener('click', e => {
+      const act = e.target.dataset.act;
+      if (act === 'rename') { const n = prompt('Collection name', c.name); if (n && n.trim()) { c.name = n.trim(); persist(); renderCollections(); } }
+      else if (act === 'add') saveAs(c.id);
+      else if (act === 'delete') {
+        if (!confirm(`Delete collection "${c.name}" with ${c.requests.length} request(s)?`)) return;
+        state.collections = state.collections.filter(x => x !== c);
+        if (curCollId === c.id) curCollId = null;
+        persist(); renderCollections();
+      } else { c.open = !c.open; persist(); renderCollections(); }
+    });
+    const items = div.querySelector('.items');
+    for (const r of reqs) {
+      const it = document.createElement('div'); it.className = 'item' + (curCollId === c.id && cur.id === r.id ? ' active' : '');
+      it.innerHTML = `<span class="method m-${esc(r.method)}">${esc(r.method)}</span><span class="name" title="${esc(r.url)}">${esc(r.name || r.url || 'Untitled')}</span>
+        <span class="actions"><button class="icon" data-act="dup" title="Duplicate">&#10697;</button><button class="icon" data-act="delete" title="Delete">&#10005;</button></span>`;
+      it.addEventListener('click', e => {
+        const act = e.target.dataset.act;
+        if (act === 'dup') { const d = clone(r); d.id = uid(); d.name = (r.name || 'Untitled') + ' copy'; c.requests.splice(c.requests.indexOf(r) + 1, 0, d); persist(); renderCollections(); }
+        else if (act === 'delete') {
+          if (!confirm(`Delete request "${r.name || r.url}"?`)) return;
+          c.requests = c.requests.filter(x => x !== r);
+          if (curCollId === c.id && cur.id === r.id) curCollId = null;
+          persist(); renderCollections();
+        } else openRequest(r, c.id);
+      });
+      items.appendChild(it);
+    }
+    list.appendChild(div);
+  }
+}
+const fmtWhen = t => { const d = new Date(t); return new Date().toDateString() === d.toDateString() ? d.toTimeString().slice(0, 5) : d.toLocaleDateString(); };
+function renderHistory() {
+  const list = $('#histList'), filter = $('#sideSearch').value.trim().toLowerCase();
+  list.innerHTML = '';
+  const items = state.history.filter(h => !filter || (h.req.method + ' ' + h.req.url + ' ' + (h.req.name || '')).toLowerCase().includes(filter));
+  if (!items.length) { list.innerHTML = '<div class="empty">No history.</div>'; return; }
+  for (const h of items) {
+    const it = document.createElement('div'); it.className = 'item';
+    it.innerHTML = `<span class="method m-${esc(h.req.method)}">${esc(h.req.method)}</span><span class="name" title="${esc(h.req.url)}">${esc(h.req.url || '(no url)')}</span><span class="when">${fmtWhen(h.at)}</span>`;
+    it.addEventListener('click', () => openRequest(h.req, null));
+    list.appendChild(it);
+  }
+}
+const isDirty = () => $('#dirty').classList.contains('on');
+function openRequest(r, collId) {
+  if (isDirty() && !confirm('Discard unsaved changes in the current request?')) return;
+  loadRequest(r, collId);
+  $('#sidebar').classList.remove('open');
+}
+function setSideTab(t) {
+  sideTab = t;
+  $$('[data-side]').forEach(b => b.classList.toggle('active', b.dataset.side === t));
+  $('#collList').hidden = t !== 'coll'; $('#histList').hidden = t !== 'hist';
+  $('#addCollBtn').hidden = t !== 'coll'; $('#clearHistBtn').hidden = t !== 'hist';
+}
+
+// ---------------------------------------------------------------- save / new
+function save() {
+  if (curCollId) {
+    const c = state.collections.find(x => x.id === curCollId);
+    const i = c ? c.requests.findIndex(r => r.id === cur.id) : -1;
+    if (i >= 0) {
+      if (!cur.name.trim()) cur.name = cur.url || 'Untitled';
+      c.requests[i] = clone(cur); savedSnapshot = JSON.stringify(cur);
+      renderEditor(); persist(); toast('Saved'); return;
+    }
+  }
+  saveAs();
+}
+function saveAs(collId) {
+  if (!state.collections.length) {
+    const n = prompt('Name of the first collection', 'My API'); if (n === null) return;
+    state.collections.push({ id: uid(), name: n.trim() || 'My API', open: true, requests: [] });
+    collId = state.collections[0].id;
+  }
+  let c = collId ? state.collections.find(x => x.id === collId) : null;
+  if (!c) {
+    if (state.collections.length === 1) c = state.collections[0];
+    else {
+      const pick = prompt('Save to collection (number):\n' + state.collections.map((x, i) => `${i + 1}. ${x.name}`).join('\n'), '1');
+      if (pick === null) return;
+      c = state.collections[parseInt(pick, 10) - 1]; if (!c) { toast('No such collection'); return; }
+    }
+  }
+  const name = prompt('Request name', cur.name || cur.url || 'Untitled'); if (name === null) return;
+  cur.name = name.trim() || 'Untitled'; cur.id = uid();
+  c.requests.push(clone(cur)); c.open = true; curCollId = c.id;
+  savedSnapshot = JSON.stringify(cur);
+  renderEditor(); persist(); toast('Saved to ' + c.name);
+}
+function startNew() {
+  if (isDirty() && !confirm('Discard unsaved changes?')) return;
+  loadRequest(newRequest(), null);
+  $('#url').focus();
+}
+
+// ---------------------------------------------------------------- environments
+let envEditId = null;
+function renderEnvSelect() {
+  const sel = $('#envSelect');
+  sel.innerHTML = '<option value="">No environment</option>' + state.envs.map(e => `<option value="${esc(e.id)}">${esc(e.name)}</option>`).join('');
+  sel.value = state.activeEnv || '';
+}
+function openEnvModal() {
+  envEditId = state.activeEnv || (state.envs[0] ? state.envs[0].id : null);
+  renderEnvModal(); $('#envModal').classList.add('open');
+}
+function renderEnvModal() {
+  const list = $('#envList'); list.innerHTML = '';
+  for (const e of state.envs) {
+    const it = document.createElement('div'); it.className = 'item' + (e.id === envEditId ? ' active' : '');
+    it.innerHTML = `<span class="name">${esc(e.name)}</span>`;
+    it.addEventListener('click', () => { envEditId = e.id; renderEnvModal(); });
+    list.appendChild(it);
+  }
+  const e = state.envs.find(x => x.id === envEditId);
+  $('#envEditor').style.visibility = e ? '' : 'hidden';
+  if (!e) return;
+  $('#envName').value = e.name;
+  kvTable($('#envVarsTable'), e.vars, { placeholders: ['Variable', 'Value'], onChange: persist });
+}
+
+// ---------------------------------------------------------------- import / export
+function download(name, content, type) {
+  const blob = content instanceof Blob ? content : new Blob([content], { type: type || 'application/octet-stream' });
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+}
+function exportAll() {
+  download('simple-rest-export.json', JSON.stringify({ app: 'simple-rest', version: 1, exportedAt: new Date().toISOString(), collections: state.collections, envs: state.envs }, null, 2), 'application/json');
+}
+async function importFiles(files) {
+  let nc = 0, ne = 0;
+  for (const f of files) {
+    let data; try { data = JSON.parse(await f.text()); } catch (e) { toast('Not a JSON file: ' + f.name); continue; }
+    const [c, e] = importData(data, f.name); nc += c; ne += e;
+  }
+  persist(); renderCollections(); renderEnvSelect();
+  if (nc || ne) toast(`Imported ${nc} collection(s), ${ne} environment(s)`);
+}
+function paramsFromUrl(r) {
+  const disabled = r.params.filter(p => !p.enabled);
+  r.params = parseQuery(splitUrl(r.url)[1]).concat(disabled);
+}
+function importData(d, fname) {
+  let nc = 0, ne = 0;
+  if (!d || typeof d !== 'object') { toast('Unrecognized format: ' + fname); return [0, 0]; }
+  if (Array.isArray(d.collections)) for (const c of d.collections) {
+    state.collections.push({ id: uid(), name: c.name || 'Imported', open: true, requests: (c.requests || []).map(r => { r = normalizeRequest(r); r.id = uid(); return r; }) }); nc++;
+  }
+  if (Array.isArray(d.envs)) for (const e of d.envs) {
+    state.envs.push({ id: uid(), name: e.name || 'env', vars: (e.vars || []).map(v => Object.assign(newRow(), v)) }); ne++;
+  }
+  if (d.info && Array.isArray(d.item)) { state.collections.push(importPostmanCollection(d)); nc++; }
+  if (Array.isArray(d.values) && d.name && !d.item) {
+    state.envs.push({ id: uid(), name: d.name, vars: d.values.map(v => ({ enabled: v.enabled !== false, name: v.key || '', value: String(v.value ?? '') })) }); ne++;
+  }
+  if (!nc && !ne) toast('Unrecognized format: ' + fname);
+  return [nc, ne];
+}
+function importPostmanCollection(d) {
+  const reqs = [];
+  const walk = (items, prefix) => {
+    for (const it of items || []) {
+      if (Array.isArray(it.item)) walk(it.item, prefix + (it.name ? it.name + ' / ' : ''));
+      else if (it.request) reqs.push(fromPostmanRequest(it, prefix));
+    }
+  };
+  walk(d.item, '');
+  return { id: uid(), name: (d.info && d.info.name) || 'Postman import', open: true, requests: reqs };
+}
+function fromPostmanRequest(it, prefix) {
+  const pr = typeof it.request === 'string' ? { method: 'GET', url: it.request } : it.request;
+  const r = newRequest();
+  r.name = prefix + (it.name || 'Untitled');
+  r.method = String(pr.method || 'GET').toUpperCase();
+  const u = pr.url;
+  r.url = typeof u === 'string' ? u : (u && u.raw) || '';
+  paramsFromUrl(r);
+  if (u && Array.isArray(u.query)) for (const q of u.query) if (q.disabled) r.params.push({ enabled: false, name: q.key || '', value: String(q.value ?? '') });
+  for (const h of pr.header || []) if (h && typeof h === 'object') r.headers.push({ enabled: !h.disabled, name: h.key || '', value: String(h.value ?? '') });
+  const b = pr.body;
+  if (b && b.mode === 'raw') {
+    r.body.mode = 'raw'; r.body.raw = b.raw || '';
+    const lang = b.options && b.options.raw && b.options.raw.language;
+    r.body.rawType = lang === 'javascript' ? 'js' : ['json', 'xml', 'html', 'text'].includes(lang) ? lang : (/^\s*[\[{]/.test(r.body.raw) ? 'json' : 'text');
+  } else if (b && b.mode === 'urlencoded') {
+    r.body.mode = 'form';
+    r.body.form = (b.urlencoded || []).map(f => ({ enabled: !f.disabled, name: f.key || '', value: String(f.value ?? '') }));
+  }
+  const a = pr.auth, get = (arr, k) => { const x = (arr || []).find(y => y.key === k); return x ? String(x.value ?? '') : ''; };
+  if (a && a.type === 'basic') { r.auth.type = 'basic'; r.auth.username = get(a.basic, 'username'); r.auth.password = get(a.basic, 'password'); }
+  else if (a && a.type === 'bearer') { r.auth.type = 'bearer'; r.auth.token = get(a.bearer, 'token'); }
+  else if (a && a.type === 'apikey') { r.auth.type = 'apikey'; r.auth.keyName = get(a.apikey, 'key'); r.auth.keyValue = get(a.apikey, 'value'); r.auth.keyIn = get(a.apikey, 'in') === 'query' ? 'query' : 'header'; }
+  return r;
+}
+
+// ---------------------------------------------------------------- cURL
+function toCurl() {
+  const e = buildEffective(cur);
+  const q = s => "'" + String(s).replace(/'/g, "'\\''") + "'";
+  const parts = ['curl'];
+  if (e.method === 'HEAD') parts.push('-I'); else if (e.method !== 'GET') parts.push('-X ' + e.method);
+  if (!e.verifyTls) parts.push('-k');
+  if (e.followRedirects) parts.push('-L');
+  parts.push(q(e.url));
+  for (const h of e.headers) parts.push('-H ' + q(h.name + ': ' + h.value));
+  if (e.body) parts.push('--data-raw ' + q(e.body));
+  return parts.join(' \\\n  ');
+}
+async function copyText(t) {
+  try { await navigator.clipboard.writeText(t); toast('Copied'); } catch (e) { prompt('Copy:', t); }
+}
+
+// ---------------------------------------------------------------- events
+function wire() {
+  $('#reqName').addEventListener('input', e => { cur.name = e.target.value; markDirty(); });
+  $('#method').addEventListener('change', e => { cur.method = e.target.value; markDirty(); });
+  $('#url').addEventListener('input', e => { cur.url = e.target.value; syncParamsFromUrl(); changed(); });
+  $$('input[name=bodyMode]').forEach(r => r.addEventListener('change', () => { cur.body.mode = r.value; renderBodyMode(); changed(); }));
+  $('#rawType').addEventListener('change', e => { cur.body.rawType = e.target.value; renderBodyMode(); markDirty(); });
+  $('#bodyRaw').addEventListener('input', e => { cur.body.raw = e.target.value; markDirty(); });
+  $('#beautifyBtn').addEventListener('click', () => {
+    try { cur.body.raw = JSON.stringify(JSON.parse(cur.body.raw), null, 2); $('#bodyRaw').value = cur.body.raw; markDirty(); } catch (e) { toast('Invalid JSON: ' + e.message); }
+  });
+  $('#authType').addEventListener('change', e => { cur.auth.type = e.target.value; renderAuthType(); changed(); });
+  const bindAuth = (id, key) => $(id).addEventListener('input', e => { cur.auth[key] = e.target.value; markDirty(); });
+  bindAuth('#authUser', 'username'); bindAuth('#authPass', 'password'); bindAuth('#authToken', 'token');
+  bindAuth('#authKeyName', 'keyName'); bindAuth('#authKeyValue', 'keyValue');
+  $('#authKeyIn').addEventListener('change', e => { cur.auth.keyIn = e.target.value; markDirty(); });
+  $('#optTimeout').addEventListener('input', e => { cur.options.timeoutMs = +e.target.value || 0; markDirty(); });
+  $('#optRedirects').addEventListener('change', e => { cur.options.followRedirects = e.target.checked; markDirty(); });
+  $('#optTls').addEventListener('change', e => { cur.options.verifyTls = e.target.checked; markDirty(); });
+  $('#optCookies').addEventListener('change', e => { cur.options.cookies = e.target.checked; markDirty(); });
+
+  $('#sendBtn').addEventListener('click', sendRequest);
+  $('#curlBtn').addEventListener('click', () => copyText(toCurl()));
+  $('#saveBtn').addEventListener('click', save);
+  $('#saveAsBtn').addEventListener('click', () => saveAs());
+  $('#newBtn').addEventListener('click', startNew);
+  const isEnter = e => e.key === 'Enter' || e.keyCode === 13;
+  $('#url').addEventListener('keydown', e => { if (isEnter(e)) { e.preventDefault(); sendRequest(); } });
+  document.addEventListener('keydown', e => {
+    if ((e.ctrlKey || e.metaKey) && isEnter(e)) { e.preventDefault(); sendRequest(); }
+    else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') { e.preventDefault(); save(); }
+    else if (e.key === 'Escape') $$('.modal-bg.open').forEach(m => m.classList.remove('open'));
+  });
+
+  $$('.tabs.inner button').forEach(b => b.addEventListener('click', () => {
+    $$('.tabs.inner button').forEach(x => x.classList.toggle('active', x === b));
+    $$('.panel').forEach(p => p.classList.toggle('active', p.id === 'panel-' + b.dataset.tab));
+  }));
+  $$('[data-rtab]').forEach(b => b.addEventListener('click', () => showRespTab(b.dataset.rtab)));
+  $$('[data-view]').forEach(b => b.addEventListener('click', () => {
+    respView = b.dataset.view; $$('[data-view]').forEach(x => x.classList.toggle('active', x === b)); renderBody();
+  }));
+  $('#wrapBtn').addEventListener('click', () => $('#respOut').classList.toggle('wrap'));
+  $('#copyRespBtn').addEventListener('click', () => { if (lastResponse && lastResponse.body != null) copyText(lastResponse.bodyBase64 ? '' : lastResponse.body); });
+  $('#dlRespBtn').addEventListener('click', downloadResponse);
+
+  $$('[data-side]').forEach(b => b.addEventListener('click', () => setSideTab(b.dataset.side)));
+  $('#sideSearch').addEventListener('input', () => { renderCollections(); renderHistory(); });
+  $('#addCollBtn').addEventListener('click', () => {
+    const n = prompt('Collection name', 'New collection'); if (n === null) return;
+    state.collections.push({ id: uid(), name: n.trim() || 'New collection', open: true, requests: [] }); persist(); renderCollections();
+  });
+  $('#clearHistBtn').addEventListener('click', () => { if (confirm('Clear the whole history?')) { state.history = []; persist(); renderHistory(); } });
+  $('#menuBtn').addEventListener('click', () => $('#sidebar').classList.toggle('open'));
+
+  $('#envSelect').addEventListener('change', e => { state.activeEnv = e.target.value; persist(); });
+  $('#envBtn').addEventListener('click', openEnvModal);
+  $('#addEnvBtn').addEventListener('click', () => {
+    const e = { id: uid(), name: 'New environment', vars: [] }; state.envs.push(e); envEditId = e.id;
+    if (!state.activeEnv) state.activeEnv = e.id;
+    renderEnvModal(); renderEnvSelect(); persist(); $('#envName').focus(); $('#envName').select();
+  });
+  $('#envName').addEventListener('input', e => {
+    const env = state.envs.find(x => x.id === envEditId); if (!env) return;
+    env.name = e.target.value;
+    $$('#envList .item').forEach((it, i) => { if (state.envs[i] === env) it.querySelector('.name').textContent = env.name; });
+    renderEnvSelect(); persist();
+  });
+  $('#delEnvBtn').addEventListener('click', () => {
+    const env = state.envs.find(x => x.id === envEditId); if (!env || !confirm(`Delete environment "${env.name}"?`)) return;
+    state.envs = state.envs.filter(x => x !== env);
+    if (state.activeEnv === env.id) state.activeEnv = '';
+    envEditId = state.envs[0] ? state.envs[0].id : null;
+    renderEnvModal(); renderEnvSelect(); persist();
+  });
+
+  $('#settingsBtn').addEventListener('click', () => {
+    const s = state.settings;
+    $('#setTimeout').value = s.timeoutMs; $('#setRedirects').checked = s.followRedirects; $('#setTls').checked = s.verifyTls;
+    $('#setCookies').checked = s.cookies; $('#setHistory').checked = s.history;
+    $('#settingsModal').classList.add('open');
+  });
+  $('#setTimeout').addEventListener('input', e => { state.settings.timeoutMs = +e.target.value || 30000; persist(); });
+  $('#setRedirects').addEventListener('change', e => { state.settings.followRedirects = e.target.checked; persist(); });
+  $('#setTls').addEventListener('change', e => { state.settings.verifyTls = e.target.checked; persist(); });
+  $('#setCookies').addEventListener('change', e => { state.settings.cookies = e.target.checked; persist(); });
+  $('#setHistory').addEventListener('change', e => { state.settings.history = e.target.checked; persist(); });
+  $('#clearCookiesBtn').addEventListener('click', async () => {
+    if (MODE !== 'server') { toast('Cookies are managed by the browser in this mode'); return; }
+    try { await fetch('/api/cookies', { method: 'DELETE' }); toast('Cookie jar cleared'); } catch (e) { toast(e.message); }
+  });
+
+  $('#importBtn').addEventListener('click', () => $('#importFile').click());
+  $('#importFile').addEventListener('change', e => { importFiles(Array.from(e.target.files)); e.target.value = ''; });
+  $('#exportBtn').addEventListener('click', exportAll);
+  $$('[data-close]').forEach(b => b.addEventListener('click', () => b.closest('.modal-bg').classList.remove('open')));
+  $$('.modal-bg').forEach(m => m.addEventListener('mousedown', e => { if (e.target === m) m.classList.remove('open'); }));
+
+  const sp = $('#splitter'), work = $('.work'); let drag = false;
+  const move = y => { const r = work.getBoundingClientRect(); const h = Math.min(Math.max(y - r.top, 120), r.height - 140); document.documentElement.style.setProperty('--req-h', h + 'px'); };
+  sp.addEventListener('mousedown', e => { drag = true; e.preventDefault(); });
+  window.addEventListener('mousemove', e => { if (drag) move(e.clientY); });
+  window.addEventListener('mouseup', () => { drag = false; });
+  sp.addEventListener('touchstart', e => { drag = true; }, { passive: true });
+  window.addEventListener('touchmove', e => { if (drag) move(e.touches[0].clientY); }, { passive: true });
+  window.addEventListener('touchend', () => { drag = false; });
+}
+
+// ---------------------------------------------------------------- init
+async function init() {
+  await detectMode();
+  await loadState();
+  $('#dataPathInfo').textContent = MODE === 'server' ? info.dataPath : 'browser localStorage (this browser profile only)';
+  wire();
+  renderEnvSelect();
+  loadRequest(newRequest(), null);
+  renderHistory();
+  setSideTab('coll');
+  showRespTab('body');
+}
+init();
+})();
+</script>
+</body>
+</html>

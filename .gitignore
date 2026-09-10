@@ -1,0 +1,10 @@
+/dist/
+/simple-rest
+/simple-rest.exe
+/simple-rest-data.json
+/simple-rest-data.json.tmp
+/simple-rest-update.json
+/.simple-rest-update/
+/.claude/
+*.old
+*.part
