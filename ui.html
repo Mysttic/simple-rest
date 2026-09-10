@@ -44,7 +44,8 @@ a { color: var(--info); }
   grid-column: 1 / -1; display: flex; align-items: center; gap: 8px; padding: 0 12px;
   background: var(--bg2); border-bottom: 1px solid var(--line);
 }
-.topbar .brand { font-weight: 700; letter-spacing: .3px; margin-right: 6px; }
+.topbar .brand { font-weight: 700; letter-spacing: .3px; margin-right: 6px; white-space: nowrap; }
+.topbar .badge { white-space: nowrap; }
 .topbar .brand span { color: var(--acc); }
 .topbar .spacer { flex: 1; }
 .badge { font-size: 11px; padding: 2px 7px; border-radius: 10px; background: var(--bg4); color: var(--fg2); }
@@ -151,6 +152,12 @@ img.preview { max-width: 100%; padding: 12px; }
 .spin { display: inline-block; width: 12px; height: 12px; border: 2px solid #fff; border-right-color: transparent; border-radius: 50%; animation: spin .7s linear infinite; vertical-align: -2px; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
+/* updates */
+pre.notes { background: var(--bg); border: 1px solid var(--line); border-radius: 5px; padding: 8px; margin: 8px 0 0; white-space: pre-wrap; font: 12px/1.4 var(--mono); max-height: 160px; overflow: auto; }
+progress { width: 100%; height: 8px; accent-color: var(--acc); margin: 6px 0; }
+#updateBadge { cursor: pointer; border: 0; }
+#updSection h3 { margin: 16px 0 8px; font-size: 13px; }
+
 @media (max-width: 800px) {
   body { grid-template-columns: 1fr; }
   .sidebar { position: fixed; top: 44px; bottom: 0; left: 0; width: min(320px, 85vw); z-index: 5; transform: translateX(-100%); transition: transform .15s; }
@@ -167,6 +174,7 @@ img.preview { max-width: 100%; padding: 12px; }
   <button id="menuBtn" class="icon" title="Collections">&#9776;</button>
   <div class="brand">simple<span>-rest</span></div>
   <span id="modeBadge" class="badge">...</span>
+  <button id="updateBadge" class="badge warn" title="A newer release is available, open Settings" hidden></button>
   <div class="spacer"></div>
   <select id="envSelect" title="Active environment"><option value="">No environment</option></select>
   <button id="envBtn" title="Manage environments">Environments</button>
@@ -323,6 +331,15 @@ img.preview { max-width: 100%; padding: 12px; }
         <label>Cookie jar</label><div><button id="clearCookiesBtn">Clear cookies</button></div>
         <label>History</label><label><input type="checkbox" id="setHistory"> record history</label>
         <label>Data file</label><div class="hint" id="dataPathInfo" style="word-break:break-all"></div>
+      </div>
+      <div id="updSection">
+        <h3>Updates</h3>
+        <div class="grid">
+          <label>Version</label><div class="hint" id="updVersion"></div>
+          <label>Automatic</label><label><input type="checkbox" id="setAutoUpdate"> check for a new release once a day (off by default)</label>
+          <label>Now</label><div><button id="updCheckBtn">Check for updates</button></div>
+        </div>
+        <div id="updBox" style="margin-top:10px"><div class="hint">Not checked yet.</div></div>
       </div>
     </div>
     <footer><button class="primary" data-close>Close</button></footer>
@@ -930,8 +947,8 @@ function fromPostmanRequest(it, prefix) {
 }
 
 // ---------------------------------------------------------------- cURL
-function toCurl() {
-  const e = buildEffective(cur);
+function toCurl(r = cur) {
+  const e = buildEffective(r);
   const q = s => "'" + String(s).replace(/'/g, "'\\''") + "'";
   const parts = ['curl'];
   if (e.method === 'HEAD') parts.push('-I'); else if (e.method !== 'GET') parts.push('-X ' + e.method);
@@ -946,8 +963,89 @@ async function copyText(t) {
   try { await navigator.clipboard.writeText(t); toast('Copied'); } catch (e) { prompt('Copy:', t); }
 }
 
+// ---------------------------------------------------------------- updates (only when served by the binary)
+let updStatus = null, updPoll = null;
+async function fetchUpdateStatus() {
+  if (MODE !== 'server') return;
+  try {
+    const r = await fetch('/api/update', { cache: 'no-store' });
+    if (r.ok) { updStatus = await r.json(); renderUpdate(); }
+  } catch (e) { /* the binary is away (restarting) or has no updater */ }
+}
+function renderUpdate() {
+  const s = updStatus; if (!s) return;
+  $('#updVersion').textContent = s.version + (s.platform ? ' (' + s.platform + ')' : '');
+  $('#setAutoUpdate').checked = !!s.autoCheck;
+  const badge = $('#updateBadge');
+  badge.hidden = s.state !== 'newer';
+  if (s.state === 'newer') badge.textContent = 'Update ' + s.latest.version;
+  const when = s.lastCheck ? new Date(s.lastCheck).toLocaleString() : '';
+  let html;
+  if (s.restarting) html = '<div class="hint">Restarting with the new version…</div>';
+  else if (s.downloading) html = `<div>Downloading ${esc(s.latest ? s.latest.assetName : '')}…</div><progress max="${s.total || 1}" value="${s.received}"></progress><div class="hint">${fmtSize(s.received)}${s.total ? ' / ' + fmtSize(s.total) : ''}</div>`;
+  else if (s.checking) html = '<div class="hint">Checking…</div>';
+  else if (s.state === 'newer') {
+    const l = s.latest;
+    html = `<div><b>simple-rest ${esc(l.version)}</b> is available` + (l.publishedAt ? ` <span class="hint">(${new Date(l.publishedAt).toLocaleDateString()})</span>` : '') + '</div>';
+    if (l.notes) html += `<pre class="notes">${esc(l.notes)}</pre>`;
+    html += '<div class="bar" style="padding:8px 0 0">' + (s.canInstall
+      ? '<button class="primary" id="updInstallBtn">Install and restart</button>'
+      : `<span class="hint">This copy cannot update itself: ${esc(s.cannotInstallReason || '')}.</span>`)
+      + ` <a href="${esc(s.page)}" target="_blank" rel="noopener">Download page</a></div>`;
+    if (s.error) html += `<div class="hint" style="color:var(--err)">${esc(s.error)}</div>`;
+  } else if (s.state === 'uptodate') html = `<div class="hint">This is the newest release${when ? ' (checked ' + when + ')' : ''}.</div>`;
+  else if (s.state === 'failed') html = `<div class="hint" style="color:var(--err)">Could not check for updates: ${esc(s.error || 'connection problem')}. Check the connection and try again.</div>`;
+  else html = '<div class="hint">Not checked yet.</div>';
+  $('#updBox').innerHTML = html;
+  const ib = $('#updInstallBtn'); if (ib) ib.addEventListener('click', installUpdate);
+}
+async function checkUpdate() {
+  const btn = $('#updCheckBtn'); btn.disabled = true;
+  try { const r = await fetch('/api/update/check', { method: 'POST' }); updStatus = await r.json(); }
+  catch (e) { toast('Check failed: ' + e.message); }
+  btn.disabled = false; renderUpdate();
+}
+async function installUpdate() {
+  try {
+    const r = await fetch('/api/update/install', { method: 'POST' });
+    const s = await r.json();
+    if (!r.ok) { toast(s.error || 'Update failed'); return; }
+    updStatus = s; renderUpdate(); pollUpdate();
+  } catch (e) { toast('Update failed: ' + e.message); }
+}
+// pollUpdate follows the download, then waits for the new binary to answer
+// with another version number and reloads the page.
+function pollUpdate() {
+  clearInterval(updPoll);
+  const oldVersion = updStatus.version;
+  let failures = 0;
+  updPoll = setInterval(async () => {
+    try {
+      const r = await fetch('/api/update', { cache: 'no-store' });
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      const s = await r.json();
+      if (s.version !== oldVersion) { clearInterval(updPoll); location.reload(); return; }
+      failures = 0; updStatus = s; renderUpdate();
+      if (!s.downloading && !s.restarting) clearInterval(updPoll);
+    } catch (e) {
+      if (++failures > 60) {
+        clearInterval(updPoll);
+        $('#updBox').innerHTML = '<div class="hint" style="color:var(--err)">The program did not come back after the restart. Start it again by hand.</div>';
+      }
+    }
+  }, 700);
+}
+
 // ---------------------------------------------------------------- events
 function wire() {
+  $('#setAutoUpdate').addEventListener('change', async e => {
+    try {
+      const r = await fetch('/api/update/settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ autoCheck: e.target.checked }) });
+      updStatus = await r.json(); renderUpdate();
+    } catch (err) { toast('Could not save the setting: ' + err.message); }
+  });
+  $('#updCheckBtn').addEventListener('click', checkUpdate);
+  $('#updateBadge').addEventListener('click', () => $('#settingsBtn').click());
   $('#reqName').addEventListener('input', e => { cur.name = e.target.value; markDirty(); });
   $('#method').addEventListener('change', e => { cur.method = e.target.value; markDirty(); });
   $('#url').addEventListener('input', e => { cur.url = e.target.value; syncParamsFromUrl(); changed(); });
@@ -1027,6 +1125,7 @@ function wire() {
     $('#setTimeout').value = s.timeoutMs; $('#setRedirects').checked = s.followRedirects; $('#setTls').checked = s.verifyTls;
     $('#setCookies').checked = s.cookies; $('#setHistory').checked = s.history;
     $('#settingsModal').classList.add('open');
+    fetchUpdateStatus();
   });
   $('#setTimeout').addEventListener('input', e => { state.settings.timeoutMs = +e.target.value || 30000; persist(); });
   $('#setRedirects').addEventListener('change', e => { state.settings.followRedirects = e.target.checked; persist(); });
@@ -1059,14 +1158,21 @@ async function init() {
   await detectMode();
   await loadState();
   $('#dataPathInfo').textContent = MODE === 'server' ? info.dataPath : 'browser localStorage (this browser profile only)';
+  $('#updSection').hidden = MODE !== 'server';
   wire();
   renderEnvSelect();
   loadRequest(newRequest(), null);
   renderHistory();
   setSideTab('coll');
   showRespTab('body');
+  fetchUpdateStatus();
+  setInterval(fetchUpdateStatus, 15 * 60 * 1000);
 }
-init();
+
+// The pure parts are exposed for the Node tests in tests/; the page itself
+// starts only when the markup is there.
+globalThis.__sr = { state, splitUrl, parseQuery, encName, encValue, subst, activeVars, buildEffective, highlightJSON, normalizeRequest, newRequest, paramsFromUrl, importPostmanCollection, fromPostmanRequest, toCurl };
+if (typeof document !== 'undefined' && document.querySelector('#url')) init();
 })();
 </script>
 </body>

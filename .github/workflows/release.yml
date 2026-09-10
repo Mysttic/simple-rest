@@ -1,0 +1,176 @@
+# Runs after a merge into master. Publishes a release only when VERSION.md is
+# above the newest v* tag; otherwise every job after "Version" is skipped.
+# Then the same files are copied to Mysttic/Mysttic, the public site, under
+# the tag simple-rest-v<version>, and that project's older releases there are
+# removed. Needs the HUB_TOKEN secret (see README, "Wydania").
+name: Release
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  version:
+    name: Version
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+      tag: ${{ steps.v.outputs.tag }}
+      previous: ${{ steps.v.outputs.previous }}
+      publishing: ${{ steps.v.outputs.publishing }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Compare VERSION.md with the newest tag
+        id: v
+        run: |
+          set -o pipefail
+          sh scripts/release-version.sh | tee -a "$GITHUB_OUTPUT"
+
+      - name: Decision
+        env:
+          VERSION: ${{ steps.v.outputs.version }}
+          PUBLISHING: ${{ steps.v.outputs.publishing }}
+        run: |
+          if [ "$PUBLISHING" = "true" ]; then
+            echo "Publishing v$VERSION." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "VERSION.md was not raised ($VERSION is already released), nothing to publish." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+  test:
+    name: Tests
+    needs: version
+    if: needs.version.outputs.publishing == 'true'
+    uses: ./.github/workflows/ci.yml
+
+  release:
+    name: Release on GitHub
+    needs: [version, test]
+    if: needs.version.outputs.publishing == 'true'
+    runs-on: ubuntu-latest
+    env:
+      VERSION: ${{ needs.version.outputs.version }}
+      TAG: ${{ needs.version.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Build every platform
+        run: sh build.sh
+
+      - name: Release notes from CHANGELOG.md
+        run: |
+          set -euo pipefail
+          {
+            sh scripts/changelog-section.sh "$VERSION"
+            echo
+            echo "Pobieranie: https://mysttic.github.io/Mysttic/simple-rest/"
+          } > notes.md
+          cat notes.md
+
+      - name: Tag and release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          count=$(ls -1 dist | wc -l)
+          if [ "$count" -ne 9 ]; then
+            echo "::error::Expected 9 files in dist (8 binaries and the checksums), got $count."
+            exit 1
+          fi
+          gh release create "$TAG" dist/* \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "simple-rest $VERSION" \
+            --notes-file notes.md \
+            --target "$GITHUB_SHA"
+          echo "Released $TAG with $count files." >> "$GITHUB_STEP_SUMMARY"
+
+  site:
+    name: Copy to the site
+    needs: [version, release]
+    if: needs.version.outputs.publishing == 'true'
+    runs-on: ubuntu-latest
+    env:
+      HUB: Mysttic/Mysttic
+      PROJECT: simple-rest
+      NAME: simple-rest
+      SITE: https://mysttic.github.io/Mysttic/simple-rest/
+      VERSION: ${{ needs.version.outputs.version }}
+      TAG: ${{ needs.version.outputs.tag }}
+      HUB_TAG: simple-rest-v${{ needs.version.outputs.version }}
+    steps:
+      - name: Credential for the site repository
+        env:
+          HUB_TOKEN: ${{ secrets.HUB_TOKEN }}
+        run: |
+          set -uo pipefail
+          if [ -z "${HUB_TOKEN:-}" ]; then
+            echo "::error::No HUB_TOKEN secret. Release $TAG was made, the copy to the site was not."
+            echo "::error::Needs a personal token with Contents: read and write on $HUB."
+            exit 1
+          fi
+
+      - name: Files from the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p copy
+          gh release download "$TAG" --repo "$GITHUB_REPOSITORY" \
+            --dir copy --pattern "$PROJECT-*"
+          ls -la copy
+          if [ "$(ls -1 copy | wc -l)" -ne 9 ]; then
+            echo "::error::Expected nine files in release $TAG."
+            exit 1
+          fi
+
+      - name: Release notes
+        run: |
+          set -euo pipefail
+          {
+            echo "$NAME $VERSION"
+            echo
+            echo "$SITE"
+          } > notes.md
+          cat notes.md
+
+      - name: Release on the site
+        env:
+          GH_TOKEN: ${{ secrets.HUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          if gh release view "$HUB_TAG" --repo "$HUB" >/dev/null 2>&1; then
+            gh release delete "$HUB_TAG" --repo "$HUB" --cleanup-tag --yes
+          fi
+          gh release create "$HUB_TAG" copy/* \
+            --repo "$HUB" \
+            --title "$NAME $VERSION" \
+            --notes-file notes.md \
+            --target master
+
+      - name: The site keeps one version
+        env:
+          GH_TOKEN: ${{ secrets.HUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          gh release list --repo "$HUB" --limit 100 --json tagName -q '.[].tagName' \
+            | { grep -E "^$PROJECT-v" || true; } \
+            | { grep -vxF "$HUB_TAG" || true; } \
+            | while read -r old; do
+                echo "Deleting $old"
+                gh release delete "$old" --repo "$HUB" --cleanup-tag --yes
+              done
+          echo "$HUB_TAG stays on the site" >> "$GITHUB_STEP_SUMMARY"

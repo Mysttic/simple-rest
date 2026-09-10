@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>simple-rest, a REST client in one file</title>
+<meta name="description" content="A Postman-like REST client that is one file: no installation, no account, no cloud. The UI runs in your browser, the requests are sent by the program, so CORS never gets in the way.">
+<link rel="icon" href="img/icon.svg">
+<link rel="stylesheet" href="../assets/style.css">
+<script src="../assets/theme.js"></script>
+</head>
+<body>
+
+<header class="top">
+  <div class="wrap">
+    <img src="img/icon.svg" alt="" loading="lazy" decoding="async">
+    <b>simple-rest</b>
+    <nav>
+      <a href="#download">Download</a>
+      <a href="#features">Features</a>
+      <a href="#privacy">Privacy</a>
+      <a href="../">Other projects</a>
+      <button class="theme" type="button" data-theme-toggle hidden></button>
+    </nav>
+  </div>
+</header>
+
+<div class="hero wrap">
+  <h1>A REST client<br>that is one file</h1>
+  <p class="lead">
+    Collections, environments, history and a response viewer, like the big
+    tools, without the installer, the account or the cloud.
+  </p>
+  <p class="claim">Download one file, run it, the browser opens. That is the whole setup.</p>
+</div>
+
+<div class="downloads wrap" id="download">
+  <h2>Download</h2>
+  <p class="release">
+    Latest release: <span class="badge" id="release-version">checking…</span>
+    <span id="release-date"></span>
+  </p>
+
+  <div class="tiles">
+    <div class="tile">
+      <h3>Windows</h3>
+      <p class="what">
+        One <code>.exe</code>, no installer. Put it in a folder of its own: it
+        keeps its data next to itself and updates itself in place.
+      </p>
+      <a class="button" id="download-win" href="#" aria-disabled="true">Download for Windows x64</a>
+      <span class="size" id="size-win"></span>
+    </div>
+
+    <div class="tile">
+      <h3>Windows on ARM</h3>
+      <p class="what">For Snapdragon laptops and other ARM64 machines.</p>
+      <a class="button" id="download-winarm" href="#" aria-disabled="true">Download for Windows ARM64</a>
+      <span class="size" id="size-winarm"></span>
+    </div>
+
+    <div class="tile">
+      <h3>Linux</h3>
+      <p class="what">
+        A static binary for any distribution. <code>chmod +x</code>, run, done.
+      </p>
+      <a class="button" id="download-linux" href="#" aria-disabled="true">Download for Linux x64</a>
+      <span class="size" id="size-linux"></span>
+    </div>
+
+    <div class="tile">
+      <h3>Raspberry Pi</h3>
+      <p class="what">
+        64-bit build for Pi 3, 4 and 5 on a 64-bit OS; the 32-bit build runs on
+        every Pi, the Zero included.
+      </p>
+      <a class="button" id="download-rpi64" href="#" aria-disabled="true">Download for Pi (64-bit)</a>
+      <span class="size" id="size-rpi64"></span>
+      <a class="button" id="download-rpi32" href="#" aria-disabled="true">Download for Pi (32-bit)</a>
+      <span class="size" id="size-rpi32"></span>
+    </div>
+
+    <div class="tile">
+      <h3>macOS</h3>
+      <p class="what">Apple Silicon or Intel. Not notarised, so allow it once in System Settings.</p>
+      <a class="button" id="download-macarm" href="#" aria-disabled="true">Download for Apple Silicon</a>
+      <span class="size" id="size-macarm"></span>
+      <a class="button" id="download-macintel" href="#" aria-disabled="true">Download for Intel</a>
+      <span class="size" id="size-macintel"></span>
+    </div>
+
+    <div class="tile">
+      <h3>Android</h3>
+      <p class="what">
+        Runs inside Termux: copy the file into the Termux home directory,
+        <code>chmod +x</code>, start it and open <code>http://127.0.0.1:8787/</code>
+        in Chrome.
+      </p>
+      <a class="button" id="download-android" href="#" aria-disabled="true">Download for Android (Termux)</a>
+      <span class="size" id="size-android"></span>
+    </div>
+
+    <div class="tile">
+      <h3>Checksums</h3>
+      <p class="what">SHA-256 of every file above, the same list the updater inside the app verifies against.</p>
+      <a class="button" id="download-sums" href="#" aria-disabled="true">Download checksums</a>
+      <span class="size" id="size-sums"></span>
+    </div>
+  </div>
+
+  <p class="note">
+    The files are not signed with a certificate, so Windows SmartScreen shows
+    “Windows protected your PC”. Choose “More info”, then “Run anyway”. Once
+    running, the app can tell you when a newer release is out and install it
+    for you; that check stays off until you turn it on in Settings.
+  </p>
+</div>
+
+<section class="band">
+  <div class="wrap">
+    <h2 id="features">What it does</h2>
+    <p class="intro">
+      Everything a day of API work needs, in a browser tab served by a 7 MB
+      binary.
+    </p>
+
+    <div class="features">
+      <div class="feature">
+        <h3>No CORS in the way</h3>
+        <p>
+          The page in your browser only talks to the program on localhost. The
+          program sends the real request, so any API answers, with every header
+          visible.
+        </p>
+      </div>
+      <div class="feature">
+        <h3>Requests, the usual way</h3>
+        <p>
+          Every method, query parameters synced with the URL, headers, raw or
+          form bodies, Basic, Bearer and API key auth, timeouts, redirects, TLS
+          verification and a cookie jar.
+        </p>
+      </div>
+      <div class="feature">
+        <h3>Collections and environments</h3>
+        <p>
+          Saved requests in collections, a history of what you sent, and
+          <code>{{variables}}</code> from the active environment substituted in
+          URL, headers, body and auth.
+        </p>
+      </div>
+      <div class="feature">
+        <h3>Reads what Postman exports</h3>
+        <p>
+          Import a Postman Collection v2.1 or a Postman environment, export
+          your own as JSON, copy any request as a <code>curl</code> command.
+        </p>
+      </div>
+      <div class="feature">
+        <h3>Responses you can read</h3>
+        <p>
+          Status, time, size and protocol, headers, JSON with colours, raw text,
+          an HTML or image preview, copy or save the body to a file.
+        </p>
+      </div>
+      <div class="feature">
+        <h3>Your data stays in one file</h3>
+        <p>
+          Collections, history and environments live in a JSON file next to the
+          program. Move the folder and everything comes along.
+        </p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="band">
+  <div class="wrap">
+    <h2 id="privacy">Privacy</h2>
+    <p class="intro">
+      The program listens on 127.0.0.1 only and refuses requests from other
+      origins and hosts, so nothing else on the machine or the network can use
+      it as a proxy.
+    </p>
+    <div class="features">
+      <div class="feature">
+        <h3>Nothing leaves on its own</h3>
+        <p>
+          No telemetry, no account, nothing collected. The only outbound
+          request the app makes by itself is the check for a newer release,
+          and it stays off until you turn it on.
+        </p>
+      </div>
+      <div class="feature">
+        <h3>Updates you can verify</h3>
+        <p>
+          The updater fetches the release from this site, checks the size and
+          the SHA-256 against the published list, and only then swaps the
+          file.
+        </p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <span>simple-rest, MIT licence</span>
+    <span>Windows 10 or 11, Linux, Raspberry Pi, macOS, Android with Termux</span>
+    <a href="../">More projects by Mysttic</a>
+  </div>
+</footer>
+
+<script src="../assets/releases.js"></script>
+<script>
+// The only per-project settings on this page. The suffixes are the release
+// contract that build.sh writes and the updater inside the app reads.
+initDownloads({
+  tagPrefix: 'simple-rest-v',
+  files: [
+    { id: 'win', match: /-windows-amd64\.exe$/ },
+    { id: 'winarm', match: /-windows-arm64\.exe$/ },
+    { id: 'linux', match: /-linux-amd64$/ },
+    { id: 'rpi64', match: /-linux-arm64$/ },
+    { id: 'rpi32', match: /-linux-armv6$/ },
+    { id: 'macarm', match: /-macos-arm64$/ },
+    { id: 'macintel', match: /-macos-amd64$/ },
+    { id: 'android', match: /-android-arm64$/ },
+    { id: 'sums', match: /-checksums\.txt$/ }
+  ]
+});
+</script>
+</body>
+</html>
