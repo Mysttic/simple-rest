@@ -1,29 +1,63 @@
-# Runs on every pull request into develop or master (and on pushes to
-# develop). A pull request into master also gets a preview of what merging
-# it publishes. The Release workflow reuses the test job through workflow_call.
+# Runs the tests on a pull request from develop into master, on a manual run
+# and when another workflow calls it. Nothing else starts CI any more: a push
+# to develop, or a pull request into develop, runs nothing at all.
+#
+# A pull request into master from a branch other than develop leaves every job
+# skipped, and GitHub reports such a run as green. That is a deliberate trade
+# for the Actions minutes this account has left, not a gap to be plugged with
+# a gate job that fails the run.
+#
+# The three-platform build stays: on a linux/amd64 runner neither go vet nor
+# go test ever compiles restart_windows.go (//go:build windows), and gofmt only
+# reads the source, so "sh build.sh" is the only step here that proves the
+# windows/amd64 and linux/arm64 targets still build. What went is the dist/
+# artifact it used to upload - that upload, not the build itself, was this
+# repository's largest consumer of the account-wide Actions storage.
+#
+# A pull request into master also gets a preview of what merging it publishes.
 name: CI
 
 on:
   pull_request:
-    branches: [master, develop]
-  push:
-    branches: [develop]
+    branches: [master]
+    paths-ignore:
+      - 'README.md'
+      - 'docs/**'
+      - 'site/**'
+      - '.gitignore'
+      - 'LICENSE'
   workflow_call:
   workflow_dispatch:
 
 permissions:
   contents: read
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   test:
     name: Tests
+    # github.head_ref is empty outside a pull request, so a manual run and a
+    # workflow_call still reach the steps.
+    if: github.event_name != 'pull_request' || github.head_ref == 'develop'
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
           cache: false
+      # setup-go caches modules, and this repository has none. What pays off
+      # is the compiler cache that go vet and go test fill.
+      - name: Go build cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/go-build
+          key: ${{ runner.os }}-gobuild-test-${{ hashFiles('go.mod', '**/*.go') }}
+          restore-keys: ${{ runner.os }}-gobuild-test-
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -43,32 +77,37 @@ jobs:
       - name: UI tests
         run: node --test "tests/**/*.test.mjs"
 
+      # Cross-compiles windows/amd64, linux/amd64 and linux/arm64 into dist/.
+      # Nothing uploads dist/ any more; the point is that the build fails here,
+      # on the pull request, instead of in release.yml after the merge.
       - name: Build every platform
         run: sh build.sh
 
-      - name: Keep the build for review
-        uses: actions/upload-artifact@v4
-        with:
-          name: dist
-          path: dist/
-          retention-days: 7
-
   e2e:
     name: Update path end to end
+    if: github.event_name != 'pull_request' || github.head_ref == 'develop'
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
           cache: false
+      - name: Go build cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/go-build
+          key: ${{ runner.os }}-gobuild-e2e-${{ hashFiles('go.mod', '**/*.go') }}
+          restore-keys: ${{ runner.os }}-gobuild-e2e-
       - name: A 0.9.0 copy updates itself from a fake hub
         run: sh scripts/e2e-update.sh
 
   release-preview:
     name: Release preview
-    if: github.event_name == 'pull_request' && github.base_ref == 'master'
+    if: github.event_name == 'pull_request' && github.base_ref == 'master' && github.head_ref == 'develop'
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
         with:
