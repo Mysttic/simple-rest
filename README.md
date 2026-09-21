@@ -109,8 +109,9 @@ Kopia zgłaszająca inny numer, do testów updatera:
 
 ## Rozwój i testy
 
-Gałęzie: `develop` (praca) i `master` (wydania). Zmiany wchodzą przez PR; przed merge
-CI musi przejść.
+Gałęzie: `develop` (praca) i `master` (wydania). CI nie odpala się na `develop` — testy
+uruchamiaj lokalnie (komendy niżej) albo ręcznie z zakładki Actions (`workflow_dispatch`);
+automatycznie sprawdzany jest dopiero PR `develop` → `master`.
 
 ```
 go test ./... -count=1                 # serwer, proxy, guard, updater (z fałszywym hubem)
@@ -123,10 +124,21 @@ node scripts/screenshots.mjs           # zrzuty do site/simple-rest/img/ (Edge a
 kopią zgłaszającą starszą wersję, po czym robi zrzuty przez protokół DevTools. Dzięki temu
 obrazki na stronie są prawdziwe i odtwarzalne po każdej zmianie interfejsu.
 
-Workflow `CI` (`.github/workflows/ci.yml`) uruchamia to wszystko na każdym PR do `develop`
-i `master` oraz przy push do `develop`, do tego `gofmt`, `go vet` i build wszystkich
-platform. PR do `master` dostaje dodatkowo job „Release preview” z informacją, czy merge
-opublikuje wydanie.
+Workflow `CI` (`.github/workflows/ci.yml`) uruchamia to wszystko, razem z `gofmt` i
+`go vet`, wyłącznie przy PR z `develop` do `master`. Push do `develop` i PR do `develop`
+nie odpalają już nic; awaryjnie zostaje ręczne uruchomienie z zakładki Actions
+(`workflow_dispatch`). PR do `master` z innej gałęzi niż `develop` pomija wszystkie joby,
+więc GitHub pokaże taki przebieg jako zielony — to świadoma decyzja, a nie przeoczenie:
+konto jest na limicie minut Actions. Build wszystkich platform (`sh build.sh`) zostaje w CI
+— na runnerze linuksowym `go vet` i `go test` nie kompilują `restart_windows.go`, więc jest
+to jedyny krok sprawdzający cele windows/amd64 i linux/arm64; zniknął tylko upload `dist/`
+jako artefakt przebiegu. PR z `develop` dostaje dodatkowo job „Release preview” z informacją,
+czy merge opublikuje wydanie.
+
+W repozytorium nie ma już żadnego przebiegu cyklicznego ani sprzątania Actions storage.
+Artefaktów przebiegów nie wysyła teraz nic, ale logi każdego przebiegu nadal liczą się do
+wspólnego dla konta limitu storage. Jeśli limit się zapcha, czyści się go ręcznie —
+z zakładki Actions albo `gh api -X DELETE /repos/Mysttic/simple-rest/actions/runs/<id>/logs`.
 
 ## Wydania
 
@@ -140,6 +152,11 @@ opublikuje wydanie.
   z plikami z `dist/`, a potem job `site` kopiuje te same pliki do Mysttic/Mysttic pod
   tagiem `simple-rest-v<wersja>` i usuwa tam starsze wydania projektu. Bez podniesienia
   `VERSION.md` merge nie publikuje nic. Obniżenie numeru zatrzymuje workflow z błędem.
+  Pełnego CI tu nie ma — te same testy poszły już na PR `develop` → `master`, na tym
+  samym drzewie.
+  Zostaje krótki job `Tests` (`go test` i testy UI, ok. 2 min) przed buildem: `master` nie
+  jest gałęzią chronioną, więc push prosto na `master` omija PR, a job `site` kasuje
+  poprzednie wydanie ze strony bezpowrotnie — nie ma do czego wrócić.
 
 Procedura wydania:
 
