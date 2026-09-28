@@ -146,8 +146,11 @@ z zakładki Actions albo `gh api -X DELETE /repos/Mysttic/simple-rest/actions/ru
   go przy budowaniu, więc binarka i tag zawsze się zgadzają.
 - `CHANGELOG.md` opisuje zmiany w każdej wersji (format Keep a Changelog). Wydanie wymaga
   sekcji `## [x.y.z]` dla numeru z `VERSION.md`; jej treść staje się opisem release.
-- Workflow `Release` (`.github/workflows/release.yml`) startuje po każdym push do `master`
-  (czyli po merge PR z `develop`) i publikuje tylko wtedy, gdy `VERSION.md` jest wyższy od
+- Workflow `Release` (`.github/workflows/release.yml`) startuje po push do `master`, który
+  zmienia `VERSION.md` (czyli po merge PR z `develop` z podbitym numerem); zmiana samego
+  `CHANGELOG.md`, kodu lub workflowa przy niewydanym numerze (np. po nieudanym przebiegu)
+  nie uruchamia nic i wymaga ręcznego „Run workflow” na `master` — tylko z `master`, z innej
+  gałęzi workflow pomija wszystkie joby. Publikuje tylko wtedy, gdy `VERSION.md` jest wyższy od
   najnowszego tagu `v*`. Wtedy: testy, build, tag `v<wersja>` i release w tym repozytorium
   z plikami z `dist/`, a potem job `site` kopiuje te same pliki do Mysttic/Mysttic pod
   tagiem `simple-rest-v<wersja>` i usuwa tam starsze wydania projektu. Bez podniesienia

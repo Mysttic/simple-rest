@@ -1,5 +1,6 @@
-# Runs after a merge into master. Publishes a release only when VERSION.md is
-# above the newest v* tag; otherwise every job after "Version" is skipped.
+# Runs after a push to master that changes VERSION.md (see the trigger below).
+# Publishes a release only when VERSION.md is above the newest v* tag;
+# otherwise every job after "Version" is skipped.
 # Then the same files are copied to Mysttic/Mysttic, the public site, under
 # the tag simple-rest-v<version>, and that project's older releases there are
 # removed. Needs the HUB_TOKEN secret (see README, "Wydania").
@@ -13,8 +14,31 @@
 name: Release
 
 on:
+  # The push trigger is limited to VERSION.md, the only file the "Version" job
+  # reads the version from (scripts/release-version.sh). A merge that leaves it
+  # alone can never publish anything, yet it used to start a runner just to
+  # find that out - a billed minute with no build and no release.
+  # What follows from the filter:
+  # - a push to master that does not touch VERSION.md starts nothing at all,
+  #   not even "Version";
+  # - a push that edits VERSION.md without raising the number still costs the
+  #   one-minute "Version" job, and everything after it is skipped;
+  # - an edit to this workflow alone, a CHANGELOG.md fix pushed after a run
+  #   that stopped for a missing "## [x.y.z]" section, or any merge or push
+  #   without VERSION.md (a code fix, say) after a run that failed before the
+  #   tag or never started, starts no release by itself (on a pull request
+  #   from develop the "Release preview" in ci.yml warns about it): use
+  #   "Run workflow" (workflow_dispatch) on master, which compares VERSION.md
+  #   with the newest tag the same way and publishes only while v<version>
+  #   does not exist yet. A run that failed after creating the tag
+  #   (for instance in "site") is retried with "Re-run failed jobs" instead.
+  # - a push of more than 3,000 changed files may not start the workflow even
+  #   when VERSION.md is one of them (GitHub's limit on path filters): use
+  #   "Run workflow" on master.
   push:
     branches: [master]
+    paths:
+      - 'VERSION.md'
   workflow_dispatch:
 
 permissions:
@@ -27,6 +51,10 @@ concurrency:
 jobs:
   version:
     name: Version
+    # "Run workflow" lets anyone pick a branch; releasing from anything but
+    # master would tag an unreviewed commit and replace the site's release.
+    # Skipping this job skips every job after it.
+    if: github.ref == 'refs/heads/master'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     outputs:
