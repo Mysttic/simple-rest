@@ -2,7 +2,8 @@
 
 Wszystkie istotne zmiany w projekcie. Format według [Keep a Changelog](https://keepachangelog.com/pl/1.1.0/),
 numeracja według [SemVer](https://semver.org/lang/pl/). Numer bieżącej wersji jest w `VERSION.md`;
-release powstaje po merge do `master`, gdy ten numer jest wyższy od ostatniego wydanego tagu.
+release powstaje po merge do `master`, który zmienia `VERSION.md`, gdy ten numer jest wyższy od
+ostatniego wydanego tagu.
 
 ## [Unreleased]
 

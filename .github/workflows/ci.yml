@@ -124,9 +124,19 @@ jobs:
           VERSION: ${{ steps.v.outputs.version }}
           PREVIOUS: ${{ steps.v.outputs.previous }}
           PUBLISHING: ${{ steps.v.outputs.publishing }}
+        # release.yml starts on a push to master only when that push changes
+        # VERSION.md. HEAD here is the test merge of this PR into master, so
+        # HEAD^1 is master and this diff is what the merge pushes. A version
+        # left unreleased by an earlier failed (or never started) run is not
+        # published by a merge that leaves VERSION.md alone.
         run: |
-          if [ "$PUBLISHING" = "true" ]; then
-            echo "Merging this PR publishes **v$VERSION** (newest release so far: $PREVIOUS) and copies it to the site." >> "$GITHUB_STEP_SUMMARY"
-          else
+          touched=$(git diff --name-only HEAD^1 HEAD -- VERSION.md)
+          if [ "$PUBLISHING" != "true" ]; then
             echo "VERSION.md holds $VERSION, the same as the newest release: merging publishes nothing." >> "$GITHUB_STEP_SUMMARY"
+          elif [ -z "$touched" ]; then
+            msg="VERSION.md holds $VERSION, not released yet (newest release: $PREVIOUS), but this PR does not change VERSION.md: merging it starts no release. After the merge use Run workflow on the Release workflow, on master."
+            echo "::warning::$msg"
+            echo "$msg" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "Merging this PR publishes **v$VERSION** (newest release so far: $PREVIOUS) and copies it to the site." >> "$GITHUB_STEP_SUMMARY"
           fi
