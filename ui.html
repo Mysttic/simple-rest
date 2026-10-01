@@ -702,9 +702,9 @@ async function detectMode() {
 }
 
 let toastTimer;
-function toast(msg) {
+function toast(msg, ms = 2500) {
   const t = $('#toast'); t.textContent = msg; t.classList.add('show');
-  clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('show'), 2500);
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('show'), ms);
 }
 
 // ---------------------------------------------------------------- variables
@@ -1147,8 +1147,8 @@ function download(name, content, type) {
   setTimeout(() => URL.revokeObjectURL(a.href), 2000);
 }
 // The top-level keys of our own format that this version knows: those of an
-// export and those of the data file, which imports too. Any other key comes
-// from a newer version and is skipped.
+// export and those of the data file, which imports too. Any other key of such
+// a file comes from a newer version and is skipped.
 const EXPORT_KEYS = ['app', 'exportedAt', ...STATE_KEYS];
 // exportData is what Export writes: a copy, so the caller may change it.
 function exportData() {
@@ -1159,15 +1159,17 @@ function exportAll() {
 }
 // importFiles reads every file before it touches the state: a sync while a
 // file is read replaces the state and would drop what earlier files added.
-// It alone tells the user what came in and what did not.
+// It alone tells the user what came in and what did not, files it could not
+// import included, in one toast that stays longer the more it says.
 async function importFiles(files) {
   const texts = await Promise.all(files.map(f => f.text().catch(() => '')));
   let nc = 0, ne = 0, unsupported = 0;
-  const skipped = [];
+  const skipped = [], failed = [];
   files.forEach((f, i) => {
-    let data; try { data = JSON.parse(texts[i]); } catch (e) { toast('Not a JSON file: ' + f.name); return; }
-    const got = importData(data);
-    if (!got.collections.length && !got.envs.length && !got.skipped.length) { toast('Unrecognized format: ' + f.name); return; }
+    let data; try { data = JSON.parse(texts[i]); } catch (e) { failed.push('Not a JSON file: ' + f.name); return; }
+    // importData leaves the state alone, so a file it throws on adds nothing.
+    let got = null; try { got = importData(data); } catch (e) { /* reported below */ }
+    if (!got || (!got.collections.length && !got.envs.length && !got.skipped.length)) { failed.push('Unrecognized format: ' + f.name); return; }
     state.collections.push(...got.collections); state.envs.push(...got.envs);
     nc += got.collections.length; ne += got.envs.length; unsupported += got.unsupported;
     for (const k of got.skipped) if (!skipped.includes(k)) skipped.push(k);
@@ -1177,22 +1179,28 @@ async function importFiles(files) {
   if (nc || ne) msg.push(`Imported ${nc} collection(s), ${ne} environment(s)`);
   if (unsupported) msg.push(`${unsupported} request(s) use OAuth 2.0 or pre-request scripts, which are not imported`);
   if (skipped.length) msg.push(`Skipped: ${skipped.join(', ')} (needs a newer simple-rest)`);
-  if (msg.length) toast(msg.join('. '));
+  msg.push(...failed);
+  const text = msg.join('. ');
+  if (text) toast(text, Math.max(2500, text.length * 60));
 }
 function paramsFromUrl(r) {
   const disabled = r.params.filter(p => !p.enabled);
   r.params = parseQuery(splitUrl(r.url)[1]).concat(disabled);
 }
-// importData reads one parsed file: our export (or data file), a Postman v2.1
-// collection or a Postman environment. It leaves the state alone and gives
-// back what to add, with new ids. skipped names the top-level keys of our
-// format that only a newer version knows; unsupported counts the Postman
-// requests that use OAuth 2.0 or pre-request scripts, which are not imported.
-// Nothing recognized gives empty lists.
+// importData reads one parsed file: our export (or data file), a Postman
+// collection (v2.0 or v2.1) or a Postman environment. It leaves the state
+// alone and gives back what to add, with new ids. skipped names the top-level
+// keys of our format that only a newer version knows; unsupported counts the
+// Postman requests that use OAuth 2.0 or pre-request scripts, which are not
+// imported. Nothing recognized gives empty lists.
 function importData(d) {
   const out = { collections: [], envs: [], schedules: [], tcp: [], skipped: [], unsupported: 0 };
   if (!d || typeof d !== 'object' || Array.isArray(d)) return out;
   if (d.app === 'simple-rest' || Array.isArray(d.collections) || Array.isArray(d.envs)) {
+    // Other files with a collections or envs array import too, but only an
+    // export or a data file of ours (which always has history and settings)
+    // has keys that a newer simple-rest would know.
+    const ours = d.app === 'simple-rest' || (Object.hasOwn(d, 'history') && Object.hasOwn(d, 'settings'));
     for (const x of arr(d.collections)) {
       const c = obj(x);
       out.collections.push({ id: uid(), name: str(c.name) || 'Imported', open: true, requests: arr(c.requests).map(r => Object.assign(normalizeRequest(r), { id: uid() })) });
@@ -1201,7 +1209,7 @@ function importData(d) {
       const e = obj(x);
       out.envs.push({ id: uid(), name: str(e.name) || 'env', vars: arr(e.vars).map(normalizeRow) });
     }
-    out.skipped = Object.keys(d).filter(k => !EXPORT_KEYS.includes(k));
+    if (ours) out.skipped = Object.keys(d).filter(k => !EXPORT_KEYS.includes(k));
   } else if (d.info && Array.isArray(d.item)) {
     const c = importPostmanCollection(d, out);
     out.collections.push(c);
@@ -1261,7 +1269,10 @@ function fromPostmanRequest(it, prefix, parentAuth = null) {
     r.body.mode = 'form';
     r.body.form = (b.urlencoded || []).map(f => ({ enabled: !f.disabled, name: f.key || '', value: String(f.value ?? '') }));
   }
-  const a = pmAuth(pr.auth) || parentAuth, get = (arr, k) => { const x = (arr || []).find(y => y.key === k); return x ? String(x.value ?? '') : ''; };
+  // Postman v2.1 keeps the auth attributes as a list of {key, value}, v2.0 as
+  // an object; anything else gives empty values.
+  const a = pmAuth(pr.auth) || parentAuth;
+  const get = (list, k) => str(Array.isArray(list) ? obj(list.find(y => obj(y).key === k)).value : obj(list)[k]);
   if (a && a.type === 'basic') { r.auth.type = 'basic'; r.auth.username = get(a.basic, 'username'); r.auth.password = get(a.basic, 'password'); }
   else if (a && a.type === 'bearer') { r.auth.type = 'bearer'; r.auth.token = get(a.bearer, 'token'); }
   else if (a && a.type === 'apikey') { r.auth.type = 'apikey'; r.auth.keyName = get(a.apikey, 'key'); r.auth.keyValue = get(a.apikey, 'value'); r.auth.keyIn = get(a.apikey, 'in') === 'query' ? 'query' : 'header'; }

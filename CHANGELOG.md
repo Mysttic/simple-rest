@@ -18,10 +18,13 @@ ostatniego wydanego tagu.
   najbliższego folderu, a potem kolekcji, a `noauth` daje brak auth. Zmienne kolekcji
   (`variable`) trafiają do nowego środowiska `<nazwa kolekcji> variables`. OAuth 2.0
   i skrypty pre-request nie są importowane, a powiadomienie po imporcie podaje liczbę
-  takich zapytań.
+  takich zapytań. Auth zapisane jako obiekt (Postman v2.0) też jest czytane.
 - Import pliku z nowszej wersji importuje to, co ta wersja zna, a o reszcie mówi
   w powiadomieniu, np. `Skipped: tcp (needs a newer simple-rest)`, zamiast
   `Unrecognized format`.
+- Jedno powiadomienie po imporcie podsumowuje wszystkie wybrane pliki, także te, których
+  nie udało się zaimportować, i znika tym później, im jest dłuższe. Plik, którego nie da
+  się odczytać, nie przerywa importu pozostałych.
 
 ### Zmienione
 

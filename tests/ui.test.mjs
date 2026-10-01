@@ -195,6 +195,24 @@ test('Postman import: noauth means no auth and stops the inheritance', () => {
   assert.equal(a['Public / Mine'].type, 'basic', 'a request below noauth may still set its own');
 });
 
+test('Postman import reads auth attributes kept as an object (v2.0) and passes over broken ones', () => {
+  const a = authOf(sr.importPostmanCollection({
+    info: { name: 'V20' }, auth: { type: 'bearer', bearer: { token: 'abc' } },
+    item: [
+      { name: 'Top', request: { url: 'http://h/top' } },
+      { name: 'F', auth: { type: 'basic', basic: { username: 'ala', password: 'kot' } }, item: [{ name: 'In', request: { url: 'http://h/in' } }] },
+      { name: 'Key', request: { url: 'http://h/k', auth: { type: 'apikey', apikey: { key: 'K', value: 'V', in: 'query' } } } },
+      { name: 'Null', request: { url: 'http://h/n', auth: { type: 'basic', basic: [null, 'x', { key: 'username', value: 'u' }] } } },
+      { name: 'Junk', request: { url: 'http://h/j', auth: { type: 'bearer', bearer: 'x' } } },
+    ],
+  }));
+  assert.deepEqual([a.Top.type, a.Top.token], ['bearer', 'abc'], 'from the collection');
+  assert.deepEqual([a['F / In'].type, a['F / In'].username, a['F / In'].password], ['basic', 'ala', 'kot'], 'from the folder');
+  assert.deepEqual([a.Key.type, a.Key.keyName, a.Key.keyValue, a.Key.keyIn], ['apikey', 'K', 'V', 'query']);
+  assert.deepEqual([a.Null.type, a.Null.username, a.Null.password], ['basic', 'u', '']);
+  assert.deepEqual([a.Junk.type, a.Junk.token], ['bearer', '']);
+});
+
 test('Postman import: collection variables become an environment, and an environment file one too', () => {
   const ui = loadUI();
   const got = ui.importData({
@@ -274,6 +292,13 @@ test('importData reads our own format, skips what only a newer version knows and
   assert.deepEqual(ui.importData({ app: 'simple-rest', version: 1, tcp: [] }).skipped, ['tcp'], 'an export with nothing this version knows');
   const dataFile = ui.importData({ version: 1, collections: [{ name: 'A', requests: [] }], history: [{ id: 'h' }], envs: [], activeEnv: '', settings: { timeoutMs: 1 } });
   assert.deepEqual([dataFile.collections.length, dataFile.skipped], [1, []], 'the keys of the data file are known');
+  const newerFile = ui.importData({ version: 1, collections: [], history: [], envs: [{ name: 'E' }], activeEnv: '', settings: {}, tcp: [] });
+  assert.deepEqual([newerFile.envs.length, newerFile.skipped], [1, ['tcp']], 'a data file of a newer version');
+  // The legacy Postman data dump has a collections array too, but is not ours:
+  // a newer simple-rest would not import the rest of it either.
+  const dump = ui.importData({ version: 1, collections: [{ name: 'Old', requests: [{ url: 'http://h', method: 'GET' }] }], environments: [{ name: 'Prod', values: [] }], headerPresets: [], globals: [] });
+  assert.deepEqual([dump.collections.map(c => c.name), dump.skipped], [['Old'], []], 'a file of another tool');
+  assert.deepEqual(ui.importData({ envs: [{ name: 'E' }], other: 1 }).skipped, []);
   // There is no document here: a toast from importData would throw.
   for (const d of [null, 'text', 42, [1, 2], { foo: 1 }, { info: { name: 'x' } }]) {
     const none = ui.importData(d);
@@ -326,4 +351,43 @@ test('importFiles adds what importData found and sums it up in one toast', async
   await ui.importFiles([file('broken.json', '{')]);
   assert.equal(shown(), 'Not a JSON file: broken.json');
   assert.deepEqual(ui.state.collections.map(c => c.name), ['One', 'Shop'], 'nothing more came in');
+});
+
+test('importFiles names the files it could not import in the same toast, which stays longer when it says more', async t => {
+  const timers = fakeTimers();
+  const ui = loadUI();
+  globalThis.document = fakeDom();
+  // The save that importFiles schedules fires while the clock runs: without
+  // the program it goes to localStorage.
+  const saved = Object.getOwnPropertyDescriptor(globalThis, 'localStorage');
+  Object.defineProperty(globalThis, 'localStorage', { value: { getItem: () => null, setItem() {} }, configurable: true, writable: true });
+  t.after(() => {
+    timers.restore(); delete globalThis.document;
+    delete globalThis.localStorage; if (saved) Object.defineProperty(globalThis, 'localStorage', saved);
+  });
+  const file = (name, data) => ({ name, text: async () => (typeof data === 'string' ? data : JSON.stringify(data)) });
+  const el = globalThis.document.querySelector('#toast');
+
+  await ui.importFiles([
+    file('good.json', { app: 'simple-rest', version: 1, collections: [{ name: 'Good', requests: [] }], envs: [] }),
+    file('broken.json', '{'),
+    file('other.json', { foo: 1 }),
+    // importData throws on a null query entry; the file adds nothing and the
+    // others still come in.
+    file('bad.postman_collection.json', { info: { name: 'Bad' }, item: [{ name: 'A', request: { url: { raw: 'http://h/a', query: [null] } } }] }),
+    file('v20.postman_collection.json', { info: { name: 'V20' }, auth: { type: 'bearer', bearer: { token: 'abc' } }, item: [{ name: 'A', request: { url: 'http://h/a', auth: { type: 'oauth2' } } }] }),
+  ]);
+  assert.deepEqual(ui.state.collections.map(c => c.name), ['Good', 'V20']);
+  assert.equal(ui.saveInfo().pending, true, 'saved');
+  const text = 'Imported 2 collection(s), 0 environment(s). 1 request(s) use OAuth 2.0 or pre-request scripts, which are not imported. '
+    + 'Not a JSON file: broken.json. Unrecognized format: other.json. Unrecognized format: bad.postman_collection.json';
+  assert.equal(el.textContent, text);
+  await timers.run(2500);
+  assert.ok(el.classList.contains('show'), 'still shown after the usual 2.5 s');
+  await timers.run(text.length * 60 - 2500);
+  assert.ok(!el.classList.contains('show'), 'gone after 60 ms per character');
+
+  await ui.importFiles([file('other.json', { foo: 1 })]);
+  await timers.run(2500);
+  assert.ok(!el.classList.contains('show'), 'a short toast goes after 2.5 s');
 });
