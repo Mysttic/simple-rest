@@ -767,8 +767,29 @@ func (p hostPolicy) describe() string {
 	return s + "; other names need -allow-host"
 }
 
+// flagName reports whether a refused name is plain enough to hand back as a
+// ready -allow-host flag: labels of letters, digits, hyphens and underscores,
+// none starting or ending with a hyphen, joined by dots. A Host header may
+// also carry characters such as ; & $ ( ) % ! * or a comma, which a shell
+// pasted into would act on or -allow-host would read as a second name.
+func flagName(n string) bool {
+	for _, label := range strings.Split(n, ".") {
+		if label == "" || label[0] == '-' || label[len(label)-1] == '-' {
+			return false
+		}
+		for i := 0; i < len(label); i++ {
+			c := label[i]
+			if !('a' <= c && c <= 'z' || '0' <= c && c <= '9' || c == '-' || c == '_') {
+				return false
+			}
+		}
+	}
+	return true
+}
+
 // refuseHost answers 403 to a Host name the policy does not take. The first
-// time a name comes, the console says so too, with the flag that lets it in.
+// time a name comes, the console says so too, with the flag that lets it in
+// when the name is plain enough for one (flagName).
 func (a *app) refuseHost(w http.ResponseWriter, r *http.Request, host string) {
 	name := normHost(host)
 	if name == "" {
@@ -785,6 +806,13 @@ func (a *app) refuseHost(w http.ResponseWriter, r *http.Request, host string) {
 		a.refused[name] = true
 	}
 	a.refusedMu.Unlock()
+	if !flagName(name) {
+		if first {
+			a.logq.printf("refused host %q (from %s): open simple-rest by its IP address", name, hostOnly(r.RemoteAddr))
+		}
+		http.Error(w, fmt.Sprintf("forbidden host %q: open simple-rest by its IP address", name), http.StatusForbidden)
+		return
+	}
 	if first {
 		a.logq.printf("refused host %q (from %s): to open simple-rest by this name, start it with -allow-host %s", name, hostOnly(r.RemoteAddr), name)
 	}

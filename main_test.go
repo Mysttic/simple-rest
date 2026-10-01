@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net"
 	"net/http"
@@ -508,6 +509,40 @@ func TestHostGuard(t *testing.T) {
 	open.refusedMu.Unlock()
 	if kept != 3 {
 		t.Errorf("refused names kept: %d, want 3", kept)
+	}
+
+	// A Host header may also carry characters a shell acts on, or a comma that
+	// -allow-host would read as a second name. Such a name gets no ready flag,
+	// neither in the answer nor in the console; a plain DNS name still does.
+	odd := []string{"x;reboot;.example", "x&calc&.example", "$(reboot).example", "a.example,evil.example",
+		"x'y.example", "x%path%.example", "x!y.example", "x*.example", "x=y.example", "x+y.example", "x~y.example"}
+	for _, h := range odd {
+		want := fmt.Sprintf("forbidden host %q: open simple-rest by its IP address", h)
+		if code, body := hostStatus(t, srv, h+":8787"); code != http.StatusForbidden || body != want {
+			t.Errorf("Host %q: %d %q", h, code, body)
+		}
+	}
+	for _, h := range []string{"xn--bcher-kva.example", "my_pc.firma.pl", "a-1.b2.example"} {
+		if code, body := hostStatus(t, srv, h+":8787"); code != http.StatusForbidden || !strings.HasSuffix(body, "-allow-host "+h) {
+			t.Errorf("Host %q: %d %q", h, code, body)
+		}
+	}
+	if !open.logq.flush(time.Second) {
+		t.Fatal("log queue did not flush")
+	}
+	mu.Lock()
+	got = append([]string(nil), lines[3:]...)
+	mu.Unlock()
+	if len(got) != len(odd)+3 {
+		t.Fatalf("console lines: %.600q", got)
+	}
+	for i, h := range odd {
+		if want := fmt.Sprintf("refused host %q (from 127.0.0.1): open simple-rest by its IP address", h); got[i] != want {
+			t.Errorf("console line %q, want %q", got[i], want)
+		}
+	}
+	if !strings.HasSuffix(got[len(odd)], "-allow-host xn--bcher-kva.example") {
+		t.Errorf("console line %q", got[len(odd)])
 	}
 
 	all := newApp(filepath.Join(t.TempDir(), "d.json"), false)

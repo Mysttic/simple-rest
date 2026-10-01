@@ -310,7 +310,8 @@ nazwą z `-allow-host`. Wielkość liter i kropka na końcu nazwy nie mają znac
 temu obca strona nie skieruje przez DNS rebinding swojej nazwy na ten komputer, żeby czytać
 odpowiedzi programu.
 Inna nazwa dostaje 403 z podpowiedzią, a konsola przy pierwszym odrzuceniu danej nazwy
-podaje gotową flagę, np. `-allow-host pc123.firma.pl`. `-allow-host "*"` wyłącza to
+podaje gotową flagę, np. `-allow-host pc123.firma.pl`. Nazwa ze znakami innymi niż litery,
+cyfry, myślnik, podkreślnik i kropka gotowej flagi nie dostaje. `-allow-host "*"` wyłącza to
 sprawdzanie, jak przed wersją 1.2.0, a program ostrzega o tym przy starcie. Gwiazdka
 w cudzysłowie podwójnym działa w cmd, PowerShell i sh; w cmd apostrofy (`'*'`) trafiają do
 programu razem z gwiazdką i sprawdzanie zostaje włączone. Przy nasłuchu na 127.0.0.1 flaga
