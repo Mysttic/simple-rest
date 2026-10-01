@@ -93,7 +93,9 @@ Każdy zapis idzie z nagłówkiem `If-Match`. Jeśli plik zmieniła w międzycza
 albo inny komputer, program odrzuca zapis i plik zostaje bez zmian. Karta pokazuje wtedy
 baner z przyciskiem Reload i do przeładowania niczego nie zapisuje, więc ostatnią zmianę
 trzeba po przeładowaniu zrobić jeszcze raz. Strona otwarta z innej wersji programu (np.
-karta sprzed aktualizacji) dostaje taki sam baner i niczego nie nadpisze.
+karta sprzed aktualizacji) też niczego nie nadpisze. Strona z wersji 1.2.0 lub nowszej
+pokazuje wtedy taki sam baner, a karta z wersji 1.1.0 lub starszej przy każdej próbie
+zapisu pokazuje powiadomienie „Save failed” z prośbą o przeładowanie strony.
 
 Wybór środowiska na górnym pasku dotyczy tylko bieżącej karty i przeżywa jej
 przeładowanie. Plik pamięta ostatni wybór jako środowisko startowe nowej karty.

@@ -390,10 +390,18 @@ const arr = v => Array.isArray(v) ? v : [];
 const toMs = v => Math.max(0, Math.trunc(+v) || 0);
 const SWITCHES = ['followRedirects', 'verifyTls', 'cookies'];
 const AUTH_KEYS = ['type', 'username', 'password', 'token', 'keyName', 'keyValue', 'keyIn'];
+// setOwn and assignOwn work like an assignment and Object.assign, but define
+// the key: JSON.parse makes "__proto__" a plain key, and an assignment would
+// replace the prototype of t with its value instead of keeping the key.
+const setOwn = (t, k, v) => Object.defineProperty(t, k, { value: v, enumerable: true, writable: true, configurable: true });
+function assignOwn(t, src) {
+  for (const k of Object.keys(src)) setOwn(t, k, src[k]);
+  return t;
+}
 
 const newRow = () => ({ enabled: true, name: '', value: '' });
 function normalizeRow(x) {
-  const r = Object.assign(newRow(), obj(x));
+  const r = assignOwn(newRow(), obj(x));
   r.enabled = r.enabled === undefined || !!r.enabled;
   r.name = str(r.name); r.value = str(r.value);
   return r;
@@ -411,11 +419,12 @@ function newRequest(s = state.settings) {
 function normalizeRequest(r, s = state.settings) {
   const d = newRequest(s);
   r = obj(r);
-  const out = Object.assign(d, r, {
+  const known = {
     id: str(r.id) || d.id, name: str(r.name), method: String(r.method || 'GET').toUpperCase(), url: str(r.url),
     params: arr(r.params).map(normalizeRow), headers: arr(r.headers).map(normalizeRow),
-    body: Object.assign(d.body, obj(r.body)), auth: Object.assign(d.auth, obj(r.auth)), options: Object.assign(d.options, obj(r.options)),
-  });
+    body: assignOwn(d.body, obj(r.body)), auth: assignOwn(d.auth, obj(r.auth)), options: assignOwn(d.options, obj(r.options)),
+  };
+  const out = Object.assign(assignOwn(d, r), known);
   const b = out.body;
   b.raw = str(b.raw); b.form = arr(b.form).map(normalizeRow);
   if (!Object.hasOwn(RAW_TYPES, b.rawType)) b.rawType = 'text';
@@ -430,20 +439,20 @@ function normalizeRequest(r, s = state.settings) {
 // stay on their objects.
 function normalizeDoc(data) {
   const d = obj(data);
-  const settings = Object.assign({ ...DEFAULT_SETTINGS }, obj(d.settings));
+  const settings = assignOwn({ ...DEFAULT_SETTINGS }, obj(d.settings));
   settings.timeoutMs = toMs(settings.timeoutMs);
   for (const k of SWITCHES) settings[k] = !!settings[k];
   const collections = arr(d.collections).map(x => {
-    const c = Object.assign({ id: '', name: '', open: true, requests: [] }, obj(x));
+    const c = assignOwn({ id: '', name: '', open: true, requests: [] }, obj(x));
     return Object.assign(c, { id: str(c.id) || uid(), name: str(c.name) || 'Collection', open: c.open !== false, requests: arr(c.requests).map(r => normalizeRequest(r, settings)) });
   });
   const envs = arr(d.envs).map(x => {
-    const e = Object.assign({ id: '', name: '', vars: [] }, obj(x));
+    const e = assignOwn({ id: '', name: '', vars: [] }, obj(x));
     return Object.assign(e, { id: str(e.id) || uid(), name: str(e.name) || 'env', vars: arr(e.vars).map(normalizeRow) });
   });
   const activeEnv = str(d.activeEnv);
   const extra = {};
-  for (const k of Object.keys(d)) if (!STATE_KEYS.includes(k)) extra[k] = d[k];
+  for (const k of Object.keys(d)) if (!STATE_KEYS.includes(k)) setOwn(extra, k, d[k]);
   return {
     version: 1, collections, history: arr(d.history).slice(0, 200), envs,
     activeEnv: envs.some(e => e.id === activeEnv) ? activeEnv : '', settings, extra,
@@ -451,14 +460,15 @@ function normalizeDoc(data) {
 }
 // applyState refills state from a normalized document. keepEnv keeps the
 // environment of this tab (a sync); otherwise the tab takes the one it had
-// before a reload, or else the one in the file.
+// before a reload, or else the one in the file. '' (No environment) is a
+// choice like any other; an environment that is gone is not.
 function applyState(doc, { keepEnv = false } = {}) {
   const want = keepEnv ? [state.activeEnv] : [loadTabEnv(), doc.activeEnv];
   for (const k of STATE_KEYS) state[k] = doc[k];
   extraKeys = doc.extra || {};
-  state.activeEnv = want.find(id => id && findEnv(id)) || '';
+  state.activeEnv = want.find(id => id === '' || (id && findEnv(id))) ?? '';
 }
-const serializeState = () => JSON.stringify(Object.assign({}, extraKeys, state));
+const serializeState = () => JSON.stringify(Object.assign(assignOwn({}, extraKeys), state));
 
 // The active environment belongs to the tab: sessionStorage outlives a reload
 // but not the tab, and the file keeps the last choice only as the start value
@@ -517,7 +527,12 @@ async function putState() {
   const data = serializeState();
   if (data === lastSynced) { setSaveState('ok'); return true; }
   if (MODE !== 'server') {
-    try { localStorage.setItem('simple-rest', data); } catch (e) { toast('Save failed: ' + e.message); setSaveState('unsaved'); return false; }
+    // localStorage has no If-Match: a save over what another tab saved since
+    // this tab last looked is a conflict, as a 412 is.
+    try {
+      if ((localStorage.getItem('simple-rest') || '') !== lastSynced) { setSaveState('conflict'); return false; }
+      localStorage.setItem('simple-rest', data);
+    } catch (e) { toast('Save failed: ' + e.message); setSaveState('unsaved'); return false; }
     lastSynced = data;
     setSaveState('ok');
     return true;
@@ -849,9 +864,12 @@ function buildEffective(r, vars = activeVars()) {
 
 // ---------------------------------------------------------------- sending
 let sending = false;
+// sendRequest keeps its own copy of the request: a sync may load another
+// version of it into the editor while the answer is on its way.
 async function sendRequest() {
   if (sending) return;
-  const eff = buildEffective(cur);
+  const sent = clone(cur);
+  const eff = buildEffective(sent);
   if (!eff.url) { toast('URL is empty'); $('#url').focus(); return; }
   sending = true;
   const btn = $('#sendBtn'); btn.innerHTML = '<span class="spin"></span>'; btn.disabled = true;
@@ -871,8 +889,8 @@ async function sendRequest() {
   }
   sending = false; btn.textContent = 'Send'; btn.disabled = false;
   lastResponse = res;
-  renderResponse(res);
-  addHistory();
+  renderResponse(res, eff.url);
+  addHistory(sent);
 }
 async function sendDirect(eff, t0) {
   const h = new Headers();
@@ -892,9 +910,9 @@ async function sendDirect(eff, t0) {
   }
   return { status: r.status, statusText: r.statusText, proto: '', headers, body, bodyBase64, size: bytes.length, timeMs: performance.now() - t0, finalUrl: r.url };
 }
-function addHistory() {
+function addHistory(req) {
   if (!state.settings.history) return;
-  const snap = clone(cur); snap.id = uid();
+  const snap = clone(req); snap.id = uid();
   state.history.unshift({ id: uid(), at: Date.now(), req: snap });
   if (state.history.length > 200) state.history.length = 200;
   renderHistory(); persist();
@@ -922,7 +940,9 @@ function highlightJSON(text) {
   }
   return out + esc(text.slice(last));
 }
-function renderResponse(res) {
+// renderResponse shows res; url is where the request went, so a different
+// final URL is a redirect.
+function renderResponse(res, url) {
   const out = $('#respOut');
   $('#respHeaders').innerHTML = '';
   $('#cntRespHeaders').textContent = '';
@@ -935,7 +955,7 @@ function renderResponse(res) {
   }
   const cls = 'c' + String(res.status)[0];
   setStatus(res.status + ' ' + (res.statusText || ''), cls, fmtMs(res.timeMs) + ' · ' + fmtSize(res.size) + (res.proto ? ' · ' + res.proto : ''));
-  const sentUrl = buildEffective(cur).url.replace(/ /g, '%20');
+  const sentUrl = url.replace(/ /g, '%20');
   if (res.finalUrl && res.finalUrl !== sentUrl) $('#respUrl').textContent = '→ ' + res.finalUrl;
   if (res.error) toast(res.error);
   $('#respHeaders').innerHTML = '<table class="hdrs">' + res.headers.map(h => `<tr><td>${esc(h.name)}</td><td>${esc(h.value)}</td></tr>`).join('') + '</table>';
@@ -1129,12 +1149,15 @@ function download(name, content, type) {
 function exportAll() {
   download('simple-rest-export.json', JSON.stringify({ app: 'simple-rest', version: 1, exportedAt: new Date().toISOString(), collections: state.collections, envs: state.envs }, null, 2), 'application/json');
 }
+// importFiles reads every file before it touches the state: a sync while a
+// file is read replaces the state and would drop what earlier files added.
 async function importFiles(files) {
+  const texts = await Promise.all(files.map(f => f.text().catch(() => '')));
   let nc = 0, ne = 0;
-  for (const f of files) {
-    let data; try { data = JSON.parse(await f.text()); } catch (e) { toast('Not a JSON file: ' + f.name); continue; }
+  files.forEach((f, i) => {
+    let data; try { data = JSON.parse(texts[i]); } catch (e) { toast('Not a JSON file: ' + f.name); return; }
     const [c, e] = importData(data, f.name); nc += c; ne += e;
-  }
+  });
   persist(); renderCollections(); renderEnvSelect();
   if (nc || ne) toast(`Imported ${nc} collection(s), ${ne} environment(s)`);
 }
@@ -1441,7 +1464,7 @@ async function init() {
 globalThis.__sr = {
   state, splitUrl, parseQuery, encName, encValue, subst, activeVars, buildEffective, highlightJSON, normalizeRequest, newRequest, paramsFromUrl, importPostmanCollection, fromPostmanRequest, toCurl,
   str, normalizeRow, normalizeDoc, applyState, serializeState, findEnv, varsOf, setActiveEnv, detectMode, loadState, loadRequest,
-  persist, persistNow, flushPersist, syncIfBehind, installUpdate,
+  persist, persistNow, flushPersist, syncIfBehind, installUpdate, sendRequest, importFiles,
   saveInfo: () => ({ saveState, lastTag, lastSynced, pending: savePending() }),
   editorInfo: () => ({ cur, collId: curCollId, saved: savedSnapshot }),
 };

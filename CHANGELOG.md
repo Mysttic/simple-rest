@@ -21,7 +21,9 @@ ostatniego wydanego tagu.
   wersji programu dostaje 409, a brak `If-Match` daje 428. Gdy plik zmienił się w innej
   karcie albo na innym komputerze, zapis dostaje 412 z `{"error": ...}` i plik zostaje bez
   zmian. W obu przypadkach karta pokazuje baner z przyciskiem Reload i do przeładowania
-  niczego nie zapisuje.
+  niczego nie zapisuje. Karta otwarta jeszcze z wersji 1.1.0 nie ma banera: przy każdej
+  próbie zapisu pokazuje komunikat 409 w powiadomieniu „Save failed” i też niczego nie
+  nadpisuje.
 - Wybór środowiska dotyczy karty i przeżywa jej przeładowanie. Plik pamięta go tylko jako
   środowisko startowe nowej karty.
 - Klucze, których ta wersja nie zna (na najwyższym poziomie pliku, w ustawieniach,

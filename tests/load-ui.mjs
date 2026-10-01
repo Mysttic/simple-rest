@@ -26,12 +26,14 @@ export const sr = loadUI();
 // ---- fakes for the tests that go past the pure functions
 
 // FakeElement stands in for any element the page touches: it takes any
-// property, ignores events, and what it looks up inside itself is new.
+// property, keeps its listeners for dispatch(), and what it looks up inside
+// itself is new. closest(sel) gives what a test put into parents[sel].
 class FakeElement {
   constructor(tag = 'div') {
     Object.assign(this, {
       tagName: tag.toUpperCase(), hidden: false, value: '', textContent: '', innerHTML: '', className: '',
       checked: false, disabled: false, style: {}, dataset: {}, children: [], isConnected: true,
+      parents: {}, listeners: {},
     });
     const cls = new Set();
     this.classList = {
@@ -41,14 +43,20 @@ class FakeElement {
       contains: c => cls.has(c),
     };
   }
-  addEventListener() {}
-  removeEventListener() {}
+  addEventListener(type, fn, opts) { (this.listeners[type] ||= []).push({ fn, once: !!(opts && opts.once) }); }
+  removeEventListener(type, fn) { this.listeners[type] = (this.listeners[type] || []).filter(l => l.fn !== fn); }
+  // dispatch calls the listeners of type, and drops those added with once.
+  dispatch(type) {
+    const ls = this.listeners[type] || [];
+    this.listeners[type] = ls.filter(l => !l.once);
+    for (const l of ls) l.fn({ type, target: this });
+  }
   querySelector() { return new FakeElement(); }
   // A key/value row has three inputs: the checkbox, the name and the value.
   querySelectorAll() { return [new FakeElement('input'), new FakeElement('input'), new FakeElement('input')]; }
   appendChild(c) { this.children.push(c); return c; }
   insertRow() { return new FakeElement('tr'); }
-  closest() { return null; }
+  closest(sel) { return this.parents[sel] || null; }
   remove() {}
   focus() {}
   select() {}

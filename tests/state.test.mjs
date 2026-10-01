@@ -30,18 +30,24 @@ function res(status, body = '', headers = {}) {
 
 // fakeServer answers like the program does: /api/info, and GET and PUT of
 // /api/state with ETag, If-None-Match, X-Simple-Rest-Version and If-Match.
-// change() is a save made elsewhere; hold() keeps answers back until release().
+// /api/send answers 200 from the URL it was sent to. change() is a save made
+// elsewhere; hold(url) keeps answers back (only for url, if given) until
+// release().
 function fakeServer(doc) {
-  const s = { version: '1.2.0', text: JSON.stringify(doc), tag: '"t1"', n: 1, calls: [], down: false, gate: null };
+  const s = { version: '1.2.0', text: JSON.stringify(doc), tag: '"t1"', n: 1, calls: [], down: false, gate: null, gateUrl: null };
   s.change = d => { s.text = JSON.stringify(d); s.tag = `"t${++s.n}"`; };
-  s.hold = () => { let open; s.gate = new Promise(r => { open = r; }); s.release = () => { s.gate = null; open(); }; };
+  s.hold = (url = null) => { let open; s.gate = new Promise(r => { open = r; }); s.gateUrl = url; s.release = () => { s.gate = null; open(); }; };
   s.count = (method, url = '/api/state') => s.calls.filter(c => c.method === method && c.url === url).length;
   s.fetch = async (url, init = {}) => {
     const method = init.method || 'GET', h = init.headers || {};
     s.calls.push({ method, url, headers: h, body: init.body });
     if (s.down) throw new TypeError('Failed to fetch');
-    if (s.gate) await s.gate;
+    if (s.gate && (!s.gateUrl || s.gateUrl === url)) await s.gate;
     if (url === '/api/info') return res(200, JSON.stringify({ mode: 'server', version: s.version, os: 'linux', arch: 'amd64', dataPath: '/d.json' }));
+    if (url === '/api/send') {
+      const sent = JSON.parse(init.body).url;
+      return res(200, JSON.stringify({ status: 200, statusText: 'OK', headers: [], body: '{}', size: 2, timeMs: 1, finalUrl: sent }));
+    }
     if (url !== '/api/state') return res(404, 'not found');
     if (method === 'GET') {
       if (h['If-None-Match'] === s.tag) return res(304, '', { ETag: s.tag });
@@ -113,6 +119,28 @@ test('normalizeDoc keeps what it does not know through serializeState', () => {
     version: 1, collections: [], history: [], envs: [], activeEnv: '',
     settings: { timeoutMs: 30000, followRedirects: true, verifyTls: true, cookies: true, history: true },
   }, 'no file: defaults, and the keys of the previous file are gone');
+});
+
+test('normalizeDoc keeps a key named __proto__ as a plain key', () => {
+  const sr = loadUI();
+  const text = '{"version":1,"__proto__":{"x":1},"settings":{"__proto__":{"y":2}},'
+    + '"collections":[{"id":"c","name":"C","__proto__":{"c":3},"requests":[{"id":"r","__proto__":{"r":4},"options":{"__proto__":{"o":5}}}]}],'
+    + '"envs":[{"id":"e","name":"n","__proto__":{"z":6},"vars":[{"name":"v","__proto__":{"w":7}}]}]}';
+  const doc = sr.normalizeDoc(JSON.parse(text));
+  const req = doc.collections[0].requests[0];
+  for (const o of [doc.extra, doc.settings, doc.collections[0], req, req.options, doc.envs[0], doc.envs[0].vars[0]]) {
+    assert.equal(Object.getPrototypeOf(o), Object.prototype, 'the prototype stays');
+  }
+  sr.applyState(doc);
+  const out = JSON.parse(sr.serializeState());
+  const own = o => Object.getOwnPropertyDescriptor(o, '__proto__')?.value;
+  assert.deepEqual(own(out), { x: 1 }, 'top level');
+  assert.deepEqual(own(out.settings), { y: 2 }, 'settings');
+  assert.deepEqual(own(out.collections[0]), { c: 3 }, 'collection');
+  assert.deepEqual(own(out.collections[0].requests[0]), { r: 4 }, 'request');
+  assert.deepEqual(own(out.collections[0].requests[0].options), { o: 5 }, 'request options');
+  assert.deepEqual(own(out.envs[0]), { z: 6 }, 'environment');
+  assert.deepEqual(own(out.envs[0].vars[0]), { w: 7 }, 'row');
 });
 
 test('normalizeDoc applies the type rules', () => {
@@ -188,6 +216,11 @@ test('a reloaded tab takes its environment from sessionStorage', async t => {
 test('a tab whose environment is gone takes the one from the file', async t => {
   const { sr } = await setup(t, DOC, { session: { 'simple-rest-env': 'gone' } });
   assert.equal(sr.state.activeEnv, 'e1');
+});
+
+test('a tab that picked No environment keeps it over a reload', async t => {
+  const { sr } = await setup(t, DOC, { session: { 'simple-rest-env': '' } });
+  assert.equal(sr.state.activeEnv, '', 'the file names e1');
 });
 
 test('the tab keeps its own environment', async t => {
@@ -370,6 +403,59 @@ test('syncIfBehind waits for a pending save', async t => {
   assert.deepEqual(JSON.parse(server.text).collections, []);
 });
 
+test('a typed value in a modal field holds the sync until the field loses focus', async t => {
+  const { sr, server } = await setup(t, DOC);
+  const theirs = copy(DOC);
+  theirs.collections[0].name = 'Theirs';
+  server.change(theirs);
+  const field = document.createElement('input');
+  field.dataset.held = '1';
+  document.activeElement = field;
+  assert.equal(await sr.syncIfBehind(), 'applied', 'outside an open modal the field holds nothing');
+
+  theirs.collections[0].name = 'Theirs again';
+  server.change(theirs);
+  field.parents['.modal-bg.open'] = document.createElement('div');
+  const gets = server.count('GET');
+  assert.equal(await sr.syncIfBehind(), 'deferred');
+  assert.equal(await sr.syncIfBehind(), 'deferred');
+  assert.equal(server.count('GET'), gets, 'the file is not asked for');
+  assert.equal(field.listeners.focusout.length, 1, 'one wait for the field');
+  assert.equal(sr.state.collections[0].name, 'Theirs');
+
+  document.activeElement = null;
+  field.dispatch('focusout');
+  await settle();
+  assert.equal(server.count('GET'), gets + 1);
+  assert.equal(sr.state.collections[0].name, 'Theirs again');
+});
+
+test('a sync puts the cursor back into the table cell the redraw replaced', async t => {
+  const { sr, server, el } = await setup(t, DOC);
+  el('#envModal').classList.add('open');
+  const table = el('#envVarsTable');
+  table.id = 'envVarsTable';
+  const td = document.createElement('td');
+  Object.assign(td, { cellIndex: 2, parentNode: { rowIndex: 1 } });
+  const field = document.createElement('input');
+  Object.assign(field, { selectionStart: 2, selectionEnd: 4, parents: { td, table } });
+  // Redrawing the table (kvTable) takes the old field out of the page.
+  Object.defineProperty(table, 'innerHTML', { set() { field.isConnected = false; }, get() { return ''; } });
+  const fresh = document.createElement('input');
+  fresh.focus = () => { document.activeElement = fresh; };
+  fresh.setSelectionRange = (a, b) => { fresh.selection = [a, b]; };
+  table.rows = [null, { cells: [null, null, { querySelector: s => (s === 'input' ? fresh : null) }] }];
+  document.activeElement = field;
+
+  const theirs = copy(DOC);
+  theirs.envs[0].vars[0].value = 'http://other';
+  server.change(theirs);
+  assert.equal(await sr.syncIfBehind(), 'applied');
+  assert.equal(field.isConnected, false, 'the environment table was redrawn');
+  assert.equal(document.activeElement, fresh);
+  assert.deepEqual(fresh.selection, [2, 4]);
+});
+
 test('a sync loads the open request into a clean editor and keeps unsaved edits', async t => {
   const { sr, server } = await setup(t, DOC);
   sr.loadRequest(sr.state.collections[0].requests[0], 'c1');
@@ -395,6 +481,50 @@ test('a sync loads the open request into a clean editor and keeps unsaved edits'
   assert.equal(sr.editorInfo().cur.url, 'http://h/mine');
 });
 
+test('Send records the request it sent, also when a sync reloads the editor meanwhile', async t => {
+  const { sr, server, el } = await setup(t, DOC);
+  sr.loadRequest(sr.state.collections[0].requests[0], 'c1');
+  server.hold('/api/send');
+  const send = sr.sendRequest();
+  await settle();
+  const theirs = copy(DOC);
+  theirs.collections[0].requests[0].url = 'http://h/v2';
+  server.change(theirs);
+  assert.equal(await sr.syncIfBehind(), 'applied');
+  assert.equal(sr.editorInfo().cur.url, 'http://h/v2', 'the clean editor took the new version');
+  server.release();
+  await send;
+  assert.equal(JSON.parse(server.calls.find(c => c.url === '/api/send').body).url, 'http://h/login');
+  assert.equal(sr.state.history[0].req.url, 'http://h/login', 'history has what was sent');
+  assert.equal(el('#respUrl').textContent, '', 'no redirect line: the answer came from the URL that was sent');
+});
+
+test('an import of several files changes the state in one go, so a sync cannot drop a file', async t => {
+  const { sr, server, timers, el } = await setup(t, DOC);
+  const theirs = copy(DOC);
+  theirs.collections.push({ id: 'c2', name: 'Theirs', open: true, requests: [] });
+  server.change(theirs);
+  // Closing the file chooser focuses the window: a sync starts while the files are read.
+  server.hold();
+  const sync = sr.syncIfBehind();
+  let second;
+  const imported = sr.importFiles([
+    { name: 'one.json', text: async () => JSON.stringify({ collections: [{ name: 'One', requests: [] }] }) },
+    { name: 'two.json', text: () => new Promise(r => { second = () => r(JSON.stringify({ collections: [{ name: 'Two', requests: [] }] })); }) },
+  ]);
+  await settle();
+  server.release();
+  assert.equal(await sync, 'applied');
+  second();
+  await imported;
+  await timers.run(400);
+  const names = ['API', 'Theirs', 'One', 'Two'];
+  assert.deepEqual(sr.state.collections.map(c => c.name), names);
+  assert.deepEqual(JSON.parse(server.text).collections.map(c => c.name), names);
+  assert.equal(sr.saveInfo().saveState, 'ok');
+  assert.equal(el('#toast').textContent, 'Imported 2 collection(s), 0 environment(s)');
+});
+
 test('without the program: localStorage, and what another tab saved there', async t => {
   const { sr, server, local } = await setup(t, DOC, { standalone: true });
   assert.equal(sr.state.collections[0].name, 'API');
@@ -406,4 +536,25 @@ test('without the program: localStorage, and what another tab saved there', asyn
   assert.equal(await sr.syncIfBehind(), 'applied');
   assert.deepEqual(sr.state.collections, []);
   assert.equal(server.calls.length, 0, 'the program is never asked');
+});
+
+test('without the program: a save over what another tab saved is a conflict', async t => {
+  const { sr: a, local, timers, el } = await setup(t, DOC, { standalone: true });
+  const b = loadUI();
+  await b.detectMode();
+  await b.loadState();
+  b.state.collections[0].name = 'Changed in B';
+  assert.equal(await b.persistNow(), true);
+
+  a.state.envs[0].name = 'Changed in A';
+  a.persist();
+  assert.equal(await a.syncIfBehind(), 'deferred', 'the storage event finds a save pending');
+  await timers.run(400);
+  assert.equal(a.saveInfo().saveState, 'conflict');
+  assert.equal(el('#conflictBanner').hidden, false);
+  const saved = JSON.parse(local.getItem('simple-rest'));
+  assert.equal(saved.collections[0].name, 'Changed in B', 'the save of the other tab stays');
+  assert.equal(saved.envs[0].name, 'local');
+  assert.equal(await b.syncIfBehind(), 'same');
+  assert.equal(b.state.collections[0].name, 'Changed in B');
 });
