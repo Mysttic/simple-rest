@@ -1146,53 +1146,103 @@ function download(name, content, type) {
   document.body.appendChild(a); a.click(); a.remove();
   setTimeout(() => URL.revokeObjectURL(a.href), 2000);
 }
+// The top-level keys of our own format that this version knows: those of an
+// export and those of the data file, which imports too. Any other key comes
+// from a newer version and is skipped.
+const EXPORT_KEYS = ['app', 'exportedAt', ...STATE_KEYS];
+// exportData is what Export writes: a copy, so the caller may change it.
+function exportData() {
+  return { app: 'simple-rest', version: 1, exportedAt: new Date().toISOString(), collections: clone(state.collections), envs: clone(state.envs) };
+}
 function exportAll() {
-  download('simple-rest-export.json', JSON.stringify({ app: 'simple-rest', version: 1, exportedAt: new Date().toISOString(), collections: state.collections, envs: state.envs }, null, 2), 'application/json');
+  download('simple-rest-export.json', JSON.stringify(exportData(), null, 2), 'application/json');
 }
 // importFiles reads every file before it touches the state: a sync while a
 // file is read replaces the state and would drop what earlier files added.
+// It alone tells the user what came in and what did not.
 async function importFiles(files) {
   const texts = await Promise.all(files.map(f => f.text().catch(() => '')));
-  let nc = 0, ne = 0;
+  let nc = 0, ne = 0, unsupported = 0;
+  const skipped = [];
   files.forEach((f, i) => {
     let data; try { data = JSON.parse(texts[i]); } catch (e) { toast('Not a JSON file: ' + f.name); return; }
-    const [c, e] = importData(data, f.name); nc += c; ne += e;
+    const got = importData(data);
+    if (!got.collections.length && !got.envs.length && !got.skipped.length) { toast('Unrecognized format: ' + f.name); return; }
+    state.collections.push(...got.collections); state.envs.push(...got.envs);
+    nc += got.collections.length; ne += got.envs.length; unsupported += got.unsupported;
+    for (const k of got.skipped) if (!skipped.includes(k)) skipped.push(k);
   });
   persist(); renderCollections(); renderEnvSelect();
-  if (nc || ne) toast(`Imported ${nc} collection(s), ${ne} environment(s)`);
+  const msg = [];
+  if (nc || ne) msg.push(`Imported ${nc} collection(s), ${ne} environment(s)`);
+  if (unsupported) msg.push(`${unsupported} request(s) use OAuth 2.0 or pre-request scripts, which are not imported`);
+  if (skipped.length) msg.push(`Skipped: ${skipped.join(', ')} (needs a newer simple-rest)`);
+  if (msg.length) toast(msg.join('. '));
 }
 function paramsFromUrl(r) {
   const disabled = r.params.filter(p => !p.enabled);
   r.params = parseQuery(splitUrl(r.url)[1]).concat(disabled);
 }
-function importData(d, fname) {
-  let nc = 0, ne = 0;
-  if (!d || typeof d !== 'object') { toast('Unrecognized format: ' + fname); return [0, 0]; }
-  if (Array.isArray(d.collections)) for (const c of d.collections) {
-    state.collections.push({ id: uid(), name: c.name || 'Imported', open: true, requests: (c.requests || []).map(r => { r = normalizeRequest(r); r.id = uid(); return r; }) }); nc++;
+// importData reads one parsed file: our export (or data file), a Postman v2.1
+// collection or a Postman environment. It leaves the state alone and gives
+// back what to add, with new ids. skipped names the top-level keys of our
+// format that only a newer version knows; unsupported counts the Postman
+// requests that use OAuth 2.0 or pre-request scripts, which are not imported.
+// Nothing recognized gives empty lists.
+function importData(d) {
+  const out = { collections: [], envs: [], schedules: [], tcp: [], skipped: [], unsupported: 0 };
+  if (!d || typeof d !== 'object' || Array.isArray(d)) return out;
+  if (d.app === 'simple-rest' || Array.isArray(d.collections) || Array.isArray(d.envs)) {
+    for (const x of arr(d.collections)) {
+      const c = obj(x);
+      out.collections.push({ id: uid(), name: str(c.name) || 'Imported', open: true, requests: arr(c.requests).map(r => Object.assign(normalizeRequest(r), { id: uid() })) });
+    }
+    for (const x of arr(d.envs)) {
+      const e = obj(x);
+      out.envs.push({ id: uid(), name: str(e.name) || 'env', vars: arr(e.vars).map(normalizeRow) });
+    }
+    out.skipped = Object.keys(d).filter(k => !EXPORT_KEYS.includes(k));
+  } else if (d.info && Array.isArray(d.item)) {
+    const c = importPostmanCollection(d, out);
+    out.collections.push(c);
+    // Collection variables become an environment of their own.
+    const vars = arr(d.variable).map(v => normalizeRow({ enabled: !obj(v).disabled, name: obj(v).key, value: obj(v).value }));
+    if (vars.length) out.envs.push({ id: uid(), name: c.name + ' variables', vars });
+  } else if (Array.isArray(d.values) && d.name && !d.item) {
+    out.envs.push({ id: uid(), name: str(d.name), vars: d.values.map(v => normalizeRow({ enabled: obj(v).enabled !== false, name: obj(v).key, value: obj(v).value })) });
   }
-  if (Array.isArray(d.envs)) for (const e of d.envs) {
-    state.envs.push({ id: uid(), name: e.name || 'env', vars: arr(e.vars).map(normalizeRow) }); ne++;
-  }
-  if (d.info && Array.isArray(d.item)) { state.collections.push(importPostmanCollection(d)); nc++; }
-  if (Array.isArray(d.values) && d.name && !d.item) {
-    state.envs.push({ id: uid(), name: d.name, vars: d.values.map(v => ({ enabled: v.enabled !== false, name: v.key || '', value: String(v.value ?? '') })) }); ne++;
-  }
-  if (!nc && !ne) toast('Unrecognized format: ' + fname);
-  return [nc, ne];
+  return out;
 }
-function importPostmanCollection(d) {
+// pmAuth is the auth a Postman request, folder or collection sets itself, or
+// null when it has none or inherits it. noauth is an auth of its own: none.
+const pmAuth = a => (a && typeof a === 'object' && a.type && a.type !== 'inherit' ? a : null);
+// preRequest tells whether a Postman item, folder or collection has a
+// pre-request script that does something.
+const preRequest = x => arr(x.event).some(e => e && e.listen === 'prerequest' && !e.disabled && [].concat(obj(e.script).exec ?? []).join('\n').trim() !== '');
+// importPostmanCollection turns a Postman collection into one of ours. A
+// request without auth of its own takes the auth of the nearest folder that
+// has one, else of the collection. OAuth 2.0 and pre-request scripts (of the
+// request, a folder or the collection) have no counterpart here: the requests
+// that use them come in without and are counted in stats.unsupported.
+function importPostmanCollection(d, stats = { unsupported: 0 }) {
   const reqs = [];
-  const walk = (items, prefix) => {
-    for (const it of items || []) {
-      if (Array.isArray(it.item)) walk(it.item, prefix + (it.name ? it.name + ' / ' : ''));
-      else if (it.request) reqs.push(fromPostmanRequest(it, prefix));
+  const walk = (items, prefix, auth, script) => {
+    for (const it of arr(items)) {
+      const x = obj(it), scripted = script || preRequest(x);
+      if (Array.isArray(x.item)) walk(x.item, prefix + (x.name ? x.name + ' / ' : ''), pmAuth(x.auth) || auth, scripted);
+      else if (x.request) {
+        const a = pmAuth(obj(x.request).auth) || auth;
+        if (scripted || (a && a.type === 'oauth2')) stats.unsupported++;
+        reqs.push(fromPostmanRequest(x, prefix, auth));
+      }
     }
   };
-  walk(d.item, '');
-  return { id: uid(), name: (d.info && d.info.name) || 'Postman import', open: true, requests: reqs };
+  walk(d.item, '', pmAuth(d.auth), preRequest(d));
+  return { id: uid(), name: str(obj(d.info).name) || 'Postman import', open: true, requests: reqs };
 }
-function fromPostmanRequest(it, prefix) {
+// fromPostmanRequest maps one Postman request; parentAuth is the auth it
+// inherits when it has none of its own.
+function fromPostmanRequest(it, prefix, parentAuth = null) {
   const pr = typeof it.request === 'string' ? { method: 'GET', url: it.request } : it.request;
   const r = newRequest();
   r.name = prefix + (it.name || 'Untitled');
@@ -1211,7 +1261,7 @@ function fromPostmanRequest(it, prefix) {
     r.body.mode = 'form';
     r.body.form = (b.urlencoded || []).map(f => ({ enabled: !f.disabled, name: f.key || '', value: String(f.value ?? '') }));
   }
-  const a = pr.auth, get = (arr, k) => { const x = (arr || []).find(y => y.key === k); return x ? String(x.value ?? '') : ''; };
+  const a = pmAuth(pr.auth) || parentAuth, get = (arr, k) => { const x = (arr || []).find(y => y.key === k); return x ? String(x.value ?? '') : ''; };
   if (a && a.type === 'basic') { r.auth.type = 'basic'; r.auth.username = get(a.basic, 'username'); r.auth.password = get(a.basic, 'password'); }
   else if (a && a.type === 'bearer') { r.auth.type = 'bearer'; r.auth.token = get(a.bearer, 'token'); }
   else if (a && a.type === 'apikey') { r.auth.type = 'apikey'; r.auth.keyName = get(a.apikey, 'key'); r.auth.keyValue = get(a.apikey, 'value'); r.auth.keyIn = get(a.apikey, 'in') === 'query' ? 'query' : 'header'; }
@@ -1463,6 +1513,7 @@ async function init() {
 // look at the save and editor state.
 globalThis.__sr = {
   state, splitUrl, parseQuery, encName, encValue, subst, activeVars, buildEffective, highlightJSON, normalizeRequest, newRequest, paramsFromUrl, importPostmanCollection, fromPostmanRequest, toCurl,
+  importData, exportData,
   str, normalizeRow, normalizeDoc, applyState, serializeState, findEnv, varsOf, setActiveEnv, detectMode, loadState, loadRequest,
   persist, persistNow, flushPersist, syncIfBehind, installUpdate, sendRequest, importFiles,
   saveInfo: () => ({ saveState, lastTag, lastSynced, pending: savePending() }),

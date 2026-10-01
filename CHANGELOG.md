@@ -14,6 +14,14 @@ ostatniego wydanego tagu.
   dialogowego, a nowszą wersję wczytuje tylko wtedy, gdy sama nie ma niezapisanych zmian.
   `GET /api/state` zwraca `ETag` (skrót treści pliku) i odpowiada 304 na pasujące
   `If-None-Match`.
+- Import kolekcji Postmana: zapytanie bez własnego auth albo z typem `inherit` dostaje auth
+  najbliższego folderu, a potem kolekcji, a `noauth` daje brak auth. Zmienne kolekcji
+  (`variable`) trafiają do nowego środowiska `<nazwa kolekcji> variables`. OAuth 2.0
+  i skrypty pre-request nie są importowane, a powiadomienie po imporcie podaje liczbę
+  takich zapytań.
+- Import pliku z nowszej wersji importuje to, co ta wersja zna, a o reszcie mówi
+  w powiadomieniu, np. `Skipped: tcp (needs a newer simple-rest)`, zamiast
+  `Unrecognized format`.
 
 ### Zmienione
 

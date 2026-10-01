@@ -48,6 +48,11 @@ Jeśli port 8787 jest zajęty, program wybiera losowy wolny port i wypisuje adre
 - Kolekcje z zapisanymi zapytaniami, historia (200 ostatnich), środowiska ze zmiennymi
   `{{nazwa}}` podstawianymi w URL, params, nagłówkach, body i auth.
 - Import/Export do JSON. Import rozumie też Postman Collection v2.1 i Postman Environment.
+  Zapytanie z Postmana bez własnego auth (albo z `inherit`) dostaje auth najbliższego
+  folderu, a potem kolekcji; `noauth` znaczy brak auth. Zmienne kolekcji trafiają do
+  nowego środowiska `<nazwa kolekcji> variables`. OAuth 2.0 i skrypty pre-request nie są
+  importowane, a powiadomienie po imporcie podaje liczbę takich zapytań. Sekcje pliku
+  z nowszej wersji simple-rest (np. `tcp`) są pomijane i wymienione w powiadomieniu.
 - Kopiowanie zapytania jako polecenie `curl`.
 - Skróty: Enter w polu URL lub Ctrl+Enter wysyła, Ctrl+S zapisuje.
 
