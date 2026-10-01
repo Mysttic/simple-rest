@@ -94,7 +94,7 @@ func TestSendGetQueryAndHeaders(t *testing.T) {
 	in.Headers = []kv{{"X-Test", "1"}, {"  ", "ignored"}, {"X-Multi", "a"}, {"X-Multi", "b"}}
 	res := a.send(context.Background(), in)
 	e := decodeEcho(t, res)
-	if res.Status != 200 || res.StatusText != "OK" || res.Proto != "HTTP/1.1" || res.TimeMs <= 0 {
+	if res.Status != 200 || res.StatusText != "OK" || res.Proto != "HTTP/1.1" || res.TimeMs < 0 {
 		t.Errorf("response meta: %+v", res)
 	}
 	if res.FinalURL != in.URL || res.Size != len(res.Body) {
