@@ -415,7 +415,7 @@ function newRequest(s = state.settings) {
   };
 }
 // normalizeRequest fills in what old or foreign requests lack; s gives the
-// default options.
+// default options. It has a twin in effective.go (see buildEffective).
 function normalizeRequest(r, s = state.settings) {
   const d = newRequest(s);
   r = obj(r);
@@ -712,7 +712,7 @@ const findEnv = id => state.envs.find(e => e.id === id);
 // varsOf maps the names of the enabled rows of env to their values. Names are
 // taken as typed and a later row wins over an earlier one with the same name.
 // The map has no prototype, so {{constructor}} is a variable only when a row
-// sets it.
+// sets it. varsOf and subst have twins in effective.go (see buildEffective).
 function varsOf(env) {
   const m = Object.create(null);
   if (env) for (const v of env.vars) if (v.enabled && v.name) m[v.name] = v.value;
@@ -754,6 +754,7 @@ function kvTable(table, rows, opts = {}) {
 // ---------------------------------------------------------------- URL <-> params sync
 const splitUrl = u => { const i = u.indexOf('?'); return i < 0 ? [u, ''] : [u.slice(0, i), u.slice(i + 1)]; };
 const dec = s => { try { return decodeURIComponent(s); } catch (e) { return s; } };
+// encName and encValue have twins in effective.go (see buildEffective).
 const encName = s => s.replace(/[ #&=%]/g, c => '%' + c.charCodeAt(0).toString(16).toUpperCase());
 const encValue = s => s.replace(/[ #&]/g, c => '%' + c.charCodeAt(0).toString(16).toUpperCase());
 function parseQuery(q) {
@@ -831,6 +832,12 @@ function loadRequest(req, collId) {
 }
 
 // ---------------------------------------------------------------- building the effective request
+// A schedule sends a request that the program builds in Go (effective.go) the
+// way buildEffective builds one here. The twins there are decodeRequest and
+// decodeSettings (normalizeRequest and the settings of normalizeDoc), varsOf,
+// subst, encName, encValue and buildEffective. Change one only together with
+// its twin and with a vector in testdata/effective.json, which
+// tests/effective.test.mjs and effective_test.go both run.
 const b64 = s => btoa(unescape(encodeURIComponent(s)));
 function buildEffective(r, vars = activeVars()) {
   const s = x => subst(x, vars);
