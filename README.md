@@ -34,7 +34,7 @@ Flagi:
 ```
 -listen 127.0.0.1:8787   adres nasłuchu (0.0.0.0:8787 udostępnia UI w sieci lokalnej)
 -allow-host <nazwy>      dodatkowe nazwy hosta, pod którymi wolno otworzyć UI przy nasłuchu
-                         poza 127.0.0.1, po przecinku; '*' przyjmuje każdą nazwę
+                         poza 127.0.0.1, po przecinku; "*" przyjmuje każdą nazwę
 -data <plik>             plik z danymi (domyślnie simple-rest-data.json obok binarki)
 -no-browser              nie otwieraj przeglądarki automatycznie
 -version                 wypisz wersję i zakończ
@@ -79,7 +79,13 @@ Ustawienia (ikona koła zębatego), sekcja Updates:
   z pliku `...-checksums.txt`, podmienia własny plik wykonywalny i uruchamia się ponownie
   na tym samym porcie, z tymi samymi argumentami. Strona w przeglądarce czeka na nową wersję
   i sama się przeładowuje. Jeśli nowa wersja odrzuca nazwę, pod którą otwarto stronę
-  (reguła Host, patrz „Bezpieczeństwo”), strona mówi to wprost.
+  (reguła Host, patrz „Bezpieczeństwo”), strona z wersji 1.2.0 i nowszej mówi to wprost.
+  Strona z wersji starszej niż 1.2.0 tego nie umie: kto przy nasłuchu poza 127.0.0.1
+  otwiera UI pod nazwą spoza reguły, np. `pc123.firma.pl`, po aktualizacji do 1.2.0
+  zobaczy po około 40 sekundach komunikat, że program nie wrócił, choć nowa wersja działa
+  na tym samym porcie. Wtedy otwórz UI po adresie IP albo zatrzymaj program i uruchom go
+  z `-allow-host pc123.firma.pl`. Nie uruchamiaj drugiej kopii obok działającej: port jest
+  zajęty, więc wstałaby na losowym porcie, na tym samym pliku danych.
   Na Windows stary plik zostaje chwilowo jako `.exe.old` i jest usuwany przy starcie.
 - Kopia, która nie może się zaktualizować (katalog bez prawa zapisu, uruchomienie przez
   `go run`, brak pliku wydania dla tego systemu), mówi to wprost i linkuje do strony
@@ -230,9 +236,11 @@ nazwą z `-allow-host`. Wielkość liter i kropka na końcu nazwy nie mają znac
 temu obca strona nie skieruje przez DNS rebinding swojej nazwy na ten komputer, żeby czytać
 odpowiedzi programu.
 Inna nazwa dostaje 403 z podpowiedzią, a konsola przy pierwszym odrzuceniu danej nazwy
-podaje gotową flagę, np. `-allow-host pc123.firma.pl`. `-allow-host '*'` wyłącza to
-sprawdzanie, jak przed wersją 1.2.0, a program ostrzega o tym przy starcie. Przy nasłuchu na
-127.0.0.1 flaga nic nie zmienia.
+podaje gotową flagę, np. `-allow-host pc123.firma.pl`. `-allow-host "*"` wyłącza to
+sprawdzanie, jak przed wersją 1.2.0, a program ostrzega o tym przy starcie. Gwiazdka
+w cudzysłowie podwójnym działa w cmd, PowerShell i sh; w cmd apostrofy (`'*'`) trafiają do
+programu razem z gwiazdką i sprawdzanie zostaje włączone. Przy nasłuchu na 127.0.0.1 flaga
+nic nie zmienia.
 
 Strony programu nie da się osadzić w ramce na innej stronie (`X-Frame-Options: DENY`
 i `Content-Security-Policy: frame-ancestors 'none'`), więc obca strona nie podsunie

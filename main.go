@@ -584,8 +584,13 @@ func isLoopbackHost(h string) bool {
 var localSuffixes = []string{".local", ".lan", ".home", ".home.arpa", ".internal", ".localdomain"}
 
 // maxRefusedNames caps how many refused Host names the console reports, so a
-// stream of made-up names cannot grow the list without end.
-const maxRefusedNames = 100
+// stream of made-up names cannot grow the list without end. maxHostName, the
+// longest name DNS allows, caps the length of each: a longer Host can be no
+// name to open the page by, so it is neither kept nor reported.
+const (
+	maxRefusedNames = 100
+	maxHostName     = 253
+)
 
 // hostPolicy says which Host names reach the program when it listens beyond
 // loopback. Through DNS rebinding a web page on another site can give its own
@@ -682,6 +687,10 @@ func (a *app) refuseHost(w http.ResponseWriter, r *http.Request, host string) {
 	name := normHost(host)
 	if name == "" {
 		http.Error(w, "forbidden host: the request names no host", http.StatusForbidden)
+		return
+	}
+	if len(name) > maxHostName {
+		http.Error(w, "forbidden host", http.StatusForbidden)
 		return
 	}
 	a.refusedMu.Lock()

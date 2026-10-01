@@ -478,6 +478,16 @@ func TestHostGuard(t *testing.T) {
 	if code, _ := hostStatus(t, srv, "evil.example"); code != http.StatusForbidden {
 		t.Errorf("evil.example = %d", code)
 	}
+	// A name longer than DNS allows (253 bytes) gets a short answer and is
+	// neither kept nor logged, so long made-up names fill neither memory nor
+	// the console.
+	longest := strings.Repeat("a", 253-len(".example")) + ".example"
+	if code, body := hostStatus(t, srv, longest+":8787"); code != http.StatusForbidden || !strings.Contains(body, "-allow-host "+longest) {
+		t.Errorf("Host of %d bytes: %d %.60q", len(longest), code, body)
+	}
+	if code, body := hostStatus(t, srv, "a"+longest+":8787"); code != http.StatusForbidden || body != "forbidden host" {
+		t.Errorf("Host of %d bytes: %d %.60q", len(longest)+1, code, body)
+	}
 
 	// The console hears about each refused name once, with the flag to use.
 	if !open.logq.flush(time.Second) {
@@ -486,9 +496,16 @@ func TestHostGuard(t *testing.T) {
 	mu.Lock()
 	got := append([]string(nil), lines...)
 	mu.Unlock()
-	if len(got) != 2 || !strings.Contains(got[0], `refused host "pc123.firma.pl" (from 127.0.0.1)`) ||
-		!strings.HasSuffix(got[0], "-allow-host pc123.firma.pl") || !strings.Contains(got[1], `"evil.example"`) {
-		t.Errorf("console lines: %q", got)
+	if len(got) != 3 || !strings.Contains(got[0], `refused host "pc123.firma.pl" (from 127.0.0.1)`) ||
+		!strings.HasSuffix(got[0], "-allow-host pc123.firma.pl") || !strings.Contains(got[1], `"evil.example"`) ||
+		!strings.HasSuffix(got[2], "-allow-host "+longest) {
+		t.Errorf("console lines: %.300q", got)
+	}
+	open.refusedMu.Lock()
+	kept := len(open.refused)
+	open.refusedMu.Unlock()
+	if kept != 3 {
+		t.Errorf("refused names kept: %d, want 3", kept)
 	}
 
 	all := newApp(filepath.Join(t.TempDir(), "d.json"), false)
@@ -593,11 +610,15 @@ func TestLogQueueDrops(t *testing.T) {
 		t.Errorf("lines = %q, want %q", g, want)
 	}
 
-	// Lines dropped with nothing after them come out on flush.
+	// Lines dropped with nothing after them come out on flush. The writer
+	// holds line "a" before the b lines come, so b0 takes the one place in
+	// the queue and b1 to b9 are dropped.
 	block := make(chan struct{})
+	taken := make(chan struct{})
 	var n int
 	q2 := newLogQueue(1, func(s string) {
 		if n++; n == 1 {
+			close(taken)
 			<-block
 		}
 		mu.Lock()
@@ -608,6 +629,7 @@ func TestLogQueueDrops(t *testing.T) {
 	lines = nil
 	mu.Unlock()
 	q2.printf("a")
+	<-taken
 	for i := 0; i < 10; i++ {
 		q2.printf("b%d", i)
 	}
@@ -615,8 +637,9 @@ func TestLogQueueDrops(t *testing.T) {
 	if !q2.flush(time.Second) {
 		t.Fatal("flush timed out")
 	}
-	if g := got(); len(g) < 2 || g[0] != "a" || !strings.HasSuffix(g[len(g)-1], "log lines dropped)") {
-		t.Errorf("lines after flush = %q", g)
+	want = []string{"a", "b0", "(9 log lines dropped)"}
+	if g := got(); strings.Join(g, "|") != strings.Join(want, "|") {
+		t.Errorf("lines after flush = %q, want %q", g, want)
 	}
 }
 
