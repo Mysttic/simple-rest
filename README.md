@@ -25,6 +25,12 @@ nazwę z końcówką `.local`, `.lan`, `.home`, `.home.arpa`, `.internal` albo `
 lub nazwę komputera, którą zwraca system. Inną nazwę, np. `pc123.firma.pl` z firmowego DNS,
 trzeba dopisać flagą `-allow-host pc123.firma.pl` (patrz „Bezpieczeństwo”).
 
+Zapytania wysyła program, a harmonogramy działają w nim, więc wszystko dzieje się na maszynie
+z binarką, np. na Raspberry Pi. Serwer docelowy musi być osiągalny z tej maszyny, a nie
+z komputera, na którym jest przeglądarka. Wersje linuksowe są budowane bez CGO i nie
+rozwiązują nazw `.local` (mDNS): na Linuksie i Raspberry Pi podaj adres IP albo nazwę
+z DNS sieci. Na Windows nazwy `.local` działają tak jak w systemie.
+
 Inne systemy (macOS, Windows na ARM, 32-bitowe Raspberry Pi) nie mają gotowego pliku, ale
 budują się jedną komendą, patrz „Budowanie”. Taka kopia mówi w ustawieniach, że nie ma dla
 niej pliku wydania, i nie próbuje się aktualizować.
@@ -53,7 +59,10 @@ Jeśli port 8787 jest zajęty, program wybiera losowy wolny port i wypisuje adre
   widok raw, podgląd HTML/obrazków, kopiowanie i zapis body do pliku.
 - Kolekcje z zapisanymi zapytaniami, historia (200 ostatnich), środowiska ze zmiennymi
   `{{nazwa}}` podstawianymi w URL, params, nagłówkach, body i auth.
-- Import/Export do JSON. Import rozumie też Postman Collection v2.1 i Postman Environment.
+- Harmonogramy: program co zadany czas wysyła zapisane zapytanie, np. logowanie, i ustawia
+  zmienną, np. `{{token}}`, wartością z odpowiedzi (patrz „Harmonogramy”).
+- Import/Export do JSON, razem z definicjami harmonogramów (bez ustawionych wartości).
+  Import rozumie też Postman Collection v2.1 i Postman Environment.
   Zapytanie z Postmana bez własnego auth (albo z `inherit`) dostaje auth najbliższego
   folderu, a potem kolekcji; `noauth` znaczy brak auth. Zmienne kolekcji trafiają do
   nowego środowiska `<nazwa kolekcji> variables`. OAuth 2.0 i skrypty pre-request nie są
@@ -61,6 +70,43 @@ Jeśli port 8787 jest zajęty, program wybiera losowy wolny port i wypisuje adre
   z nowszej wersji simple-rest (np. `tcp`) są pomijane i wymienione w powiadomieniu.
 - Kopiowanie zapytania jako polecenie `curl`.
 - Skróty: Enter w polu URL lub Ctrl+Enter wysyła, Ctrl+S zapisuje.
+
+## Harmonogramy
+
+Harmonogram (kanał cykliczny) to zapisane zapytanie, które program wysyła co zadany czas,
+żeby wyciągnąć z odpowiedzi wartość, zwykle token, i ustawić nią zmienną w wybranym
+środowisku. Przycisk Schedules na górnym pasku otwiera okno harmonogramów i pokazuje, ile
+z nich jest włączonych; czerwona ramka znaczy, że któryś stoi, a `?`, że program nie
+odpowiada.
+
+- **+ Schedule** bierze zapytanie otwarte w edytorze, o ile jest zapisane w kolekcji. To samo
+  robi przycisk ⟳ przy zapytaniu na pasku bocznym, a znacznik ⟳ pokazuje zapytania, które
+  wysyła włączony harmonogram. Nowy harmonogram jest wyłączony: najpierw sprawdź reguły
+  przyciskiem Run now, potem zaznacz Enabled.
+- **Every** to odstęp między przebiegami, od 10 sekund do doby. **Expiry** to ścieżka JSON
+  do czasu ważności w sekundach (np. `expires_in`): program odświeża wartość tyle sekund
+  przed jej wygaśnięciem, ile podasz, ale nie rzadziej niż co Every. Puste pole zostawia
+  samo Every.
+- **Set from the response** to reguły: ścieżka JSON (`access_token`, `data.items[0].token`,
+  opcjonalnie z `$.`), nazwa nagłówka albo wyrażenie regularne w składni Go (RE2, bez
+  lookbehind i odwołań wstecznych; wartość to pierwsza grupa). Reguła z Opt może nic nie
+  znaleźć. Gdy reguła wymagana nic nie znajdzie, przebieg nie ustawia niczego.
+- Wartość trafia do nakładki w pamięci programu. W swoim środowisku wygrywa z tabelą, także
+  z wyłączonym wierszem, i działa także dla nazwy, której w tabeli nie ma. Okno Environments
+  pokazuje ją pod tabelą z przyciskami Copy i Clear. Zapytania widzą ją tylko w karcie, która
+  ma wybrane to środowisko.
+- Przed Send i przed cURL karta zapisuje zmiany i prosi program o świeże wartości zmiennych,
+  których używa zapytanie (najwyżej 25 sekund). Gdy wartość może być stara albo jej brak, bo
+  harmonogram jest wyłączony, stoi albo się nie udał, powiadomienie mówi to wprost, a zapytanie
+  i tak wychodzi.
+- Odrzucone logowanie (401, 403), przekierowanie i inna odpowiedź 4xx zatrzymują harmonogram
+  po pierwszej próbie, żeby nie zablokować konta. 5xx, 408 i 429 są ponawiane coraz rzadziej,
+  a piąta porażka z rzędu też zatrzymuje harmonogram. Run now po poprawce zdejmuje
+  zatrzymanie.
+- Harmonogram wysyła wersję zapytania zapisaną w kolekcji, a nie niezapisane zmiany z edytora.
+- Harmonogramy działają w programie, także bez otwartej karty, ale tylko dopóki program
+  działa. Każdy start programu, także po aktualizacji, wyłącza wszystkie harmonogramy
+  i czyści nakładkę, a wartości nigdy nie trafiają do pliku danych, eksportu ani historii.
 
 ## Aktualizacje z aplikacji
 
@@ -87,6 +133,9 @@ Ustawienia (ikona koła zębatego), sekcja Updates:
   z `-allow-host pc123.firma.pl`. Nie uruchamiaj drugiej kopii obok działającej: port jest
   zajęty, więc wstałaby na losowym porcie, na tym samym pliku danych.
   Na Windows stary plik zostaje chwilowo jako `.exe.old` i jest usuwany przy starcie.
+  Restart wyłącza wszystkie harmonogramy i czyści ich wartości, więc przy włączonych
+  harmonogramach przycisk najpierw pyta o zgodę. Inne otwarte karty po restarcie pokazują
+  powiadomienie, że harmonogramy trzeba włączyć ponownie.
 - Kopia, która nie może się zaktualizować (katalog bez prawa zapisu, uruchomienie przez
   `go run`, brak pliku wydania dla tego systemu), mówi to wprost i linkuje do strony
   pobierania.
@@ -97,7 +146,7 @@ restart) uruchamia `sh scripts/e2e-update.sh`; to samo robi CI.
 
 ## Dane
 
-Wszystko (kolekcje, historia, środowiska, ustawienia) trafia do jednego pliku JSON obok
+Wszystko (kolekcje, historia, środowiska, ustawienia, definicje harmonogramów) trafia do jednego pliku JSON obok
 binarki: `simple-rest-data.json`. Wystarczy przenieść katalog, żeby przenieść dane.
 Aktualizacja nie dotyka tego pliku.
 
@@ -118,6 +167,11 @@ zapisu pokazuje powiadomienie „Save failed” z prośbą o przeładowanie stro
 
 Wybór środowiska na górnym pasku dotyczy tylko bieżącej karty i przeżywa jej
 przeładowanie. Plik pamięta ostatni wybór jako środowisko startowe nowej karty.
+
+Definicje harmonogramów leżą w pliku pod kluczem `schedules`. To, czy harmonogram jest
+włączony, kiedy ruszy, dlaczego stoi i jakie wartości ustawił, program trzyma tylko
+w pamięci i nigdy nie zapisuje pliku danych sam. Uwaga: po cofnięciu do wersji 1.1.0
+pierwszy zapis z karty usuwa z pliku klucz `schedules`.
 
 Pola, których ta wersja nie zna, na przykład dopisane przez nowszą wersję, przeżywają
 zapis bez zmian.
@@ -149,16 +203,25 @@ Kopia zgłaszająca inny numer, do testów updatera:
 
 ## Rozwój i testy
 
-Gałęzie: `develop` (praca) i `master` (wydania). CI nie odpala się na `develop` — testy
+Gałęzie: `develop` (praca) i `master` (wydania). CI nie odpala się na `develop`, więc testy
 uruchamiaj lokalnie (komendy niżej) albo ręcznie z zakładki Actions (`workflow_dispatch`);
 automatycznie sprawdzany jest dopiero PR `develop` → `master`.
 
 ```
-go test ./... -count=1                 # serwer, proxy, guard, updater (z fałszywym hubem)
-node --test "tests/**/*.test.mjs"      # czyste funkcje UI: params/URL, zmienne, auth, import Postman, cURL
+go test ./... -count=1                 # serwer, proxy, guard, updater (z fałszywym hubem), harmonogramy
+go test -race ./... -count=1           # to samo z wykrywaniem wyścigów (potrzebny gcc); CI tego nie robi
+node --test "tests/**/*.test.mjs"      # UI: params/URL, zmienne, auth, import Postman, cURL, zapis, harmonogramy
 sh scripts/e2e-update.sh               # ścieżka aktualizacji end to end na prawdziwej binarce
 node scripts/screenshots.mjs           # zrzuty do site/simple-rest/img/ (Edge albo Chrome)
 ```
+
+Testy UI ładują skrypt z `ui.html` przez `tests/load-ui.mjs`, bez przeglądarki:
+`tests/ui.test.mjs` sprawdza czyste funkcje, `tests/state.test.mjs` zapis i synchronizację
+pliku danych, a `tests/schedules.test.mjs` okno harmonogramów, nakładkę i Send z odświeżaniem
+wartości. Zapytanie harmonogramu buduje program w Go (`effective.go`), tak jak strona buduje
+zapytanie przycisku Send. Wspólne wektory w `testdata/effective.json` uruchamiają
+`effective_test.go` i `tests/effective.test.mjs`, więc obie strony budują to samo zapytanie
+z tych samych danych. Zmiana jednej z tych funkcji wymaga zmiany jej odpowiednika i wektora.
 
 `scripts/screenshots.mjs` buduje aplikację, uruchamia ją z przykładową kolekcją i drugą
 kopią zgłaszającą starszą wersję, po czym robi zrzuty przez protokół DevTools. Dzięki temu
@@ -168,16 +231,16 @@ Workflow `CI` (`.github/workflows/ci.yml`) uruchamia to wszystko, razem z `gofmt
 `go vet`, wyłącznie przy PR z `develop` do `master`. Push do `develop` i PR do `develop`
 nie odpalają już nic; awaryjnie zostaje ręczne uruchomienie z zakładki Actions
 (`workflow_dispatch`). PR do `master` z innej gałęzi niż `develop` pomija wszystkie joby,
-więc GitHub pokaże taki przebieg jako zielony — to świadoma decyzja, a nie przeoczenie:
-konto jest na limicie minut Actions. Build wszystkich platform (`sh build.sh`) zostaje w CI
-— na runnerze linuksowym `go vet` i `go test` nie kompilują `restart_windows.go`, więc jest
+więc GitHub pokaże taki przebieg jako zielony. To świadoma decyzja, a nie przeoczenie:
+konto jest na limicie minut Actions. Build wszystkich platform (`sh build.sh`) zostaje w CI,
+bo na runnerze linuksowym `go vet` i `go test` nie kompilują `restart_windows.go`, więc jest
 to jedyny krok sprawdzający cele windows/amd64 i linux/arm64; zniknął tylko upload `dist/`
 jako artefakt przebiegu. PR z `develop` dostaje dodatkowo job „Release preview” z informacją,
 czy merge opublikuje wydanie.
 
 W repozytorium nie ma już żadnego przebiegu cyklicznego ani sprzątania Actions storage.
 Artefaktów przebiegów nie wysyła teraz nic, ale logi każdego przebiegu nadal liczą się do
-wspólnego dla konta limitu storage. Jeśli limit się zapcha, czyści się go ręcznie —
+wspólnego dla konta limitu storage. Jeśli limit się zapcha, czyści się go ręcznie:
 z zakładki Actions albo `gh api -X DELETE /repos/Mysttic/simple-rest/actions/runs/<id>/logs`.
 
 ## Wydania
@@ -189,17 +252,17 @@ z zakładki Actions albo `gh api -X DELETE /repos/Mysttic/simple-rest/actions/ru
 - Workflow `Release` (`.github/workflows/release.yml`) startuje po push do `master`, który
   zmienia `VERSION.md` (czyli po merge PR z `develop` z podbitym numerem); zmiana samego
   `CHANGELOG.md`, kodu lub workflowa przy niewydanym numerze (np. po nieudanym przebiegu)
-  nie uruchamia nic i wymaga ręcznego „Run workflow” na `master` — tylko z `master`, z innej
+  nie uruchamia nic i wymaga ręcznego „Run workflow” na `master`, i to tylko z `master`: z innej
   gałęzi workflow pomija wszystkie joby. Publikuje tylko wtedy, gdy `VERSION.md` jest wyższy od
   najnowszego tagu `v*`. Wtedy: testy, build, tag `v<wersja>` i release w tym repozytorium
   z plikami z `dist/`, a potem job `site` kopiuje te same pliki do Mysttic/Mysttic pod
   tagiem `simple-rest-v<wersja>` i usuwa tam starsze wydania projektu. Bez podniesienia
   `VERSION.md` merge nie publikuje nic. Obniżenie numeru zatrzymuje workflow z błędem.
-  Pełnego CI tu nie ma — te same testy poszły już na PR `develop` → `master`, na tym
+  Pełnego CI tu nie ma: te same testy poszły już na PR `develop` → `master`, na tym
   samym drzewie.
   Zostaje krótki job `Tests` (`go test` i testy UI, ok. 2 min) przed buildem: `master` nie
   jest gałęzią chronioną, więc push prosto na `master` omija PR, a job `site` kasuje
-  poprzednie wydanie ze strony bezpowrotnie — nie ma do czego wrócić.
+  poprzednie wydanie ze strony bezpowrotnie i nie ma do czego wrócić.
 
 Procedura wydania:
 
@@ -220,7 +283,10 @@ Strona projektu na hubie leży gotowa w `site/simple-rest/`; jak ją podpiąć o
 `ui.html` otwarty bezpośrednio w przeglądarce też działa, ale wtedy
 zapytania wysyła przeglądarka: serwer docelowy musi zezwalać na CORS, opcje TLS i cookies
 są ignorowane, dane trzymane są w localStorage tej przeglądarki, a sekcja aktualizacji
-jest ukryta.
+jest ukryta. Harmonogramy działają tylko w programie: okno Schedules pokazuje definicje,
+np. zaimportowane z pliku, ale tylko do odczytu, a Send nie pyta o świeże wartości.
+Podobnie strona otwarta z innej wersji programu (np. karta sprzed aktualizacji) pokazuje
+harmonogramy z banerem i bez akcji, dopóki jej nie przeładujesz; Send działa dalej.
 
 ## Bezpieczeństwo
 
@@ -244,11 +310,14 @@ nic nie zmienia.
 
 Strony programu nie da się osadzić w ramce na innej stronie (`X-Frame-Options: DENY`
 i `Content-Security-Policy: frame-ancestors 'none'`), więc obca strona nie podsunie
-kliknięcia w Send ani w Install and restart.
+kliknięcia w Send, Enabled, Run now ani Install and restart.
 
 Program nie ma hasła. `-listen 0.0.0.0:8787` wystawia proxy HTTP bez uwierzytelniania na
 całą sieć lokalną: każdy, kto dosięgnie programu, widzi i zmienia wszystko, co program
 trzyma, czyli kolekcje, historię i środowiska razem z wartościami zmiennych (także haseł
-i tokenów), i wysyła zapytania z tej maszyny. Używaj tego tylko w zaufanej sieci. Jedyne
-połączenie wychodzące, które program nawiązuje sam z siebie, to sprawdzenie wydań, i to
-dopiero po włączeniu.
+i tokenów), wartości ustawione przez harmonogramy (`GET /api/schedules`), i wysyła
+zapytania z tej maszyny, także włącza i wyłącza harmonogramy. Używaj tego tylko w zaufanej
+sieci. Sam z siebie program łączy się tylko w dwóch przypadkach, i to dopiero po włączeniu:
+żeby sprawdzić wydania i żeby wysłać zapytanie harmonogramu. Harmonogram włączony z innego
+komputera działa dalej po zamknięciu tamtej karty; okno Schedules pokazuje, od kiedy jest
+włączony i z jakiego adresu.

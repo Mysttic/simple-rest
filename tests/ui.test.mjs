@@ -11,7 +11,8 @@ const request = (over = {}) => Object.assign(sr.newRequest(), over);
 const header = (h, name) => h.filter(x => x.name.toLowerCase() === name.toLowerCase()).map(x => x.value);
 
 test('the page exposes its pure functions', () => {
-  for (const f of ['splitUrl', 'parseQuery', 'encName', 'encValue', 'subst', 'buildEffective', 'highlightJSON', 'normalizeRequest', 'importPostmanCollection', 'toCurl']) {
+  for (const f of ['splitUrl', 'parseQuery', 'encName', 'encValue', 'subst', 'buildEffective', 'highlightJSON', 'normalizeRequest', 'importPostmanCollection', 'toCurl',
+    'normalizeSchedule', 'requestTexts', 'referencedVars', 'schedulesSetting', 'schedulesUsing', 'varConflicts', 'effectiveVars', 'maskValue', 'isExpired', 'featureState']) {
     assert.equal(typeof sr[f], 'function', f);
   }
 });
@@ -277,9 +278,9 @@ test('importData reads our own format, skips what only a newer version knows and
     envs: [{ id: 'e1', name: 'local', vars: [{ name: 'base', value: 1 }] }],
     tcp: [{ id: 't1', host: 'h', port: 1 }], future: { x: 1 },
   });
-  assert.deepEqual(Object.keys(got).sort(), ['collections', 'envs', 'schedules', 'skipped', 'tcp', 'unsupported']);
+  assert.deepEqual(Object.keys(got).sort(), ['collections', 'envs', 'orphans', 'schedules', 'skipped', 'tcp', 'unsupported']);
   assert.deepEqual(got.skipped, ['tcp', 'future']);
-  assert.deepEqual([got.schedules, got.tcp, got.unsupported], [[], [], 0]);
+  assert.deepEqual([got.schedules, got.tcp, got.unsupported, got.orphans], [[], [], 0, 0]);
   assert.deepEqual(got.collections.map(c => [c.name, c.open, c.requests.length]), [['API', true, 1], ['Empty', true, 0], ['Imported', true, 0]]);
   const r = got.collections[0].requests[0];
   assert.deepEqual([r.name, r.method, r.url, r.note], ['One', 'GET', 'http://h', 'kept']);
@@ -311,7 +312,8 @@ test('exportData is a copy of the collections and environments that imports back
   ui.state.collections.push({ id: 'c1', name: 'API', open: true, requests: [ui.normalizeRequest({ id: 'r1', name: 'One', url: 'http://h' })] });
   ui.state.envs.push({ id: 'e1', name: 'local', vars: [{ enabled: true, name: 'base', value: 'http://h' }] });
   const out = ui.exportData();
-  assert.deepEqual(Object.keys(out), ['app', 'version', 'exportedAt', 'collections', 'envs']);
+  assert.deepEqual(Object.keys(out), ['app', 'version', 'exportedAt', 'collections', 'envs', 'schedules']);
+  assert.deepEqual(out.schedules, []);
   assert.deepEqual([out.app, out.version], ['simple-rest', 1]);
   assert.ok(!Number.isNaN(Date.parse(out.exportedAt)));
   assert.deepEqual(out.collections, ui.state.collections);

@@ -38,12 +38,46 @@ ostatniego wydanego tagu.
   są tylko w pamięci: po każdym starcie programu, także po aktualizacji, wszystkie
   harmonogramy są wyłączone, a program nigdy nie zapisuje pliku danych. Odrzucone
   logowanie (401, 403), przekierowanie i inne odpowiedzi 4xx zatrzymują harmonogram po
-  pierwszej próbie, a 5xx, 408 i 429 po pięciu porażkach z rzędu. Na razie jest tylko API:
+  pierwszej próbie, a 5xx, 408 i 429 po pięciu porażkach z rzędu. API:
   `GET /api/schedules`, `POST /api/schedules/{id}/enable`, `.../disable` i `.../run`,
   `POST /api/schedules/disable-all`, `POST /api/vars/ensure` oraz
-  `DELETE /api/vars/{envId}/{name}`. Okno harmonogramów w UI dochodzi w kolejnej zmianie.
+  `DELETE /api/vars/{envId}/{name}`.
   Uwaga: po cofnięciu do 1.1.0 pierwszy zapis z karty usuwa z pliku klucz `schedules`
   (definicje harmonogramów).
+- Okno Schedules z przyciskiem na górnym pasku. Przycisk pokazuje liczbę włączonych
+  harmonogramów, czerwoną ramkę, gdy któryś stoi albo nie może ruszyć, i `?`, gdy program
+  nie odpowiada. Okno ma listę ze stanem (`ok 2m`, `retry 0:30`, `stopped`, `no request`,
+  `missing {{password}}` itd.), edycję definicji (zapytanie, środowisko, Every, ścieżka
+  czasu ważności i zapas, reguły JSON, nagłówek i regex z Opt), Enabled z godziną i adresem,
+  z którego harmonogram włączono, Run now, Delete i Turn all off oraz ostatni i następny
+  przebieg, zamaskowane wartości z Copy, pola odpowiedzi, powód zatrzymania z początkiem
+  odpowiedzi (z odpowiedzi 2xx tylko klucze i liczby JSON, teksty zamaskowane) i podpowiedzi
+  (problemy definicji, inne środowisko karty z przyciskiem Select it, ta sama zmienna z dwóch
+  harmonogramów, brakująca zmienna, składnia RE2, niezapisane zmiany zapytania). Enabled
+  i Run now nie ruszają, gdy zmian karty nie udało się zapisać. Nowy harmonogram
+  (+ Schedule albo przycisk ⟳ przy zapytaniu na pasku bocznym) jest wyłączony, a bez
+  środowisk powstaje środowisko `Default`. Znacznik ⟳ na pasku bocznym pokazuje zapytania
+  wysyłane przez włączony harmonogram.
+- Okno Environments pokazuje pod tabelą wartości ustawione przez harmonogramy: kto i kiedy
+  je ustawił, do kiedy są ważne, czy zastępują wiersz tabeli, z przyciskami Copy i Clear.
+- Send i cURL zapisują najpierw zmiany karty i proszą program o świeże wartości zmiennych
+  zapytania, które ustawiają harmonogramy środowiska karty (`POST /api/vars/ensure`,
+  najwyżej 25 sekund). Gdy to trwa dłużej niż 300 ms, status pokazuje `Refreshing token…`.
+  Brak odpowiedzi nie blokuje wysyłki, a powiadomienie mówi, gdy wartość może być stara
+  albo jej brak, bo harmonogram stoi, się nie udał, jest wyłączony albo wartość wygasła.
+- Karta pyta program o harmonogramy co 2 sekundy przy otwartym oknie Schedules albo
+  Environments, co 10 sekund, gdy jest widoczna, od razu po akcji i po powrocie do karty,
+  a w tle wcale. Odpowiedź niesie też znacznik pliku danych, więc karta pobiera plik tylko
+  wtedy, gdy się zmienił. Po restarcie programu karta mówi, że harmonogramy są wyłączone,
+  o ile któryś był włączony albo miał wartości.
+- Eksport zawiera definicje harmonogramów, bez ustawionych wartości. Import przypina je do
+  nowych identyfikatorów zapytań i środowisk z tego samego pliku, a harmonogram bez swojego
+  zapytania albo środowiska pomija i podaje ich liczbę w powiadomieniu.
+- Bez programu, a także ze strony z innej wersji programu, okno Schedules pokazuje
+  definicje tylko do odczytu, z banerem, a akcje harmonogramów i odświeżanie wartości przed
+  Send są wyłączone. Send działa dalej.
+- Błąd `no such host` dla nazwy `.local` przy ręcznym Send w programie na Linuksie dostaje
+  tę samą podpowiedź co harmonogram: wersje linuksowe nie rozwiązują nazw mDNS.
 
 ### Zmienione
 
@@ -63,6 +97,9 @@ ostatniego wydanego tagu.
 - `{{constructor}}` i inne nazwy z prototypu obiektu nie rozwijają się, a `{{__proto__}}`
   działa jak każda zmienna.
 - Instalacja aktualizacji najpierw zapisuje dane i nie rusza, jeśli zapis się nie udał.
+  Przy włączonych harmonogramach najpierw pyta, bo restart je wyłącza.
+- Potwierdzenia usunięcia zapytania, kolekcji i środowiska wymieniają harmonogramy, które
+  z nich korzystają.
 - Przy nasłuchu poza 127.0.0.1 (np. `-listen 0.0.0.0:8787`) nagłówek Host musi być adresem
   IP, nazwą bez kropki, nazwą z końcówką `.local`, `.lan`, `.home`, `.home.arpa`,
   `.internal` albo `.localdomain`, nazwą komputera albo nazwą z `-allow-host`. Inna nazwa

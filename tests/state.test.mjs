@@ -111,13 +111,13 @@ test('normalizeDoc keeps what it does not know through serializeState', () => {
   assert.equal(out.collections[0].requests[0].note, 'kept', 'request');
   assert.equal(out.envs[0].owner, 'me', 'environment');
   assert.equal(out.envs[0].vars[0].secret, false, 'row');
-  assert.deepEqual(Object.keys(out).sort(), ['activeEnv', 'collections', 'envs', 'future', 'history', 'settings', 'version']);
+  assert.deepEqual(Object.keys(out).sort(), ['activeEnv', 'collections', 'envs', 'future', 'history', 'schedules', 'settings', 'version']);
   assert.equal(sr.state.activeEnv, 'e1');
 
   sr.applyState(sr.normalizeDoc(null));
   assert.deepEqual(JSON.parse(sr.serializeState()), {
     version: 1, collections: [], history: [], envs: [], activeEnv: '',
-    settings: { timeoutMs: 30000, followRedirects: true, verifyTls: true, cookies: true, history: true },
+    settings: { timeoutMs: 30000, followRedirects: true, verifyTls: true, cookies: true, history: true }, schedules: [],
   }, 'no file: defaults, and the keys of the previous file are gone');
 });
 

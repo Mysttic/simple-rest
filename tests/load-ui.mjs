@@ -52,8 +52,10 @@ class FakeElement {
     for (const l of ls) l.fn({ type, target: this });
   }
   querySelector() { return new FakeElement(); }
-  // A key/value row has three inputs: the checkbox, the name and the value.
-  querySelectorAll() { return [new FakeElement('input'), new FakeElement('input'), new FakeElement('input')]; }
+  // A key/value row has three inputs: the checkbox, the name and the value. A
+  // rule row of a schedule has four: the checkbox, the variable, the path and
+  // the Opt checkbox.
+  querySelectorAll() { return [1, 2, 3, 4].map(() => new FakeElement('input')); }
   appendChild(c) { this.children.push(c); return c; }
   insertRow() { return new FakeElement('tr'); }
   closest(sel) { return this.parents[sel] || null; }
