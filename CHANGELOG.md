@@ -7,6 +7,38 @@ ostatniego wydanego tagu.
 
 ## [Unreleased]
 
+### Dodane
+
+- Konsola TCP w programie, na razie tylko jako API (okno w UI dochodzi osobno). Program
+  łączy się jako klient z urządzeniem albo systemem w sieci (nazwa DNS, IPv4 albo IPv6,
+  także ze strefą) i utrzymuje połączenie do rozłączenia; nigdy nie nasłuchuje. Keepalive
+  wykrywa martwe urządzenie po około 30 sekundach, a na Linuksie także przy danych
+  w drodze (`TCP_USER_TIMEOUT`). Ramkowanie: None (domyślne, surowe bajty dzielone po
+  ciszy `idleMs`), LF, CRLF, MLLP (`0B`, treść, `1C 0D`) i STX/ETX. Wysyłka dokłada ramkę,
+  chyba że komunikat już ją ma. Odbiór dzieli bajty na komunikaty, bajty spoza ramki
+  (np. ACK albo NAK) trafiają do logu osobno, a ramka ponad 1 MB jest ucinana. Wysyłki
+  z wielu kart idą na kabel w kolejności numerów w logu. Wait for reply bierze za
+  odpowiedź pierwszy wpis, który zaczął przychodzić po wysłaniu, i mierzy czas, bez
+  trzymania połączenia HTTP. API: `GET /api/tcp`, `POST /api/tcp/{id}/connect`,
+  `.../send` i `.../disconnect`, `DELETE /api/tcp/{id}/wait`, `GET` i
+  `DELETE /api/tcp/{id}/log` oraz `DELETE /api/tcp/{id}`.
+- Zmienne w komunikatach TCP oraz w hoście i porcie połączenia podstawia program z tego
+  samego źródła co w harmonogramach: wiersze środowiska wybranego przy Connect, a nad
+  nimi nakładka harmonogramów. Połączenie wysyła zawsze ze swoim środowiskiem, niezależnie
+  od karty. Zmienna bez wartości zostaje w komunikacie dosłownie i jest zgłaszana,
+  a w hoście albo porcie blokuje Connect.
+- Połączenia TCP i ich log (najwyżej 1000 wpisów albo 2 MB na połączenie) są tylko
+  w pamięci programu i wspólne dla wszystkich kart i komputerów. Po każdym starcie
+  programu, także po aktualizacji, żadne połączenie nie jest otwarte. Zamknięcie programu
+  i restart po aktualizacji zamykają wszystkie połączenia (FIN). Konsola programu podaje
+  Connect i Disconnect z adresem, z którego przyszły, ale nigdy treść komunikatów ani
+  wartości zmiennych.
+- Strumień zdarzeń `GET /api/events` (server-sent events), jeden na widoczną kartę:
+  zdarzenia konsoli TCP, `state.changed` po zmianie pliku danych i `sched.changed` po
+  zmianie harmonogramów (najwyżej jedno na 250 ms). Karta, która wraca z identyfikatorem
+  ostatniego zdarzenia, dostaje to, co ją ominęło, a po restarcie programu albo przy
+  dużej zaległości stan bieżący. Na razie karty dalej odpytują program co kilka sekund.
+
 ## [1.2.0] - 2026-10-01
 
 ### Dodane

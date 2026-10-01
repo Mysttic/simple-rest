@@ -165,18 +165,27 @@ type schedDef struct {
 	envRows []kvRow
 }
 
-// fileView is what the scheduler knows of one version of the data file.
+// fileView is what the scheduler knows of one version of the data file. The
+// TCP console reads its environments and the names of its connections too.
 type fileView struct {
-	seq  int // goes up with every read, so an older view never replaces a newer one
-	tag  string
-	err  string // the file cannot be read or is no JSON object
-	defs []*schedDef
-	byID map[string]*schedDef
-	envs map[string]bool // ids of all environments
+	seq      int // goes up with every read, so an older view never replaces a newer one
+	tag      string
+	err      string // the file cannot be read or is no JSON object
+	defs     []*schedDef
+	byID     map[string]*schedDef
+	envs     map[string]bool    // ids of all environments
+	env      map[string]envView // the environments by id
+	tcpNames map[string]string  // names of the TCP connections by id
+}
+
+// envView is an environment of the data file.
+type envView struct {
+	name string
+	rows []kvRow
 }
 
 func emptyView() *fileView {
-	return &fileView{byID: map[string]*schedDef{}, envs: map[string]bool{}}
+	return &fileView{byID: map[string]*schedDef{}, envs: map[string]bool{}, env: map[string]envView{}, tcpNames: map[string]string{}}
 }
 
 // secs reads a whole number of seconds: missing or null gives def, and a
@@ -369,9 +378,24 @@ func parseView(data []byte, tag string, seq int) *fileView {
 	}
 	envs := map[string]json.RawMessage{}
 	for _, e := range x.list(top["envs"], "") {
-		if id := x.text(x.object(e, "")["id"], "", ""); id != "" && envs[id] == nil {
+		m := x.object(e, "")
+		if id := x.text(m["id"], "", ""); id != "" && envs[id] == nil {
 			envs[id] = e
 			v.envs[id] = true
+			ev := envView{name: x.text(m["name"], "", "")}
+			if ev.name == "" {
+				ev.name = "env" // as normalizeDoc names it
+			}
+			ev.rows, _ = decodeFields(m["vars"], "vars")
+			v.env[id] = ev
+		}
+	}
+	for _, c := range x.list(top["tcp"], "") {
+		m := x.object(c, "")
+		if id := x.text(m["id"], "", ""); id != "" {
+			if _, seen := v.tcpNames[id]; !seen {
+				v.tcpNames[id] = x.text(m["name"], "", "")
+			}
 		}
 	}
 	for _, sr := range x.list(top["schedules"], "") {
@@ -482,6 +506,7 @@ type scheduler struct {
 	gen      uint64    // goes up with every change a snapshot shows
 	rev      uint64    // rev of the data file stateTag belongs to
 	stateTag string
+	changed  chan struct{} // signalled when gen goes up; the event stream follows it
 	stopping bool
 	dirty    bool  // the data file changed since the loop last looked
 	lastLook int64 // when the loop last looked at the data file
@@ -512,7 +537,7 @@ func newScheduler(a *app) *scheduler {
 	ctx, cancel := context.WithCancel(context.Background())
 	return &scheduler{
 		jobs: map[string]*jobRT{}, defs: emptyView(),
-		sem: make(chan struct{}, maxParallel), wake: make(chan struct{}, 1),
+		sem: make(chan struct{}, maxParallel), wake: make(chan struct{}, 1), changed: make(chan struct{}, 1),
 		now:  func() int64 { return time.Now().UnixMilli() },
 		send: a.exchange, vars: newVarStore(),
 		logf: func(format string, args ...any) { a.logq.printf(format, args...) },
@@ -594,9 +619,9 @@ func (s *scheduler) sync() *fileView {
 	s.mu.Lock()
 	if v.seq > s.defs.seq {
 		lines = s.reconcileLocked(v)
-		s.gen++
+		s.bumpLocked()
 	} else if dropped {
-		s.gen++
+		s.bumpLocked()
 	}
 	s.mu.Unlock()
 	for _, l := range lines {
@@ -658,10 +683,27 @@ func (s *scheduler) stateChanged(rev uint64, tag string) {
 	s.mu.Lock()
 	if rev > s.rev {
 		s.rev, s.stateTag, s.dirty = rev, tag, true
-		s.gen++
+		s.bumpLocked()
 	}
 	s.mu.Unlock()
 	s.poke()
+}
+
+// bumpLocked raises gen, which every change the snapshot shows does, and
+// tells the event stream without waiting for it. The caller holds s.mu.
+func (s *scheduler) bumpLocked() {
+	s.gen++
+	select {
+	case s.changed <- struct{}{}:
+	default:
+	}
+}
+
+// currentGen is gen, for sched.changed.
+func (s *scheduler) currentGen() uint64 {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.gen
 }
 
 // poke wakes the loop.
@@ -720,7 +762,7 @@ func (s *scheduler) tick() {
 		// would hold the runs off for as long; they keep their distance.
 		if now < j.plannedAt-clockSlack {
 			j.plan(now, now+(j.nextAt-j.plannedAt), j.nextFrom)
-			s.gen++
+			s.bumpLocked()
 		}
 		if !j.running && j.blocked == "" && now >= j.nextAt {
 			s.startLocked(id, j, false)
@@ -740,7 +782,7 @@ func (s *scheduler) startLocked(id string, j *jobRT, manual bool) bool {
 	ctx, cancel := context.WithCancel(s.ctx)
 	j.running, j.runGen, j.done, j.cancel = true, j.gen, make(chan struct{}), cancel
 	j.state = stateRunning
-	s.gen++
+	s.bumpLocked()
 	go s.run(ctx, id, j, j.gen, manual)
 	return true
 }
@@ -834,7 +876,7 @@ func (s *scheduler) finish(id string, j *jobRT, gen uint64, manual bool, d *sche
 	default: // the run counted for nothing; the job waits for its turn
 		j.state = stateWaiting
 	}
-	s.gen++
+	s.bumpLocked()
 	s.mu.Unlock()
 	if line != "" {
 		s.logf("%s", line)
@@ -1109,7 +1151,7 @@ func (s *scheduler) enable(id, from string) (int, any) {
 		if j.running {
 			j.state = stateRunning
 		}
-		s.gen++
+		s.bumpLocked()
 		turnedOn = true
 	}
 	out := s.jobJSONLocked(d, j)
@@ -1134,7 +1176,7 @@ func (s *scheduler) disable(id, from string) (int, any) {
 	d := s.defs.byID[id]
 	wasOn := j.enabled
 	s.turnOffLocked(j)
-	s.gen++
+	s.bumpLocked()
 	out := s.jobJSONLocked(d, j)
 	s.mu.Unlock()
 	if wasOn {
@@ -1154,7 +1196,7 @@ func (s *scheduler) disableAll(from string) int {
 		}
 	}
 	if n > 0 {
-		s.gen++
+		s.bumpLocked()
 	}
 	s.mu.Unlock()
 	if n > 0 {
@@ -1213,7 +1255,7 @@ func (s *scheduler) clearVar(envID, name string) bool {
 		return false
 	}
 	s.mu.Lock()
-	s.gen++
+	s.bumpLocked()
 	s.mu.Unlock()
 	return true
 }
@@ -1369,15 +1411,20 @@ func offNote(rules []extractRule, ovl map[string]overlayVar, every int, now int6
 // readJSON reads the JSON body of a POST to /api/schedules* or /api/vars*
 // into v. It answers an error itself and then returns false.
 func readJSON(w http.ResponseWriter, r *http.Request, v any) bool {
+	return readJSONMax(w, r, v, apiBodyLimit, "64 KB")
+}
+
+// readJSONMax is readJSON for a body of up to limit bytes, which size names.
+func readJSONMax(w http.ResponseWriter, r *http.Request, v any, limit int64, size string) bool {
 	if mt, _, err := mime.ParseMediaType(r.Header.Get("Content-Type")); err != nil || mt != "application/json" {
 		jsonError(w, http.StatusUnsupportedMediaType, "Content-Type must be application/json")
 		return false
 	}
-	data, err := io.ReadAll(http.MaxBytesReader(w, r.Body, apiBodyLimit))
+	data, err := io.ReadAll(http.MaxBytesReader(w, r.Body, limit))
 	var tooBig *http.MaxBytesError
 	switch {
 	case errors.As(err, &tooBig):
-		jsonError(w, http.StatusRequestEntityTooLarge, "the request body is over 64 KB")
+		jsonError(w, http.StatusRequestEntityTooLarge, "the request body is over "+size)
 		return false
 	case err != nil:
 		jsonError(w, http.StatusBadRequest, "bad request: "+err.Error())

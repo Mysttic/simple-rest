@@ -107,6 +107,8 @@ type app struct {
 	logq         *logQueue  // console lines from handlers and the guard
 	boot         string     // 16 hex digits, new with every start of the process
 	sched        *scheduler
+	bus          *eventBus // GET /api/events
+	tcp          *tcpHub
 
 	closing      atomic.Bool // set by shutdown: the routes added in 1.2.0 answer 503
 	shutdownOnce sync.Once
@@ -138,7 +140,25 @@ func newApp(dataPath string, loopbackOnly bool) *app {
 		refused: map[string]bool{},
 		jar:     jar, secure: secure, insecure: insecure,
 	}
+	a.bus = newEventBus(a.boot)
 	a.sched = newScheduler(a)
+	a.tcp = newTCPHub(a)
+	// A stream that cannot catch up from the journal starts from these.
+	a.bus.providers = []snapshotProvider{
+		func(client string, seq uint64) (string, any, bool) {
+			return "tcp.snapshot", a.tcp.list(client, seq), true
+		},
+		func(string, uint64) (string, any, bool) {
+			tag, err := a.currentTag()
+			return "state.changed", map[string]string{"tag": tag}, err == nil
+		},
+		func(string, uint64) (string, any, bool) {
+			return "sched.changed", map[string]uint64{"gen": a.sched.currentGen()}, true
+		},
+	}
+	go a.bus.follow("sched.changed", a.sched.changed, func() any {
+		return map[string]uint64{"gen": a.sched.currentGen()}
+	}, schedEventGap)
 	return a
 }
 
@@ -152,12 +172,16 @@ func newBoot() string {
 
 // shutdown ends the background work before the process ends or restarts: the
 // routes added in 1.2.0 answer 503, no schedule starts a run any more, the
-// runs in flight are cancelled, and the console gets the queued lines. It
-// waits about a second at most, and only the first call does anything.
+// runs in flight are cancelled, every TCP connection gets its FIN, the event
+// streams end, and the console gets the queued lines. It waits about a second
+// at most, and only the first call does anything.
 func (a *app) shutdown() {
 	a.shutdownOnce.Do(func() {
+		deadline := time.Now().Add(time.Second)
 		a.closing.Store(true)
 		a.sched.stop()
+		a.tcp.close(deadline)
+		a.bus.close()
 		a.logq.flush(200 * time.Millisecond)
 	})
 }
@@ -455,9 +479,11 @@ func replaceFile(path string, data []byte) (fileStamp, error) {
 
 // onStateChange runs after every change of the data file's tag, outside
 // fileMu: a PUT, or an outside edit noticed by a read. rev only grows, so a
-// listener can drop a call that arrives after a newer one.
+// listener can drop a call that arrives after a newer one. The event stream
+// tells the pages with state.changed.
 func (a *app) onStateChange(rev uint64, tag string) {
 	a.sched.stateChanged(rev, tag)
+	a.bus.stateChanged(rev, tag)
 }
 
 // etagListHas reports whether an If-None-Match value names tag. Weak tags
@@ -641,6 +667,10 @@ func routes(a *app, u *updater) http.Handler {
 	mux.HandleFunc("/api/schedules/{id}/{action}", a.handleScheduleAction)
 	mux.HandleFunc("/api/vars/ensure", a.handleEnsure)
 	mux.HandleFunc("/api/vars/{envId}/{name}", a.handleVar)
+	mux.HandleFunc("/api/events", a.handleEvents)
+	mux.HandleFunc("/api/tcp", a.handleTCP)
+	mux.HandleFunc("/api/tcp/{id}", a.handleTCPSession)
+	mux.HandleFunc("/api/tcp/{id}/{action}", a.handleTCPAction)
 	if u != nil {
 		mux.HandleFunc("/api/update", u.handle)
 		mux.HandleFunc("/api/update/", u.handle)
