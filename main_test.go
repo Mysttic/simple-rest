@@ -13,6 +13,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 )
@@ -372,6 +373,250 @@ func TestGuard(t *testing.T) {
 	res.Body.Close()
 	if res.StatusCode != http.StatusForbidden {
 		t.Errorf("foreign Origin on an open listener = %d", res.StatusCode)
+	}
+}
+
+func TestHostAllowlist(t *testing.T) {
+	// os.Hostname() may come with the domain; both the full name and its
+	// first label get in. The cases are Host headers, with or without a port.
+	p := newHostPolicy("Lab-PC.office.example", nil)
+	for _, h := range []string{
+		"192.168.1.20:8787", "10.0.0.5", "192.168.1.20.",
+		"[::1]:8787", "[::1]", "[2001:db8::7]:8787", "[fe80::1%25eth0]:8787", "[FE80::1%eth0]",
+		"localhost:8787", "LOCALHOST.", "raspberrypi:8787", "RaspberryPi.",
+		"pi.local:8787", "pi.lan", "pi.home", "pi.home.arpa:8787", "pi.internal", "pi.localdomain", "PI.LOCAL.", "a.b.home.arpa",
+		"lab-pc.office.example:8787", "LAB-PC.OFFICE.EXAMPLE.", "lab-pc",
+	} {
+		if !p.hostAllowed(hostOnly(h)) {
+			t.Errorf("%q refused", h)
+		}
+	}
+	for _, h := range []string{
+		"", "evil.example:8787", "EVIL.EXAMPLE.", "evil.example.com", "pc.firma.pl", "pc123.firma.pl:8787",
+		"pi.local.evil.example", "local.evil.example", "home.arpa", "other.office.example", "lab-pc.evil.example",
+	} {
+		if p.hostAllowed(hostOnly(h)) {
+			t.Errorf("%q let in", h)
+		}
+	}
+
+	// Without the domain the bare name gets in, and the machine's name under
+	// some other domain does not.
+	bare := newHostPolicy("LAB-PC", nil)
+	if !bare.hostAllowed("lab-pc") || !bare.hostAllowed("Lab-PC.") || bare.hostAllowed("lab-pc.office.example") {
+		t.Error("hostname without a domain")
+	}
+	if h := osHostname(); h != "" {
+		own := newHostPolicy(h, nil)
+		if !own.hostAllowed(h) || !own.hostAllowed(strings.ToUpper(h)+".") || !own.hostAllowed(strings.ToLower(h)) {
+			t.Errorf("os.Hostname() %q refused", h)
+		}
+	}
+
+	// -allow-host adds exact names; letters, a final dot and a port do not matter.
+	extra := newHostPolicy("", strings.Split(" pc.firma.pl ,Intranet.Example.:8787,", ","))
+	for _, h := range []string{"pc.firma.pl", "PC.FIRMA.PL.", "intranet.example"} {
+		if !extra.hostAllowed(h) {
+			t.Errorf("-allow-host: %q refused", h)
+		}
+	}
+	if extra.any || extra.hostAllowed("evil.example") || extra.hostAllowed("x.pc.firma.pl") {
+		t.Error("-allow-host lets in more than the names it lists")
+	}
+	star := newHostPolicy("", strings.Split("pc.firma.pl,*", ","))
+	if !star.any || !star.hostAllowed("evil.example") || !star.hostAllowed("pc.firma.pl") {
+		t.Error("-allow-host * must let in any name")
+	}
+
+	if got := p.describe(); !strings.Contains(got, ".home.arpa, .internal or .localdomain") ||
+		!strings.Contains(got, "and as lab-pc, lab-pc.office.example;") || !strings.HasSuffix(got, "need -allow-host") {
+		t.Errorf("describe = %q", got)
+	}
+	if got := star.describe(); got != "under any name" {
+		t.Errorf("describe with * = %q", got)
+	}
+}
+
+// hostStatus sends GET /api/info to srv with the given Host header.
+func hostStatus(t *testing.T, srv *httptest.Server, host string) (int, string) {
+	t.Helper()
+	r, _ := http.NewRequest(http.MethodGet, srv.URL+"/api/info", nil)
+	r.Host = host
+	res, err := http.DefaultClient.Do(r)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer res.Body.Close()
+	b, _ := io.ReadAll(res.Body)
+	return res.StatusCode, strings.TrimSpace(string(b))
+}
+
+func TestHostGuard(t *testing.T) {
+	open := newApp(filepath.Join(t.TempDir(), "d.json"), false)
+	open.hosts = newHostPolicy(osHostname(), []string{"intranet.example"})
+	var mu sync.Mutex
+	var lines []string
+	open.logq = newLogQueue(logQueueSize, func(s string) { mu.Lock(); lines = append(lines, s); mu.Unlock() })
+	srv := httptest.NewServer(routes(open, nil))
+	defer srv.Close()
+
+	ok := []string{"192.168.1.20:8787", "[fe80::1%25eth0]:8787", "raspberrypi:8787", "pi.local:8787", "intranet.example:8787"}
+	if h := osHostname(); h != "" {
+		ok = append(ok, h+":8787")
+	}
+	for _, h := range ok {
+		if code, body := hostStatus(t, srv, h); code != 200 {
+			t.Errorf("Host %q: %d %s", h, code, body)
+		}
+	}
+	const want = `forbidden host "pc123.firma.pl": open simple-rest by its IP address or start it with -allow-host pc123.firma.pl`
+	for _, h := range []string{"pc123.firma.pl:8787", "PC123.firma.pl.:8787"} {
+		if code, body := hostStatus(t, srv, h); code != http.StatusForbidden || body != want {
+			t.Errorf("Host %q: %d %q", h, code, body)
+		}
+	}
+	if code, _ := hostStatus(t, srv, "evil.example"); code != http.StatusForbidden {
+		t.Errorf("evil.example = %d", code)
+	}
+
+	// The console hears about each refused name once, with the flag to use.
+	if !open.logq.flush(time.Second) {
+		t.Fatal("log queue did not flush")
+	}
+	mu.Lock()
+	got := append([]string(nil), lines...)
+	mu.Unlock()
+	if len(got) != 2 || !strings.Contains(got[0], `refused host "pc123.firma.pl" (from 127.0.0.1)`) ||
+		!strings.HasSuffix(got[0], "-allow-host pc123.firma.pl") || !strings.Contains(got[1], `"evil.example"`) {
+		t.Errorf("console lines: %q", got)
+	}
+
+	all := newApp(filepath.Join(t.TempDir(), "d.json"), false)
+	all.hosts = newHostPolicy(osHostname(), []string{"*"})
+	srvAll := httptest.NewServer(routes(all, nil))
+	defer srvAll.Close()
+	if code, _ := hostStatus(t, srvAll, "evil.example:8787"); code != 200 {
+		t.Errorf("-allow-host * refused a name: %d", code)
+	}
+
+	// On loopback nothing changes: -allow-host is not looked at.
+	lo := testApp(t)
+	lo.hosts = newHostPolicy(osHostname(), []string{"*"})
+	srvLo := httptest.NewServer(routes(lo, nil))
+	defer srvLo.Close()
+	for _, h := range []string{"evil.example:8787", "pi.local:8787", "192.168.1.20:8787"} {
+		if code, body := hostStatus(t, srvLo, h); code != http.StatusForbidden || body != "forbidden host" {
+			t.Errorf("loopback, Host %q: %d %q", h, code, body)
+		}
+	}
+	for _, h := range []string{"localhost:8787", "127.0.0.1:8787", "[::1]:8787"} {
+		if code, _ := hostStatus(t, srvLo, h); code != 200 {
+			t.Errorf("loopback, Host %q: %d", h, code)
+		}
+	}
+}
+
+func TestIndexNoFraming(t *testing.T) {
+	srv := httptest.NewServer(routes(testApp(t), nil))
+	defer srv.Close()
+	res, err := http.Get(srv.URL + "/")
+	if err != nil {
+		t.Fatal(err)
+	}
+	res.Body.Close()
+	if got := res.Header.Get("X-Frame-Options"); got != "DENY" {
+		t.Errorf("X-Frame-Options = %q", got)
+	}
+	if got := res.Header.Get("Content-Security-Policy"); got != "frame-ancestors 'none'" {
+		t.Errorf("Content-Security-Policy = %q", got)
+	}
+}
+
+func TestJSONHelpers(t *testing.T) {
+	w := httptest.NewRecorder()
+	jsonError(w, http.StatusTeapot, `bad "thing"`)
+	var body map[string]string
+	if err := json.Unmarshal(w.Body.Bytes(), &body); err != nil || len(body) != 1 || body["error"] != `bad "thing"` ||
+		w.Code != http.StatusTeapot || !strings.HasPrefix(w.Header().Get("Content-Type"), "application/json") {
+		t.Errorf("jsonError: %d %q %v", w.Code, w.Body.String(), err)
+	}
+	w = httptest.NewRecorder()
+	methodNotAllowed(w, http.MethodGet, http.MethodPost)
+	body = nil
+	if err := json.Unmarshal(w.Body.Bytes(), &body); err != nil || body["error"] != "method not allowed" ||
+		w.Code != http.StatusMethodNotAllowed || w.Header().Get("Allow") != "GET, POST" {
+		t.Errorf("methodNotAllowed: %d %q %q %v", w.Code, w.Header().Get("Allow"), w.Body.String(), err)
+	}
+}
+
+func TestLogQueueDrops(t *testing.T) {
+	var mu sync.Mutex
+	var lines []string
+	got := func() []string { mu.Lock(); defer mu.Unlock(); return append([]string(nil), lines...) }
+	stuck := make(chan struct{})
+	writing := make(chan struct{}, 1)
+	q := newLogQueue(4, func(s string) {
+		select {
+		case writing <- struct{}{}:
+		default:
+		}
+		<-stuck // a console in QuickEdit: the write waits until it is let go
+		mu.Lock()
+		lines = append(lines, s)
+		mu.Unlock()
+	})
+
+	q.printf("line %d", 0)
+	<-writing // the writer took line 0 and hangs on it
+	start := time.Now()
+	for i := 1; i <= 10; i++ {
+		q.printf("line %d", i) // 1 to 4 fill the queue, 5 to 10 are dropped
+	}
+	if d := time.Since(start); d > time.Second {
+		t.Errorf("printf waited for the stuck console: %v", d)
+	}
+	if q.flush(50 * time.Millisecond) {
+		t.Error("flush reported success while the console is stuck")
+	}
+
+	close(stuck)
+	deadline := time.Now().Add(5 * time.Second)
+	for len(got()) < 5 && time.Now().Before(deadline) {
+		time.Sleep(5 * time.Millisecond)
+	}
+	q.printf("line %d", 11)
+	if !q.flush(time.Second) {
+		t.Fatal("flush timed out")
+	}
+	want := []string{"line 0", "line 1", "line 2", "line 3", "line 4", "(6 log lines dropped)", "line 11"}
+	if g := got(); strings.Join(g, "|") != strings.Join(want, "|") {
+		t.Errorf("lines = %q, want %q", g, want)
+	}
+
+	// Lines dropped with nothing after them come out on flush.
+	block := make(chan struct{})
+	var n int
+	q2 := newLogQueue(1, func(s string) {
+		if n++; n == 1 {
+			<-block
+		}
+		mu.Lock()
+		lines = append(lines, s)
+		mu.Unlock()
+	})
+	mu.Lock()
+	lines = nil
+	mu.Unlock()
+	q2.printf("a")
+	for i := 0; i < 10; i++ {
+		q2.printf("b%d", i)
+	}
+	close(block)
+	if !q2.flush(time.Second) {
+		t.Fatal("flush timed out")
+	}
+	if g := got(); len(g) < 2 || g[0] != "a" || !strings.HasSuffix(g[len(g)-1], "log lines dropped)") {
+		t.Errorf("lines after flush = %q", g)
 	}
 }
 

@@ -25,6 +25,9 @@ ostatniego wydanego tagu.
 - Jedno powiadomienie po imporcie podsumowuje wszystkie wybrane pliki, także te, których
   nie udało się zaimportować, i znika tym później, im jest dłuższe. Plik, którego nie da
   się odczytać, nie przerywa importu pozostałych.
+- Flaga `-allow-host a,b` dopisuje nazwy hosta, pod którymi wolno otworzyć UI przy nasłuchu
+  poza 127.0.0.1. `-allow-host '*'` przyjmuje każdą nazwę, czyli wyłącza ochronę przed DNS
+  rebinding, a program ostrzega o tym przy starcie.
 
 ### Zmienione
 
@@ -44,6 +47,16 @@ ostatniego wydanego tagu.
 - `{{constructor}}` i inne nazwy z prototypu obiektu nie rozwijają się, a `{{__proto__}}`
   działa jak każda zmienna.
 - Instalacja aktualizacji najpierw zapisuje dane i nie rusza, jeśli zapis się nie udał.
+- Przy nasłuchu poza 127.0.0.1 (np. `-listen 0.0.0.0:8787`) nagłówek Host musi być adresem
+  IP, nazwą bez kropki, nazwą z końcówką `.local`, `.lan`, `.home`, `.home.arpa`,
+  `.internal` albo `.localdomain`, nazwą komputera albo nazwą z `-allow-host`. Inna nazwa
+  dostaje 403 z podpowiedzią, a konsola przy pierwszym odrzuceniu danej nazwy podaje gotową
+  flagę. Linia startowa wymienia dozwolone sposoby wejścia. Przy nasłuchu na 127.0.0.1 nic
+  się nie zmienia.
+- Strony programu nie da się osadzić w ramce na innej stronie (`X-Frame-Options: DENY`
+  i `Content-Security-Policy: frame-ancestors 'none'`).
+- Gdy program po aktualizacji odrzuca nazwę, pod którą otwarto stronę, strona mówi to wprost
+  zamiast po kilkudziesięciu sekundach zgłosić, że program nie wrócił.
 
 ## [1.1.0] - 2026-09-10
 

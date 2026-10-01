@@ -20,6 +20,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/cookiejar"
+	"net/netip"
 	"net/url"
 	"os"
 	"os/exec"
@@ -99,6 +100,11 @@ type sendResponse struct {
 type app struct {
 	dataPath     string
 	loopbackOnly bool
+	hosts        hostPolicy // Host names let in when not loopbackOnly
+	logq         *logQueue  // console lines from handlers and the guard
+
+	refusedMu sync.Mutex      // guards refused
+	refused   map[string]bool // Host names already reported on the console
 
 	fileMu   sync.Mutex // guards the data file and rev, tag and stamp
 	rev      uint64     // goes up by one whenever tag changes
@@ -116,7 +122,13 @@ func newApp(dataPath string, loopbackOnly bool) *app {
 	secure.ForceAttemptHTTP2 = true
 	insecure := secure.Clone()
 	insecure.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
-	return &app{dataPath: dataPath, loopbackOnly: loopbackOnly, jar: jar, secure: secure, insecure: insecure}
+	return &app{
+		dataPath: dataPath, loopbackOnly: loopbackOnly,
+		hosts:   newHostPolicy(osHostname(), nil),
+		logq:    newLogQueue(logQueueSize, func(s string) { log.Print(s) }),
+		refused: map[string]bool{},
+		jar:     jar, secure: secure, insecure: insecure,
+	}
 }
 
 // ---- request execution -----------------------------------------------------
@@ -388,6 +400,20 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 	_ = json.NewEncoder(w).Encode(v)
 }
 
+// jsonError answers {"error": msg}. Routes added from 1.2.0 on answer every
+// error this way; the older ones keep their plain text answers.
+func jsonError(w http.ResponseWriter, status int, msg string) {
+	writeJSON(w, status, map[string]string{"error": msg})
+}
+
+// methodNotAllowed answers 405 with the Allow header. Route patterns carry no
+// method, because the catch-all "/" would turn a method that does not match
+// into a 404, so each handler checks the method itself.
+func methodNotAllowed(w http.ResponseWriter, allow ...string) {
+	w.Header().Set("Allow", strings.Join(allow, ", "))
+	jsonError(w, http.StatusMethodNotAllowed, "method not allowed")
+}
+
 func (a *app) handleIndex(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Path != "/" {
 		http.NotFound(w, r)
@@ -395,6 +421,12 @@ func (a *app) handleIndex(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-store")
+	// No other site may show the page in a frame and trick a click on Send or
+	// Install and restart. The policy has frame-ancestors only, because the
+	// page carries its script and styles inline. The HTML preview of a
+	// response is a frame inside this page, which the headers do not touch.
+	w.Header().Set("X-Frame-Options", "DENY")
+	w.Header().Set("Content-Security-Policy", "frame-ancestors 'none'")
 	_, _ = w.Write(uiHTML)
 }
 
@@ -463,9 +495,7 @@ func (a *app) handleState(w http.ResponseWriter, r *http.Request) {
 		tag, err := a.writeState(data, ifMatch)
 		if errors.Is(err, errStateChanged) {
 			w.Header().Set("ETag", tag)
-			writeJSON(w, http.StatusPreconditionFailed, map[string]string{
-				"error": "The data file was changed in another tab or on another computer. Reload the page.",
-			})
+			jsonError(w, http.StatusPreconditionFailed, "The data file was changed in another tab or on another computer. Reload the page.")
 			return
 		}
 		if err != nil {
@@ -491,12 +521,19 @@ func (a *app) handleCookies(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// guard rejects requests whose Host is not loopback (DNS rebinding) and
-// cross-origin requests (CSRF from other sites open in the same browser).
+// guard rejects requests whose Host a web page on another site could own (DNS
+// rebinding) and cross-origin requests (CSRF from other sites open in the same
+// browser). On loopback only localhost and loopback addresses get in; beyond
+// it, the names hostPolicy takes.
 func (a *app) guard(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if a.loopbackOnly && !isLoopbackHost(hostOnly(r.Host)) {
+		host := hostOnly(r.Host)
+		if a.loopbackOnly && !isLoopbackHost(host) {
 			http.Error(w, "forbidden host", http.StatusForbidden)
+			return
+		}
+		if !a.loopbackOnly && !a.hosts.hostAllowed(host) {
+			a.refuseHost(w, r, host)
 			return
 		}
 		if origin := r.Header.Get("Origin"); origin != "" {
@@ -538,6 +575,125 @@ func isLoopbackHost(h string) bool {
 	}
 	ip := net.ParseIP(h)
 	return ip != nil && ip.IsLoopback()
+}
+
+// ---- Host names beyond loopback ------------------------------------------------
+
+// localSuffixes end names nobody can register in public DNS, so no web page
+// on another site can point one of them at this machine.
+var localSuffixes = []string{".local", ".lan", ".home", ".home.arpa", ".internal", ".localdomain"}
+
+// maxRefusedNames caps how many refused Host names the console reports, so a
+// stream of made-up names cannot grow the list without end.
+const maxRefusedNames = 100
+
+// hostPolicy says which Host names reach the program when it listens beyond
+// loopback. Through DNS rebinding a web page on another site can give its own
+// name this machine's address and then read the answers as its own, so only
+// names such a page cannot own get through, plus those named on the command
+// line.
+type hostPolicy struct {
+	any   bool            // -allow-host *: every name, as before 1.2.0
+	names map[string]bool // os.Hostname() with and without its domain, and -allow-host
+}
+
+func osHostname() string {
+	h, _ := os.Hostname()
+	return h
+}
+
+// normHost lowers a host name and drops the dot a fully qualified name may end with.
+func normHost(h string) string {
+	return strings.TrimSuffix(strings.ToLower(strings.TrimSpace(h)), ".")
+}
+
+// newHostPolicy takes this computer's name as os.Hostname() gives it, which
+// may come with its domain (pc1.office.example) or without (PC1); both the
+// full name and its first label get in. allow holds the -allow-host items: a
+// name, a name with a port, or * for any name.
+func newHostPolicy(hostname string, allow []string) hostPolicy {
+	p := hostPolicy{names: map[string]bool{}}
+	if h := normHost(hostname); h != "" {
+		p.names[h] = true
+		if i := strings.IndexByte(h, '.'); i > 0 {
+			p.names[h[:i]] = true
+		}
+	}
+	for _, item := range allow {
+		switch n := normHost(hostOnly(strings.TrimSpace(item))); n {
+		case "":
+		case "*":
+			p.any = true
+		default:
+			p.names[n] = true
+		}
+	}
+	return p
+}
+
+// hostAllowed reports whether h, a Host header without its port, gets in: an
+// IP address (IPv6 with a zone too), a name without a dot such as localhost
+// or raspberrypi, a name with one of localSuffixes, or one of p.names.
+// Letter case and a final dot do not matter.
+func (p hostPolicy) hostAllowed(h string) bool {
+	if p.any {
+		return true
+	}
+	h = normHost(h)
+	if h == "" {
+		return false
+	}
+	if _, err := netip.ParseAddr(h); err == nil {
+		return true
+	}
+	if !strings.Contains(h, ".") || p.names[h] {
+		return true
+	}
+	for _, s := range localSuffixes {
+		if strings.HasSuffix(h, s) {
+			return true
+		}
+	}
+	return false
+}
+
+// describe lists the ways in for the startup line.
+func (p hostPolicy) describe() string {
+	if p.any {
+		return "under any name"
+	}
+	last := len(localSuffixes) - 1
+	s := "by IP address, by a name without a dot or by one ending in " +
+		strings.Join(localSuffixes[:last], ", ") + " or " + localSuffixes[last]
+	names := make([]string, 0, len(p.names))
+	for n := range p.names {
+		names = append(names, n)
+	}
+	if len(names) > 0 {
+		sort.Strings(names)
+		s += ", and as " + strings.Join(names, ", ")
+	}
+	return s + "; other names need -allow-host"
+}
+
+// refuseHost answers 403 to a Host name the policy does not take. The first
+// time a name comes, the console says so too, with the flag that lets it in.
+func (a *app) refuseHost(w http.ResponseWriter, r *http.Request, host string) {
+	name := normHost(host)
+	if name == "" {
+		http.Error(w, "forbidden host: the request names no host", http.StatusForbidden)
+		return
+	}
+	a.refusedMu.Lock()
+	first := !a.refused[name] && len(a.refused) < maxRefusedNames
+	if first {
+		a.refused[name] = true
+	}
+	a.refusedMu.Unlock()
+	if first {
+		a.logq.printf("refused host %q (from %s): to open simple-rest by this name, start it with -allow-host %s", name, hostOnly(r.RemoteAddr), name)
+	}
+	http.Error(w, fmt.Sprintf("forbidden host %q: open simple-rest by its IP address or start it with -allow-host %s", name, name), http.StatusForbidden)
 }
 
 // ---- startup -------------------------------------------------------------------
@@ -597,6 +753,7 @@ func restartProcess(srv *http.Server, exe string) {
 
 func main() {
 	listen := flag.String("listen", "127.0.0.1:8787", "listen address; use 0.0.0.0:8787 to reach the UI from other devices (e.g. a phone)")
+	allowHost := flag.String("allow-host", "", "comma-separated host names the UI may also be opened by when listening beyond loopback, besides IP addresses and local names; * allows any name and turns the DNS rebinding protection off")
 	dataPath := flag.String("data", "", "data file (default: simple-rest-data.json next to the executable)")
 	noBrowser := flag.Bool("no-browser", false, "do not open the browser automatically")
 	showVersion := flag.Bool("version", false, "print the version and exit")
@@ -635,6 +792,7 @@ func main() {
 	uiURL := fmt.Sprintf("http://%s/", net.JoinHostPort(displayHost, fmt.Sprint(addr.Port)))
 
 	a := newApp(*dataPath, loopbackOnly)
+	a.hosts = newHostPolicy(osHostname(), strings.Split(*allowHost, ","))
 	u := newUpdater(version, exePath, filepath.Join(filepath.Dir(*dataPath), projectName+"-update.json"))
 	u.logf = log.Printf
 	if *updateURL != hubAPI {
@@ -661,7 +819,12 @@ func main() {
 	log.Printf("UI:   %s", uiURL)
 	log.Printf("data: %s", *dataPath)
 	if !loopbackOnly {
-		log.Printf("listening on %s: reachable from other devices on the network", ln.Addr())
+		log.Printf("listening on %s: reachable from other devices on the network %s", ln.Addr(), a.hosts.describe())
+		if a.hosts.any {
+			log.Print("Host check is off (-allow-host *): a web page can reach simple-rest through DNS rebinding.")
+		}
+	} else if strings.TrimSpace(*allowHost) != "" {
+		log.Printf("-allow-host has no effect: listening on %s, which only this computer reaches, by localhost or a loopback address", ln.Addr())
 	}
 	if !*noBrowser {
 		openBrowser(uiURL)

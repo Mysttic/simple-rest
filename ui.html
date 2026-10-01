@@ -1349,7 +1349,9 @@ async function installUpdate() {
   } catch (e) { toast('Update failed: ' + e.message); }
 }
 // pollUpdate follows the download, then waits for the new binary to answer
-// with another version number and reloads the page.
+// with another version number and reloads the page. The program that served
+// this page let its address in, so a 403 can only come from the new one, whose
+// Host rule refuses the name the page was opened by.
 function pollUpdate() {
   clearInterval(updPoll);
   const oldVersion = updStatus.version;
@@ -1357,6 +1359,11 @@ function pollUpdate() {
   updPoll = setInterval(async () => {
     try {
       const r = await fetch('/api/update', { cache: 'no-store' });
+      if (r.status === 403) {
+        clearInterval(updPoll);
+        $('#updBox').innerHTML = '<div class="hint" style="color:var(--err)">simple-rest restarted but refuses the address you opened it with. Open it by its IP address or start it with -allow-host.</div>';
+        return;
+      }
       if (!r.ok) throw new Error('HTTP ' + r.status);
       const s = await r.json();
       if (s.version !== oldVersion) { clearInterval(updPoll); location.reload(); return; }

@@ -558,3 +558,31 @@ test('without the program: a save over what another tab saved is a conflict', as
   assert.equal(await b.syncIfBehind(), 'same');
   assert.equal(b.state.collections[0].name, 'Changed in B');
 });
+
+test('pollUpdate: a restarted program that refuses the address says so and stops polling', async t => {
+  const { sr, server, el } = await setup(t, DOC);
+  const status = { version: '1.2.0', platform: 'linux-amd64', state: 'newer', latest: { version: '1.2.1', assetName: 'a' }, downloading: true, received: 0, total: 1 };
+  let update = () => res(200, JSON.stringify(status));
+  const base = server.fetch;
+  globalThis.fetch = async (url, init = {}) => {
+    if (url === '/api/update/install') return res(202, JSON.stringify(status));
+    if (url === '/api/update') return update();
+    return base(url, init);
+  };
+  let tick = null, cleared = 0;
+  globalThis.setInterval = fn => { tick = fn; return 7; };
+  globalThis.clearInterval = id => { if (id === 7) cleared++; };
+  await sr.installUpdate();
+  assert.equal(typeof tick, 'function', 'polling started');
+
+  update = () => { throw new TypeError('Failed to fetch'); }; // between the two programs
+  await tick();
+  assert.doesNotMatch(el('#updBox').innerHTML, /refuses|did not come back/);
+  assert.equal(cleared, 0);
+
+  update = () => res(403, 'forbidden host "pc123.firma.pl": open simple-rest by its IP address or start it with -allow-host pc123.firma.pl\n');
+  await tick();
+  assert.match(el('#updBox').innerHTML, />simple-rest restarted but refuses the address you opened it with\. Open it by its IP address or start it with -allow-host\.</);
+  assert.equal(cleared, 1, 'polling stops');
+  assert.equal(globalThis.location.reloads, 0);
+});

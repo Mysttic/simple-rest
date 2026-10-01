@@ -20,6 +20,10 @@ pliki, po jednym na system, plus sumy kontrolne.
 Z innego urządzenia w sieci (telefon, tablet, druga maszyna) wystarczy uruchomić program
 z `-listen 0.0.0.0:8787` i wejść na `http://<ip-maszyny>:8787/`. Interfejs jest zwykłą
 stroną, więc działa na każdym systemie z przeglądarką, także tam, gdzie nie ma binarki.
+Zamiast adresu IP można podać nazwę lokalną: nazwę bez kropki (`http://raspberrypi:8787/`),
+nazwę z końcówką `.local`, `.lan`, `.home`, `.home.arpa`, `.internal` albo `.localdomain`
+lub nazwę komputera, którą zwraca system. Inną nazwę, np. `pc123.firma.pl` z firmowego DNS,
+trzeba dopisać flagą `-allow-host pc123.firma.pl` (patrz „Bezpieczeństwo”).
 
 Inne systemy (macOS, Windows na ARM, 32-bitowe Raspberry Pi) nie mają gotowego pliku, ale
 budują się jedną komendą, patrz „Budowanie”. Taka kopia mówi w ustawieniach, że nie ma dla
@@ -29,6 +33,8 @@ Flagi:
 
 ```
 -listen 127.0.0.1:8787   adres nasłuchu (0.0.0.0:8787 udostępnia UI w sieci lokalnej)
+-allow-host <nazwy>      dodatkowe nazwy hosta, pod którymi wolno otworzyć UI przy nasłuchu
+                         poza 127.0.0.1, po przecinku; '*' przyjmuje każdą nazwę
 -data <plik>             plik z danymi (domyślnie simple-rest-data.json obok binarki)
 -no-browser              nie otwieraj przeglądarki automatycznie
 -version                 wypisz wersję i zakończ
@@ -71,7 +77,9 @@ Ustawienia (ikona koła zębatego), sekcja Updates:
 - **Install and restart** pobiera plik dla tej platformy do `.simple-rest-update/` obok
   binarki (najpierw jako `.part`), sprawdza rozmiar zadeklarowany w wydaniu i SHA-256
   z pliku `...-checksums.txt`, podmienia własny plik wykonywalny i uruchamia się ponownie
-  na tym samym porcie. Strona w przeglądarce czeka na nową wersję i sama się przeładowuje.
+  na tym samym porcie, z tymi samymi argumentami. Strona w przeglądarce czeka na nową wersję
+  i sama się przeładowuje. Jeśli nowa wersja odrzuca nazwę, pod którą otwarto stronę
+  (reguła Host, patrz „Bezpieczeństwo”), strona mówi to wprost.
   Na Windows stary plik zostaje chwilowo jako `.exe.old` i jest usuwany przy starcie.
 - Kopia, która nie może się zaktualizować (katalog bez prawa zapisu, uruchomienie przez
   `go run`, brak pliku wydania dla tego systemu), mówi to wprost i linkuje do strony
@@ -212,6 +220,27 @@ jest ukryta.
 
 Domyślnie program nasłuchuje tylko na 127.0.0.1 i odrzuca żądania z obcym nagłówkiem
 Host lub Origin (ochrona przed DNS rebinding i CSRF ze stron otwartych w tej samej
-przeglądarce). `-listen 0.0.0.0:8787` wystawia proxy HTTP bez uwierzytelniania na całą
-sieć lokalną, więc używaj tego tylko w zaufanej sieci. Jedyne połączenie wychodzące, które
-program nawiązuje sam z siebie, to sprawdzenie wydań, i to dopiero po włączeniu.
+przeglądarce).
+
+Przy nasłuchu poza 127.0.0.1 (np. `-listen 0.0.0.0:8787`) nagłówek Host musi być adresem
+IP (także IPv6, również ze strefą), nazwą bez kropki, nazwą z końcówką, której nie da się
+zarejestrować w publicznym DNS (`.local`, `.lan`, `.home`, `.home.arpa`, `.internal`,
+`.localdomain`), nazwą komputera, którą zwraca system, albo jej pierwszym członem, albo
+nazwą z `-allow-host`. Wielkość liter i kropka na końcu nazwy nie mają znaczenia. Dzięki
+temu obca strona nie skieruje przez DNS rebinding swojej nazwy na ten komputer, żeby czytać
+odpowiedzi programu.
+Inna nazwa dostaje 403 z podpowiedzią, a konsola przy pierwszym odrzuceniu danej nazwy
+podaje gotową flagę, np. `-allow-host pc123.firma.pl`. `-allow-host '*'` wyłącza to
+sprawdzanie, jak przed wersją 1.2.0, a program ostrzega o tym przy starcie. Przy nasłuchu na
+127.0.0.1 flaga nic nie zmienia.
+
+Strony programu nie da się osadzić w ramce na innej stronie (`X-Frame-Options: DENY`
+i `Content-Security-Policy: frame-ancestors 'none'`), więc obca strona nie podsunie
+kliknięcia w Send ani w Install and restart.
+
+Program nie ma hasła. `-listen 0.0.0.0:8787` wystawia proxy HTTP bez uwierzytelniania na
+całą sieć lokalną: każdy, kto dosięgnie programu, widzi i zmienia wszystko, co program
+trzyma, czyli kolekcje, historię i środowiska razem z wartościami zmiennych (także haseł
+i tokenów), i wysyła zapytania z tej maszyny. Używaj tego tylko w zaufanej sieci. Jedyne
+połączenie wychodzące, które program nawiązuje sam z siebie, to sprawdzenie wydań, i to
+dopiero po włączeniu.
