@@ -79,6 +79,8 @@ Harmonogram (kanał cykliczny) to zapisane zapytanie, które program wysyła co 
 z nich jest włączonych; czerwona ramka znaczy, że któryś stoi, a `?`, że program nie
 odpowiada.
 
+![Okno Schedules: włączone odświeżanie tokenu, ostatni przebieg i ustawione wartości](site/simple-rest/img/schedules.png)
+
 - **+ Schedule** bierze zapytanie otwarte w edytorze, o ile jest zapisane w kolekcji. To samo
   robi przycisk ⟳ przy zapytaniu na pasku bocznym, a znacznik ⟳ pokazuje zapytania, które
   wysyła włączony harmonogram. Nowy harmonogram jest wyłączony: najpierw sprawdź reguły
@@ -224,8 +226,11 @@ zapytanie przycisku Send. Wspólne wektory w `testdata/effective.json` uruchamia
 z tych samych danych. Zmiana jednej z tych funkcji wymaga zmiany jej odpowiednika i wektora.
 
 `scripts/screenshots.mjs` buduje aplikację, uruchamia ją z przykładową kolekcją i drugą
-kopią zgłaszającą starszą wersję, po czym robi zrzuty przez protokół DevTools. Dzięki temu
-obrazki na stronie są prawdziwe i odtwarzalne po każdej zmianie interfejsu.
+kopią zgłaszającą starszą wersję, po czym robi zrzuty przez protokół DevTools. Fałszywy hub
+oferuje wydanie o numerze z `VERSION.md` i wydaje token, który odświeża włączony przez
+skrypt harmonogram. Dzięki temu obrazki na stronie są prawdziwe i odtwarzalne po każdej
+zmianie interfejsu. Zrzut promo wysyła prawdziwe zapytanie do `api.github.com`, więc
+skrypt potrzebuje sieci.
 
 Workflow `CI` (`.github/workflows/ci.yml`) uruchamia to wszystko, razem z `gofmt` i
 `go vet`, wyłącznie przy PR z `develop` do `master`. Push do `develop` i PR do `develop`
@@ -268,15 +273,18 @@ Procedura wydania:
 
 1. Na `develop`: podnieść `VERSION.md`, dopisać sekcję w `CHANGELOG.md`.
 2. PR `develop` → `master`, poczekać na zielone CI i podgląd „Release preview”.
-3. Merge. Release i kopia na hub dzieją się same.
+3. Merge. Release i kopia plików wydania na hub dzieją się same.
+4. Gdy wydanie zmienia stronę projektu (opis, zrzuty), skopiować ją ręcznie na hub,
+   patrz `site/README.md`.
 
 Wymagany sekret: `HUB_TOKEN` w ustawieniach repozytorium (Settings, Secrets and variables,
 Actions): fine-grained token dla właściciela `Mysttic`, dostęp tylko do `Mysttic/Mysttic`,
 uprawnienie Contents: Read and write. Bez niego release w tym repozytorium powstanie, a job
 `site` zakończy się czytelnym błędem.
 
-Strona projektu na hubie leży gotowa w `site/simple-rest/`; jak ją podpiąć opisuje
-`site/README.md`.
+Strona projektu na hubie leży gotowa w `site/simple-rest/`; jak ją podpiąć i odświeżać
+opisuje `site/README.md`. Job `site` kopiuje na hub tylko pliki wydania, a nie treść
+strony.
 
 ## Tryb bez binarki
 
@@ -311,6 +319,12 @@ nic nie zmienia.
 Strony programu nie da się osadzić w ramce na innej stronie (`X-Frame-Options: DENY`
 i `Content-Security-Policy: frame-ancestors 'none'`), więc obca strona nie podsunie
 kliknięcia w Send, Enabled, Run now ani Install and restart.
+
+Wersje linuksowe nie pytają o nazwy `.local` przez mDNS, tylko przez zwykły DNS sieci
+(patrz „Uruchomienie”). Zwykle kończy się to błędem `no such host` z podpowiedzią, ale
+serwer DNS, który zna taką nazwę, może wskazać inny komputer niż ten, który ogłasza ją
+w sieci, i to tam pójdzie np. login harmonogramu z hasłem. Na Linuksie i Raspberry Pi
+podawaj serwer tokenu i inne cele po adresie IP albo po nazwie z DNS sieci.
 
 Program nie ma hasła. `-listen 0.0.0.0:8787` wystawia proxy HTTP bez uwierzytelniania na
 całą sieć lokalną: każdy, kto dosięgnie programu, widzi i zmienia wszystko, co program

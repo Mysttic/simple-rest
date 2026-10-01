@@ -11,6 +11,19 @@
 set -eu
 cd "$(dirname "$0")/.."
 
+# need stops right away, naming the tool, when none of its alternatives is on
+# the PATH; without it a missing python or curl shows up much later as a fake
+# hub that never started.
+need() {
+  for tool in "$@"; do command -v "$tool" >/dev/null 2>&1 && return 0; done
+  echo "FAIL: this test needs $(echo "$*" | sed 's/ / or /g') on the PATH" >&2
+  exit 1
+}
+need go
+need curl
+need python3 python
+need sha256sum shasum
+
 project=simple-rest
 version=$(grep -m1 -v '^[[:space:]]*$' VERSION.md | sed 's/^[#[:space:]]*//; s/[[:space:]]*$//; s/^v//')
 root="$(pwd)/.e2e"
@@ -79,7 +92,7 @@ cleanup() {
   else pkill -f "$project-e2e" 2>/dev/null || true; fi
 }
 trap cleanup EXIT
-fail() { echo "FAIL: $*"; echo "--- app.log"; cat "$root/app.log" 2>/dev/null; echo "--- hub.log"; cat "$root/hub.log"; exit 1; }
+fail() { echo "FAIL: $*"; echo "--- app.log"; cat "$root/app.log" 2>/dev/null || true; echo "--- hub.log"; cat "$root/hub.log"; exit 1; }
 
 tries=60
 until curl -s -o /dev/null "http://127.0.0.1:$hubport/releases"; do

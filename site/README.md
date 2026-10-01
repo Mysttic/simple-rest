@@ -5,7 +5,7 @@ Katalog `simple-rest/` to gotowa strona dla publicznego repozytorium
 ułożona jak `chatt/`: korzysta ze wspólnych `assets/style.css`, `assets/theme.js`
 i `assets/releases.js`, a jedyny kod per projekt to wywołanie `initDownloads()` na końcu.
 
-Podpięcie (jednorazowo, w repozytorium Mysttic/Mysttic):
+Podpięcie (w repozytorium Mysttic/Mysttic):
 
 1. Skopiować `site/simple-rest/` jako `simple-rest/` do katalogu głównego huba.
 2. Dodać kartę w głównym `index.html`, obok pozostałych projektów:
@@ -19,7 +19,8 @@ Podpięcie (jednorazowo, w repozytorium Mysttic/Mysttic):
       <p>
         A REST client that is one file. Collections, environments, history and
         a response viewer in your browser, requests sent by the program, so
-        CORS never gets in the way. No installer, no account.
+        CORS never gets in the way, and schedules that keep a token fresh.
+        No installer, no account.
       </p>
       <div class="platforms">
         <span>Windows</span>
@@ -37,5 +38,8 @@ Podpięcie (jednorazowo, w repozytorium Mysttic/Mysttic):
 ```
 
 Pliki release trafiają na hub automatycznie z workflow `Release` w tym repozytorium
-(job `site`), pod tagiem `simple-rest-v<wersja>`; strona nie wymaga commitów przy
-kolejnych wydaniach.
+(job `site`), pod tagiem `simple-rest-v<wersja>`, a strona sama pokazuje najnowsze
+z nich. Treści strony job nie kopiuje. Po każdej zmianie `site/simple-rest/` (opis,
+zrzuty), zwykle przy wydaniu z nowymi funkcjami, trzeba po udanym Release skopiować
+katalog jeszcze raz (krok 1), a po zmianie karty wyżej podmienić ją w głównym
+`index.html` huba. Jedno i drugie to commit w Mysttic/Mysttic.
