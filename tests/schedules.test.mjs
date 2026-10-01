@@ -453,6 +453,23 @@ test('a failed lookup of a .local name gets the mDNS hint on Linux only', async 
   assert.doesNotMatch(el('#respOut').innerHTML, /mDNS/);
 });
 
+test('a failed send keeps its error when the response view changes', async t => {
+  const { sr, p, el } = await setup(t, DOC);
+  sr.loadRequest(sr.normalizeRequest({ url: 'http://h/down' }), null);
+  // The program answers a failure with an empty body.
+  p.sendAnswer = () => ({ status: 0, statusText: '', proto: '', headers: [], body: '', bodyBase64: false, size: 0, timeMs: 3, finalUrl: '', error: 'connection refused' });
+  await sr.sendRequest();
+  sr.renderBody();
+  assert.equal(el('#respOut').innerHTML, '<span class="x">connection refused</span>');
+  assert.equal(el('#respOut').hidden, false);
+  // The page's own catch gives no body at all.
+  const fetch0 = p.fetch;
+  globalThis.fetch = async (url, init) => { if (url === '/api/send') throw new Error('Failed to fetch'); return fetch0(url, init); };
+  await sr.sendRequest();
+  sr.renderBody();
+  assert.equal(el('#respOut').innerHTML, '<span class="x">Failed to fetch</span>');
+});
+
 test('cURL copies the request with the refreshed value', async t => {
   const { sr, p, prompts, me } = await setup(t, DOC);
   sr.applySnapshot(snapshot());

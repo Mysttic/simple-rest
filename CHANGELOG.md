@@ -125,6 +125,8 @@ ostatniego wydanego tagu.
 
 - Timeout zapytania tak duży, że w nanosekundach przekracza zakres liczby 64-bitowej,
   mógł przerwać zapytanie od razu. Teraz jest przycinany do około 292 lat.
+- Po nieudanym wysłaniu zmiana widoku odpowiedzi (Pretty, Raw, Preview) kasowała
+  komunikat błędu albo kończyła się błędem w konsoli. Komunikat zostaje.
 
 ## [1.1.0] - 2026-09-10
 

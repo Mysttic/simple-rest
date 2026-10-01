@@ -1210,6 +1210,8 @@ function renderBody() {
   const res = lastResponse, out = $('#respOut'), prev = $('#respPreview');
   out.hidden = respView === 'preview'; prev.hidden = respView !== 'preview';
   if (!res) { out.hidden = false; prev.hidden = true; return; }
+  // A failed send has no body: every view keeps the error renderResponse showed.
+  if (res.error && !res.status) { out.hidden = false; prev.hidden = true; out.innerHTML = `<span class="x">${esc(res.error)}</span>`; return; }
   const ct = contentType(res);
   if (respView === 'preview') {
     prev.innerHTML = '';
@@ -2417,6 +2419,7 @@ globalThis.__sr = {
   importData, exportData,
   str, normalizeRow, normalizeDoc, applyState, serializeState, findEnv, varsOf, setActiveEnv, detectMode, loadState, loadRequest,
   persist, persistNow, flushPersist, syncIfBehind, installUpdate, sendRequest, importFiles,
+  renderBody,
   normalizeSchedule, findRequest, requestTexts, referencedVars, schedulesSetting, schedulesUsing, varConflicts, missingVars, effectiveVars,
   maskValue, isExpired, featureState, applySnapshot, tick, ensureVars, sendFlow, copyCurl, schedAction, turnAllOff, deleteSched, addSchedule, clearVar, openSchedModal,
   saveInfo: () => ({ saveState, lastTag, lastSynced, pending: savePending() }),
