@@ -29,6 +29,21 @@ ostatniego wydanego tagu.
   poza 127.0.0.1. `-allow-host "*"` przyjmuje każdą nazwę, czyli wyłącza ochronę przed DNS
   rebinding, a program ostrzega o tym przy starcie. Gwiazdka w cudzysłowie podwójnym
   działa w cmd, PowerShell i sh.
+- Harmonogramy (kanał cykliczny) działają w programie, także bez otwartej karty: harmonogram
+  co zadany czas wysyła zapisane zapytanie i ustawia zmienną, np. `{{token}}`, wartością
+  z odpowiedzi (ścieżka JSON, nagłówek albo regex). Termin wynika z `everySec` albo z czasu
+  ważności z odpowiedzi (np. `expires_in`) minus zapas. Wartość trafia do nakładki
+  w pamięci programu, która w swoim środowisku wygrywa z wierszami tabeli. Definicje leżą
+  w pliku danych pod kluczem `schedules`, ale stan włączenia, terminy, blokady i nakładka
+  są tylko w pamięci: po każdym starcie programu, także po aktualizacji, wszystkie
+  harmonogramy są wyłączone, a program nigdy nie zapisuje pliku danych. Odrzucone
+  logowanie (401, 403), przekierowanie i inne odpowiedzi 4xx zatrzymują harmonogram po
+  pierwszej próbie, a 5xx, 408 i 429 po pięciu porażkach z rzędu. Na razie jest tylko API:
+  `GET /api/schedules`, `POST /api/schedules/{id}/enable`, `.../disable` i `.../run`,
+  `POST /api/schedules/disable-all`, `POST /api/vars/ensure` oraz
+  `DELETE /api/vars/{envId}/{name}`. Okno harmonogramów w UI dochodzi w kolejnej zmianie.
+  Uwaga: po cofnięciu do 1.1.0 pierwszy zapis z karty usuwa z pliku klucz `schedules`
+  (definicje harmonogramów).
 
 ### Zmienione
 
@@ -64,6 +79,15 @@ ostatniego wydanego tagu.
   nowa wersja działa. Wtedy wystarczy otworzyć UI po adresie IP albo zatrzymać program
   i uruchomić go z `-allow-host pc123.firma.pl`. Druga kopia uruchomiona obok działającej
   wstałaby na losowym porcie, bo port jest zajęty.
+- SIGTERM (np. `systemctl stop`) i zamknięcie okna konsoli na Windows kończą program
+  porządnie, tak jak Ctrl+C: zapytania harmonogramów w locie są przerywane, a konsola
+  dostaje zaległe linie. To samo dzieje się przed restartem po aktualizacji.
+- `GET /api/info` zwraca pole `boot`, nowe przy każdym starcie programu.
+
+### Naprawione
+
+- Timeout zapytania tak duży, że w nanosekundach przekracza zakres liczby 64-bitowej,
+  mógł przerwać zapytanie od razu. Teraz jest przycinany do około 292 lat.
 
 ## [1.1.0] - 2026-09-10
 

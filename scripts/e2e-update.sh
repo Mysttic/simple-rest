@@ -3,7 +3,10 @@
 # document asks for: a copy that reports 0.9.0 is started next to a fake hub
 # that serves the version from VERSION.md, and the script watches the copy
 # check, download, verify, swap its own executable and come back on the same
-# port with the new number. Needs go, python3 (or python) and curl.
+# port with the new number. Before the update a schedule of the data file is
+# turned on and fetches a token from the fake hub; after it the schedule must
+# be off, the overlay empty and the data file untouched. Needs go, python3
+# (or python), curl and sha256sum (or shasum).
 # Run: sh scripts/e2e-update.sh
 set -eu
 cd "$(dirname "$0")/.."
@@ -28,8 +31,25 @@ exe="$root/app/$project-e2e$ext"
 
 if command -v python3 >/dev/null 2>&1; then py=python3; else py=python; fi
 
+sha256() {
+  if command -v sha256sum >/dev/null 2>&1; then sha256sum "$1" | cut -d' ' -f1; else shasum -a 256 "$1" | cut -d' ' -f1; fi
+}
+
 rm -rf "$root"
 mkdir -p "$root/app" "$root/hub/dl"
+
+# The token server is the fake hub itself: it serves token.json like any file.
+# The data file holds a request for it, an environment and a schedule that
+# sets {{token}} from access_token; nothing in the file turns it on.
+printf '%s\n' '{"access_token":"e2e","expires_in":300}' > "$root/hub/token.json"
+cat > "$root/app/data.json" <<EOF
+{"version":1,"collections":[{"id":"c1","name":"E2E","open":true,"requests":[
+  {"id":"r1","name":"Token","method":"GET","url":"http://127.0.0.1:$hubport/token.json"}]}],
+ "envs":[{"id":"e1","name":"local","vars":[]}],"activeEnv":"e1",
+ "schedules":[{"id":"s1","name":"Token refresh","requestId":"r1","envId":"e1","everySec":240,"leadSec":60,
+  "expiresPath":"expires_in","extract":[{"enabled":true,"optional":false,"var":"token","from":"json","path":"access_token"}]}]}
+EOF
+datasum=$(sha256 "$root/app/data.json")
 
 echo "building a copy that reports 0.9.0 and the real $version"
 go build -ldflags "-X main.versionOverride=0.9.0" -o "$exe" .
@@ -87,6 +107,24 @@ wait_for_version() {
 wait_for_version 0.9.0 30 || fail "the 0.9.0 copy did not start on port $appport"
 echo "0.9.0 is up"
 
+boot_of() { curl -s "$api/info" | sed -n 's/.*"boot":"\([0-9a-f]*\)".*/\1/p'; }
+token_gets() { grep -c 'GET /token.json' "$root/hub.log" || true; }
+oldboot=$(boot_of)
+[ -n "$oldboot" ] || fail "/api/info has no boot"
+case "$(curl -s "$api/schedules")" in
+  *'"enabled":true'*) fail "a schedule is on right after the start" ;;
+esac
+code=$(curl -s -o "$root/enable.json" -w '%{http_code}' -X POST -H 'Content-Type: application/json' -d '{}' "$api/schedules/s1/enable")
+[ "$code" = 200 ] || fail "enable answered HTTP $code: $(cat "$root/enable.json")"
+tries=30
+until curl -s "$api/schedules" | grep -q '"value":"e2e"'; do
+  tries=$((tries - 1))
+  [ "$tries" -gt 0 ] || fail "the schedule did not set the token: $(curl -s "$api/schedules")"
+  sleep 0.5
+done
+[ "$(token_gets)" -ge 1 ] || fail "the hub log shows no GET /token.json"
+echo "the schedule is on and set {{token}} from the fake hub"
+
 status=$(curl -s -X POST "$api/update/check")
 case "$status" in
   *'"state":"newer"'*) ;;
@@ -114,5 +152,28 @@ while [ -e "$exe.old" ] && [ "$tries" -gt 0 ]; do tries=$((tries - 1)); sleep 0.
 [ -e "$exe.old" ] && fail "$exe.old was not removed by the new process"
 [ -d "$root/app/.$project-update" ] && fail "the update directory was left behind"
 "$exe" -version | grep -q " $version " || fail "the file on disk does not report $version"
+
+# Every start, an update included, begins with all schedules off and an empty
+# overlay, and the program never writes the data file.
+newboot=$(boot_of)
+[ -n "$newboot" ] && [ "$newboot" != "$oldboot" ] || fail "boot after the restart: '$newboot', before: '$oldboot'"
+snap=$(curl -s "$api/schedules")
+case "$snap" in
+  *"\"boot\":\"$newboot\""*'"s1":{'*) ;;
+  *) fail "no snapshot of s1 after the restart: $snap" ;;
+esac
+case "$snap" in
+  *'"enabled":true'*) fail "a schedule is on after the restart: $snap" ;;
+esac
+case "$snap" in
+  *'"value":"e2e"'*) fail "the overlay survived the restart: $snap" ;;
+esac
+[ "$(sha256 "$root/app/data.json")" = "$datasum" ] || fail "the data file changed"
+gets=$(token_gets)
+sleep 3
+[ "$(token_gets)" = "$gets" ] || fail "GET /token.json went on after the restart: $gets, then $(token_gets)"
+starts=$(grep -c 'schedules: 1 defined, all off until turned on' "$root/app.log" || true)
+[ "$starts" -ge 2 ] || fail "the log has the schedules line $starts times, want one per start"
+echo "after the restart: all schedules off, the overlay empty, the data file unchanged"
 
 echo "PASS: 0.9.0 updated itself to $version"

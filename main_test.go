@@ -6,10 +6,12 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"io"
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -874,6 +876,64 @@ func TestStateIfMatch(t *testing.T) {
 	}
 	if _, err := os.Stat(a.dataPath + ".tmp"); !os.IsNotExist(err) {
 		t.Error("temporary file left behind")
+	}
+}
+
+func TestExchange(t *testing.T) {
+	target := newTarget(t)
+	a := testApp(t)
+	// The raw answer: status, headers and the bytes of the body as they came.
+	res, err := a.exchange(context.Background(), req(target.URL+"/binary"))
+	if err != nil || res.Status != 200 || string(res.Body) != "\x89PNG\x00\x01\x02\xff" ||
+		res.Header.Get("Content-Type") != "application/octet-stream" || res.BodyErr != "" {
+		t.Errorf("binary: %+v %v", res, err)
+	}
+	// What cannot be built is a requestError: nothing went out.
+	for _, in := range []sendRequest{req(""), {URL: target.URL, Body: "not base64!", BodyBase64: true}, {URL: target.URL, Method: "BAD METHOD"}} {
+		var re *requestError
+		if _, err := a.exchange(context.Background(), in); !errors.As(err, &re) {
+			t.Errorf("%+v: %v, want a requestError", in, err)
+		}
+	}
+	// No answer is the raw error of the client.
+	ln, _ := net.Listen("tcp", "127.0.0.1:0")
+	addr := ln.Addr().String()
+	ln.Close()
+	var ue *url.Error
+	if res, err = a.exchange(context.Background(), req("http://"+addr+"/")); !errors.As(err, &ue) || res.Status != 0 {
+		t.Errorf("refused: %+v %v", res, err)
+	}
+}
+
+func TestSendHugeTimeout(t *testing.T) {
+	target := newTarget(t)
+	a := testApp(t)
+	// 18446744073710 ms in nanoseconds wraps around int64 to under a
+	// millisecond, which would time the request out at once. It is cut to
+	// the longest time.Duration instead.
+	in := req(target.URL + "/echo")
+	in.TimeoutMs = 18446744073710
+	if res := a.send(context.Background(), in); res.Error != "" || res.Status != 200 {
+		t.Errorf("huge timeout: %+v", res)
+	}
+}
+
+func TestInfoBoot(t *testing.T) {
+	a, b := testApp(t), testApp(t)
+	if len(a.boot) != 16 || strings.Trim(a.boot, "0123456789abcdef") != "" || a.boot == b.boot {
+		t.Errorf("boot %q and %q", a.boot, b.boot)
+	}
+	srv := httptest.NewServer(routes(a, nil))
+	defer srv.Close()
+	res, err := http.Get(srv.URL + "/api/info")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var info map[string]any
+	_ = json.NewDecoder(res.Body).Decode(&info)
+	res.Body.Close()
+	if info["boot"] != a.boot {
+		t.Errorf("info = %v", info)
 	}
 }
 

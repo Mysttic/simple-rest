@@ -6,6 +6,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"crypto/rand"
 	"crypto/sha256"
 	"crypto/tls"
 	_ "embed"
@@ -31,6 +32,8 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"sync/atomic"
+	"syscall"
 	"time"
 	"unicode/utf8"
 )
@@ -102,6 +105,11 @@ type app struct {
 	loopbackOnly bool
 	hosts        hostPolicy // Host names let in when not loopbackOnly
 	logq         *logQueue  // console lines from handlers and the guard
+	boot         string     // 16 hex digits, new with every start of the process
+	sched        *scheduler
+
+	closing      atomic.Bool // set by shutdown: the routes added in 1.2.0 answer 503
+	shutdownOnce sync.Once
 
 	refusedMu sync.Mutex      // guards refused
 	refused   map[string]bool // Host names already reported on the console
@@ -122,25 +130,103 @@ func newApp(dataPath string, loopbackOnly bool) *app {
 	secure.ForceAttemptHTTP2 = true
 	insecure := secure.Clone()
 	insecure.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
-	return &app{
+	a := &app{
 		dataPath: dataPath, loopbackOnly: loopbackOnly,
 		hosts:   newHostPolicy(osHostname(), nil),
 		logq:    newLogQueue(logQueueSize, func(s string) { log.Print(s) }),
+		boot:    newBoot(),
 		refused: map[string]bool{},
 		jar:     jar, secure: secure, insecure: insecure,
 	}
+	a.sched = newScheduler(a)
+	return a
+}
+
+// newBoot names one run of the process. Pages compare it to notice that the
+// program restarted and every schedule went off.
+func newBoot() string {
+	var b [8]byte
+	_, _ = rand.Read(b[:])
+	return hex.EncodeToString(b[:])
+}
+
+// shutdown ends the background work before the process ends or restarts: the
+// routes added in 1.2.0 answer 503, no schedule starts a run any more, the
+// runs in flight are cancelled, and the console gets the queued lines. It
+// waits about a second at most, and only the first call does anything.
+func (a *app) shutdown() {
+	a.shutdownOnce.Do(func() {
+		a.closing.Store(true)
+		a.sched.stop()
+		a.logq.flush(200 * time.Millisecond)
+	})
 }
 
 // ---- request execution -----------------------------------------------------
 
+// exchangeResult is an answer as it came: the status, the headers and the
+// raw bytes of the body.
+type exchangeResult struct {
+	Status     int
+	StatusText string
+	Proto      string
+	Header     http.Header
+	Body       []byte
+	BodyErr    string  // the body broke off or was cut at 64 MB; the rest is there
+	TimeMs     float64 // also when no answer came
+	FinalURL   string
+}
+
+// requestError is a request that could not be built, so nothing went out.
+type requestError struct{ err error }
+
+func (e *requestError) Error() string { return e.err.Error() }
+func (e *requestError) Unwrap() error { return e.err }
+
+// send performs the request of the Send button and wraps the answer for the
+// page.
 func (a *app) send(ctx context.Context, in sendRequest) sendResponse {
+	res, err := a.exchange(ctx, in)
+	if err != nil {
+		return sendResponse{Error: err.Error(), TimeMs: res.TimeMs}
+	}
+	out := sendResponse{
+		Status:     res.Status,
+		StatusText: res.StatusText,
+		Proto:      res.Proto,
+		TimeMs:     res.TimeMs,
+		FinalURL:   res.FinalURL,
+		Headers:    []kv{},
+		Error:      res.BodyErr,
+		Size:       len(res.Body),
+	}
+	for name, values := range res.Header {
+		for _, v := range values {
+			out.Headers = append(out.Headers, kv{name, v})
+		}
+	}
+	sort.SliceStable(out.Headers, func(i, j int) bool { return out.Headers[i].Name < out.Headers[j].Name })
+	if utf8.Valid(res.Body) && bytes.IndexByte(res.Body, 0) < 0 {
+		out.Body = string(res.Body)
+	} else {
+		out.Body = base64.StdEncoding.EncodeToString(res.Body)
+		out.BodyBase64 = true
+	}
+	return out
+}
+
+// exchange performs a request, for the Send button and for schedules alike:
+// the same transports, proxy, cookie jar and 64 MB limit. It returns the raw
+// error when no answer came, a requestError when the request could not even
+// be built.
+func (a *app) exchange(ctx context.Context, in sendRequest) (exchangeResult, error) {
 	method := strings.ToUpper(strings.TrimSpace(in.Method))
 	if method == "" {
 		method = http.MethodGet
 	}
 	rawURL := strings.TrimSpace(in.URL)
 	if rawURL == "" {
-		return sendResponse{Error: "empty URL"}
+		return exchangeResult{}, &requestError{errors.New("empty URL")}
 	}
 	if !strings.Contains(rawURL, "://") {
 		rawURL = "http://" + rawURL
@@ -151,12 +237,17 @@ func (a *app) send(ctx context.Context, in sendRequest) sendResponse {
 	if in.BodyBase64 {
 		b, err := base64.StdEncoding.DecodeString(in.Body)
 		if err != nil {
-			return sendResponse{Error: "invalid base64 body: " + err.Error()}
+			return exchangeResult{}, &requestError{errors.New("invalid base64 body: " + err.Error())}
 		}
 		body = b
 	}
 
-	timeout := time.Duration(in.TimeoutMs) * time.Millisecond
+	// A longer timeout would overflow time.Duration: about 292 years.
+	ms := int64(in.TimeoutMs)
+	if ms > maxTimeoutMs {
+		ms = maxTimeoutMs
+	}
+	timeout := time.Duration(ms) * time.Millisecond
 	if timeout <= 0 {
 		timeout = 30 * time.Second
 	}
@@ -165,7 +256,7 @@ func (a *app) send(ctx context.Context, in sendRequest) sendResponse {
 
 	req, err := http.NewRequestWithContext(ctx, method, rawURL, bytes.NewReader(body))
 	if err != nil {
-		return sendResponse{Error: err.Error()}
+		return exchangeResult{}, &requestError{err}
 	}
 	for _, h := range in.Headers {
 		name := strings.TrimSpace(h.Name)
@@ -198,40 +289,28 @@ func (a *app) send(ctx context.Context, in sendRequest) sendResponse {
 	start := time.Now()
 	res, err := client.Do(req)
 	if err != nil {
-		return sendResponse{Error: err.Error(), TimeMs: msSince(start)}
+		return exchangeResult{TimeMs: msSince(start)}, err
 	}
 	defer res.Body.Close()
 
 	data, readErr := io.ReadAll(io.LimitReader(res.Body, maxBody+1))
-	out := sendResponse{
+	out := exchangeResult{
 		Status:     res.StatusCode,
 		StatusText: strings.TrimSpace(strings.TrimPrefix(res.Status, fmt.Sprint(res.StatusCode))),
 		Proto:      res.Proto,
+		Header:     res.Header,
 		TimeMs:     msSince(start),
 		FinalURL:   res.Request.URL.String(),
-		Headers:    []kv{},
 	}
 	if readErr != nil {
-		out.Error = "reading body: " + readErr.Error()
+		out.BodyErr = "reading body: " + readErr.Error()
 	}
 	if len(data) > maxBody {
 		data = data[:maxBody]
-		out.Error = "body truncated to 64 MB"
+		out.BodyErr = "body truncated to 64 MB"
 	}
-	out.Size = len(data)
-	for name, values := range res.Header {
-		for _, v := range values {
-			out.Headers = append(out.Headers, kv{name, v})
-		}
-	}
-	sort.SliceStable(out.Headers, func(i, j int) bool { return out.Headers[i].Name < out.Headers[j].Name })
-	if utf8.Valid(data) && bytes.IndexByte(data, 0) < 0 {
-		out.Body = string(data)
-	} else {
-		out.Body = base64.StdEncoding.EncodeToString(data)
-		out.BodyBase64 = true
-	}
-	return out
+	out.Body = data
+	return out, nil
 }
 
 func msSince(t time.Time) float64 {
@@ -377,7 +456,9 @@ func replaceFile(path string, data []byte) (fileStamp, error) {
 // onStateChange runs after every change of the data file's tag, outside
 // fileMu: a PUT, or an outside edit noticed by a read. rev only grows, so a
 // listener can drop a call that arrives after a newer one.
-func (a *app) onStateChange(rev uint64, tag string) {}
+func (a *app) onStateChange(rev uint64, tag string) {
+	a.sched.stateChanged(rev, tag)
+}
 
 // etagListHas reports whether an If-None-Match value names tag. Weak tags
 // compare by their opaque part and "*" matches anything.
@@ -433,7 +514,7 @@ func (a *app) handleIndex(w http.ResponseWriter, r *http.Request) {
 func (a *app) handleInfo(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{
 		"mode": "server", "project": projectName, "version": version,
-		"os": runtime.GOOS, "arch": runtime.GOARCH, "dataPath": a.dataPath,
+		"os": runtime.GOOS, "arch": runtime.GOARCH, "dataPath": a.dataPath, "boot": a.boot,
 	})
 }
 
@@ -555,6 +636,11 @@ func routes(a *app, u *updater) http.Handler {
 	mux.HandleFunc("/api/send", a.handleSend)
 	mux.HandleFunc("/api/state", a.handleState)
 	mux.HandleFunc("/api/cookies", a.handleCookies)
+	mux.HandleFunc("/api/schedules", a.handleSchedules)
+	mux.HandleFunc("/api/schedules/disable-all", a.handleDisableAll)
+	mux.HandleFunc("/api/schedules/{id}/{action}", a.handleScheduleAction)
+	mux.HandleFunc("/api/vars/ensure", a.handleEnsure)
+	mux.HandleFunc("/api/vars/{envId}/{name}", a.handleVar)
 	if u != nil {
 		mux.HandleFunc("/api/update", u.handle)
 		mux.HandleFunc("/api/update/", u.handle)
@@ -809,15 +895,23 @@ func main() {
 		log.Printf("update checks go to %s", *updateURL)
 	}
 	srv := &http.Server{Handler: routes(a, u), ReadHeaderTimeout: 10 * time.Second}
-	u.restart = func() { restartProcess(srv, exePath) }
+	srv.RegisterOnShutdown(a.shutdown)
+	// RegisterOnShutdown starts a.shutdown in a goroutine and does not wait
+	// for it, so the restart calls it itself before the new process starts.
+	u.restart = func() { a.shutdown(); restartProcess(srv, exePath) }
 
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
+	// Windows delivers the closing of the console window (CTRL_CLOSE_EVENT)
+	// as SIGTERM, and systemd stops a service with SIGTERM.
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+	closed := make(chan struct{})
 	go func() {
 		<-ctx.Done()
+		a.shutdown()
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 		defer cancel()
 		_ = srv.Shutdown(shutdownCtx)
+		close(closed)
 	}()
 	go u.loop(ctx)
 	if exePath != "" {
@@ -827,6 +921,14 @@ func main() {
 	log.Printf("%s %s (%s/%s)", projectName, version, runtime.GOOS, runtime.GOARCH)
 	log.Printf("UI:   %s", uiURL)
 	log.Printf("data: %s", *dataPath)
+	// Nothing turns a schedule on by itself: not a flag, not the data file,
+	// not a restart after an update.
+	if v := a.sched.sync(); v.err != "" {
+		log.Printf("schedules: all off until turned on; %s", v.err)
+	} else {
+		log.Printf("schedules: %d defined, all off until turned on", len(v.defs))
+	}
+	a.sched.start()
 	if !loopbackOnly {
 		log.Printf("listening on %s: reachable from other devices on the network %s", ln.Addr(), a.hosts.describe())
 		if a.hosts.any {
@@ -843,5 +945,11 @@ func main() {
 	}
 	if u.isRestarting() {
 		select {} // restartProcess ends the process once the new one is started
+	}
+	// Serve returns as soon as Shutdown begins; the goroutine above still
+	// lets the requests in flight finish.
+	select {
+	case <-closed:
+	case <-time.After(3 * time.Second):
 	}
 }
