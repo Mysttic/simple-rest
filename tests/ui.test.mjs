@@ -1,16 +1,11 @@
 // Node tests for the pure parts of ui.html. The script is pulled out of the
-// page and evaluated here without a DOM (the page only starts itself when its
-// markup is present), so only the functions that build requests, parse URLs
-// and import files are exercised.
+// page and evaluated here without a DOM (tests/load-ui.mjs; the page only
+// starts itself when its markup is present), so only the functions that build
+// requests, parse URLs and import files are exercised.
 // Run: node --test "tests/**/*.test.mjs"
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-
-const html = readFileSync(new URL('../ui.html', import.meta.url), 'utf8');
-const src = html.match(/<script>([\s\S]*?)<\/script>/)[1];
-new Function(src)();
-const sr = globalThis.__sr;
+import { sr } from './load-ui.mjs';
 
 const request = (over = {}) => Object.assign(sr.newRequest(), over);
 const header = (h, name) => h.filter(x => x.name.toLowerCase() === name.toLowerCase()).map(x => x.value);

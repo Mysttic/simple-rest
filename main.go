@@ -6,9 +6,11 @@ package main
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
 	"crypto/tls"
 	_ "embed"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"flag"
@@ -98,7 +100,10 @@ type app struct {
 	dataPath     string
 	loopbackOnly bool
 
-	fileMu   sync.Mutex // guards the data file
+	fileMu   sync.Mutex // guards the data file and rev, tag and stamp
+	rev      uint64     // goes up by one whenever tag changes
+	tag      string     // ETag of the data file as last read or written
+	stamp    fileStamp  // mtime and size of the data file at that moment
 	jarMu    sync.Mutex // guards jar
 	jar      http.CookieJar
 	secure   *http.Transport
@@ -221,6 +226,159 @@ func msSince(t time.Time) float64 {
 	return float64(time.Since(t).Microseconds()) / 1000
 }
 
+// ---- data file revision ----------------------------------------------------------
+
+// fileStamp is what os.Stat says about the data file. A missing file has the
+// zero value, so a file that appears or disappears counts as a change.
+type fileStamp struct {
+	exists bool
+	mod    int64 // modification time, unix nanoseconds
+	size   int64
+}
+
+func statStamp(path string) (fileStamp, error) {
+	fi, err := os.Stat(path)
+	if errors.Is(err, os.ErrNotExist) {
+		return fileStamp{}, nil
+	}
+	if err != nil {
+		return fileStamp{}, err
+	}
+	return fileStamp{exists: true, mod: fi.ModTime().UnixNano(), size: fi.Size()}, nil
+}
+
+// stateTag is the ETag of the data file: the first 16 hex digits of the
+// SHA-256 of the bytes GET /api/state returns. It depends on the content only,
+// so it survives a restart and changes with a manual edit of the file.
+func stateTag(data []byte) string {
+	sum := sha256.Sum256(data)
+	return `"` + hex.EncodeToString(sum[:8]) + `"`
+}
+
+// errStateChanged is what writeState returns when If-Match no longer matches.
+var errStateChanged = errors.New("data file changed since the page read it")
+
+// setTagLocked records the tag of the data file and reports whether it moved.
+// The caller holds fileMu.
+func (a *app) setTagLocked(tag string) bool {
+	if tag == a.tag {
+		return false
+	}
+	a.tag = tag
+	a.rev++
+	return true
+}
+
+// loadLocked reads the data file (null when there is none) and records its
+// stamp and tag. It reports whether the tag moved; the caller runs
+// onStateChange for that after releasing fileMu. The caller holds fileMu.
+func (a *app) loadLocked() ([]byte, bool, error) {
+	st, err := statStamp(a.dataPath)
+	if err != nil {
+		return nil, false, err
+	}
+	data := []byte("null")
+	if st.exists {
+		if data, err = os.ReadFile(a.dataPath); errors.Is(err, os.ErrNotExist) {
+			data, st = []byte("null"), fileStamp{}
+		} else if err != nil {
+			return nil, false, err
+		}
+	}
+	a.stamp = st
+	return data, a.setTagLocked(stateTag(data)), nil
+}
+
+// readState reads the data file and its tag.
+func (a *app) readState() ([]byte, string, error) {
+	a.fileMu.Lock()
+	data, changed, err := a.loadLocked()
+	rev, tag := a.rev, a.tag
+	a.fileMu.Unlock()
+	if changed {
+		a.onStateChange(rev, tag)
+	}
+	return data, tag, err
+}
+
+// currentTag returns the tag of the data file. It only stats the file and
+// reads it again when the mtime or the size moved since the last read or
+// write, so an edit that keeps both within the mtime resolution slips past
+// it. It never slips past a PUT, which always hashes the file.
+func (a *app) currentTag() (string, error) {
+	a.fileMu.Lock()
+	changed := false
+	st, err := statStamp(a.dataPath)
+	if err == nil && (a.tag == "" || st != a.stamp) {
+		_, changed, err = a.loadLocked()
+	}
+	rev, tag := a.rev, a.tag
+	a.fileMu.Unlock()
+	if changed {
+		a.onStateChange(rev, tag)
+	}
+	if err != nil {
+		return "", err
+	}
+	return tag, nil
+}
+
+// writeState replaces the data file with data when the file still has the tag
+// ifMatch, and returns the tag the file has afterwards. A mismatch leaves the
+// file alone and returns errStateChanged with the current tag.
+func (a *app) writeState(data []byte, ifMatch string) (string, error) {
+	a.fileMu.Lock()
+	_, changed, err := a.loadLocked()
+	if err == nil && a.tag != ifMatch {
+		err = errStateChanged
+	}
+	if err == nil {
+		var st fileStamp
+		if st, err = replaceFile(a.dataPath, data); err == nil {
+			a.stamp = st
+			changed = a.setTagLocked(stateTag(data)) || changed
+		}
+	}
+	rev, tag := a.rev, a.tag
+	a.fileMu.Unlock()
+	if changed {
+		a.onStateChange(rev, tag)
+	}
+	return tag, err
+}
+
+// replaceFile writes data next to path and renames it into place, so a crash
+// never leaves half a file. The stamp is taken from the new file before the
+// rename, which keeps its mtime and size.
+func replaceFile(path string, data []byte) (fileStamp, error) {
+	tmp := path + ".tmp"
+	if err := os.WriteFile(tmp, data, 0o644); err != nil {
+		return fileStamp{}, err
+	}
+	st, err := statStamp(tmp)
+	if err == nil {
+		err = os.Rename(tmp, path)
+	}
+	return st, err
+}
+
+// onStateChange runs after every change of the data file's tag, outside
+// fileMu: a PUT, or an outside edit noticed by a read. rev only grows, so a
+// listener can drop a call that arrives after a newer one.
+func (a *app) onStateChange(rev uint64, tag string) {}
+
+// etagListHas reports whether an If-None-Match value names tag. Weak tags
+// compare by their opaque part and "*" matches anything.
+func etagListHas(header, tag string) bool {
+	for _, t := range strings.Split(header, ",") {
+		t = strings.TrimSpace(t)
+		if t == "*" || strings.TrimPrefix(t, "W/") == tag {
+			return true
+		}
+	}
+	return false
+}
+
 // ---- HTTP handlers -----------------------------------------------------------
 
 func writeJSON(w http.ResponseWriter, status int, v any) {
@@ -263,19 +421,36 @@ func (a *app) handleSend(w http.ResponseWriter, r *http.Request) {
 func (a *app) handleState(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet:
-		a.fileMu.Lock()
-		data, err := os.ReadFile(a.dataPath)
-		a.fileMu.Unlock()
-		if errors.Is(err, os.ErrNotExist) {
-			data = []byte("null")
-		} else if err != nil {
+		w.Header().Set("Cache-Control", "no-store")
+		// Pages ask every few seconds whether the file moved; while its
+		// stamp stays put that costs a stat and no read.
+		if inm := r.Header.Get("If-None-Match"); inm != "" {
+			if tag, err := a.currentTag(); err == nil && etagListHas(inm, tag) {
+				w.Header().Set("ETag", tag)
+				w.WriteHeader(http.StatusNotModified)
+				return
+			}
+		}
+		data, tag, err := a.readState()
+		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
+		w.Header().Set("ETag", tag)
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
-		w.Header().Set("Cache-Control", "no-store")
 		_, _ = w.Write(data)
 	case http.MethodPut:
+		// A page from another version (an open tab after an update) would
+		// drop what it does not know about, so it may not write at all.
+		if r.Header.Get("X-Simple-Rest-Version") != version {
+			http.Error(w, "This page comes from another simple-rest version than the running program ("+version+"). Reload the page.", http.StatusConflict)
+			return
+		}
+		ifMatch := strings.TrimSpace(r.Header.Get("If-Match"))
+		if ifMatch == "" {
+			http.Error(w, "Missing If-Match. Reload the page.", http.StatusPreconditionRequired)
+			return
+		}
 		data, err := io.ReadAll(io.LimitReader(r.Body, maxBody))
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
@@ -285,17 +460,19 @@ func (a *app) handleState(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "invalid JSON", http.StatusBadRequest)
 			return
 		}
-		a.fileMu.Lock()
-		defer a.fileMu.Unlock()
-		tmp := a.dataPath + ".tmp"
-		if err := os.WriteFile(tmp, data, 0o644); err != nil {
+		tag, err := a.writeState(data, ifMatch)
+		if errors.Is(err, errStateChanged) {
+			w.Header().Set("ETag", tag)
+			writeJSON(w, http.StatusPreconditionFailed, map[string]string{
+				"error": "The data file was changed in another tab or on another computer. Reload the page.",
+			})
+			return
+		}
+		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		if err := os.Rename(tmp, a.dataPath); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
+		w.Header().Set("ETag", tag)
 		w.WriteHeader(http.StatusNoContent)
 	default:
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)

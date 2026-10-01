@@ -2,7 +2,9 @@ package main
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"io"
 	"net"
@@ -373,31 +375,61 @@ func TestGuard(t *testing.T) {
 	}
 }
 
+// stateRes is one answer of /api/state.
+type stateRes struct {
+	code  int
+	body  string
+	tag   string
+	ctype string
+}
+
+// callState sends one request to /api/state; hdr lists header names and values.
+func callState(t *testing.T, base, method, body string, hdr ...string) stateRes {
+	t.Helper()
+	r, _ := http.NewRequest(method, base+"/api/state", strings.NewReader(body))
+	for i := 0; i+1 < len(hdr); i += 2 {
+		r.Header.Set(hdr[i], hdr[i+1])
+	}
+	res, err := http.DefaultClient.Do(r)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer res.Body.Close()
+	b, _ := io.ReadAll(res.Body)
+	return stateRes{res.StatusCode, strings.TrimSpace(string(b)), res.Header.Get("ETag"), res.Header.Get("Content-Type")}
+}
+
+// putState saves body the way the page does: with its version and If-Match.
+func putState(t *testing.T, base, body, ifMatch string) stateRes {
+	t.Helper()
+	return callState(t, base, http.MethodPut, body, "X-Simple-Rest-Version", version, "If-Match", ifMatch)
+}
+
+// revTag reads the revision fields under their lock.
+func (a *app) revTag() (uint64, string) {
+	a.fileMu.Lock()
+	defer a.fileMu.Unlock()
+	return a.rev, a.tag
+}
+
 func TestStateRoundTrip(t *testing.T) {
 	a := testApp(t)
 	srv := httptest.NewServer(routes(a, nil))
 	defer srv.Close()
-	do := func(method, body string) (int, string) {
-		r, _ := http.NewRequest(method, srv.URL+"/api/state", strings.NewReader(body))
-		res, err := http.DefaultClient.Do(r)
-		if err != nil {
-			t.Fatal(err)
-		}
-		defer res.Body.Close()
-		b, _ := io.ReadAll(res.Body)
-		return res.StatusCode, strings.TrimSpace(string(b))
+	first := callState(t, srv.URL, http.MethodGet, "")
+	if first.code != 200 || first.body != "null" || first.tag == "" {
+		t.Errorf("GET before any save: %+v", first)
 	}
-	if code, body := do(http.MethodGet, ""); code != 200 || body != "null" {
-		t.Errorf("GET before any save: %d %q", code, body)
+	if got := putState(t, srv.URL, "{bad json", first.tag); got.code != http.StatusBadRequest {
+		t.Errorf("invalid JSON = %d", got.code)
 	}
-	if code, _ := do(http.MethodPut, "{bad json"); code != http.StatusBadRequest {
-		t.Errorf("invalid JSON = %d", code)
+	doc := `{"version":1,"collections":[]}`
+	saved := putState(t, srv.URL, doc, first.tag)
+	if saved.code != http.StatusNoContent || saved.tag != stateTag([]byte(doc)) {
+		t.Errorf("PUT: %+v", saved)
 	}
-	if code, _ := do(http.MethodPut, `{"version":1,"collections":[]}`); code != http.StatusNoContent {
-		t.Errorf("PUT = %d", code)
-	}
-	if code, body := do(http.MethodGet, ""); code != 200 || body != `{"version":1,"collections":[]}` {
-		t.Errorf("GET after save: %d %q", code, body)
+	if got := callState(t, srv.URL, http.MethodGet, ""); got.code != 200 || got.body != doc || got.tag != saved.tag {
+		t.Errorf("GET after save: %+v", got)
 	}
 	if _, err := os.Stat(a.dataPath); err != nil {
 		t.Errorf("data file missing: %v", err)
@@ -405,8 +437,175 @@ func TestStateRoundTrip(t *testing.T) {
 	if _, err := os.Stat(a.dataPath + ".tmp"); !os.IsNotExist(err) {
 		t.Error("temporary file left behind")
 	}
-	if code, _ := do(http.MethodPost, "{}"); code != http.StatusMethodNotAllowed {
-		t.Errorf("POST = %d", code)
+	if got := callState(t, srv.URL, http.MethodPost, "{}"); got.code != http.StatusMethodNotAllowed {
+		t.Errorf("POST = %d", got.code)
+	}
+}
+
+func TestStateVersionGuard(t *testing.T) {
+	a := testApp(t)
+	const doc = `{"version":1,"collections":[{"id":"keep"}]}`
+	if err := os.WriteFile(a.dataPath, []byte(doc), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	srv := httptest.NewServer(routes(a, nil))
+	defer srv.Close()
+	tag := callState(t, srv.URL, http.MethodGet, "").tag
+	for _, v := range []string{"", "0.9.0", version + ".1"} {
+		hdr := []string{"If-Match", tag}
+		if v != "" {
+			hdr = append(hdr, "X-Simple-Rest-Version", v)
+		}
+		got := callState(t, srv.URL, http.MethodPut, `{"version":1}`, hdr...)
+		// A 1.1.0 page shows the text in its "Save failed: ..." toast, so it is plain text.
+		if got.code != http.StatusConflict || !strings.HasPrefix(got.ctype, "text/plain") ||
+			got.body != "This page comes from another simple-rest version than the running program ("+version+"). Reload the page." {
+			t.Errorf("version %q: %+v", v, got)
+		}
+	}
+	if data, _ := os.ReadFile(a.dataPath); string(data) != doc {
+		t.Errorf("a refused PUT changed the file: %s", data)
+	}
+}
+
+func TestStateTag(t *testing.T) {
+	a := testApp(t)
+	srv := httptest.NewServer(routes(a, nil))
+	defer srv.Close()
+	want := func(data string) string {
+		sum := sha256.Sum256([]byte(data))
+		return `"` + hex.EncodeToString(sum[:])[:16] + `"`
+	}
+
+	none := callState(t, srv.URL, http.MethodGet, "")
+	if none.code != 200 || none.body != "null" || none.tag != want("null") {
+		t.Errorf("no file yet: %+v, want ETag %s", none, want("null"))
+	}
+	if got := callState(t, srv.URL, http.MethodGet, "", "If-None-Match", none.tag); got.code != http.StatusNotModified || got.body != "" || got.tag != none.tag {
+		t.Errorf("matching If-None-Match: %+v", got)
+	}
+	if got := callState(t, srv.URL, http.MethodGet, "", "If-None-Match", `"0000000000000000", W/`+none.tag); got.code != http.StatusNotModified {
+		t.Errorf("If-None-Match list with a weak match: %+v", got)
+	}
+	if got := callState(t, srv.URL, http.MethodGet, "", "If-None-Match", `"0000000000000000"`); got.code != 200 || got.body != "null" {
+		t.Errorf("other If-None-Match: %+v", got)
+	}
+
+	// The tag is the hash of exactly the bytes served, whitespace included,
+	// and an outside edit of the file shows up on the next read.
+	edited := "{\"version\": 1, \"collections\": []}\n"
+	if err := os.WriteFile(a.dataPath, []byte(edited), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	got := callState(t, srv.URL, http.MethodGet, "", "If-None-Match", none.tag)
+	if got.code != 200 || got.body != strings.TrimSpace(edited) || got.tag != want(edited) {
+		t.Errorf("after an outside edit: %+v, want ETag %s", got, want(edited))
+	}
+
+	// currentTag notices an edit by the file's size or mtime and bumps rev.
+	rev, _ := a.revTag()
+	again := `{"version":1,"collections":[{"id":"x"}]}`
+	if err := os.WriteFile(a.dataPath, []byte(again), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	tag, err := a.currentTag()
+	if err != nil || tag != want(again) {
+		t.Errorf("currentTag = %s, %v, want %s", tag, err, want(again))
+	}
+	if r, _ := a.revTag(); r != rev+1 {
+		t.Errorf("rev = %d, want %d", r, rev+1)
+	}
+	if tag2, _ := a.currentTag(); tag2 != tag {
+		t.Errorf("currentTag without a change = %s, want %s", tag2, tag)
+	}
+	if r, _ := a.revTag(); r != rev+1 {
+		t.Errorf("rev moved without a change: %d", r)
+	}
+
+	// The program after a restart is a new app on the same file: same tag,
+	// so open pages do not get a false conflict after an update.
+	b := newApp(a.dataPath, true)
+	if tagB, err := b.currentTag(); err != nil || tagB != tag {
+		t.Errorf("new app on the same file: %s, %v, want %s", tagB, err, tag)
+	}
+	if _, tagB, err := b.readState(); err != nil || tagB != tag {
+		t.Errorf("readState of the new app: %s, %v, want %s", tagB, err, tag)
+	}
+}
+
+func TestStateIfMatch(t *testing.T) {
+	a := testApp(t)
+	srv := httptest.NewServer(routes(a, nil))
+	defer srv.Close()
+	tag := callState(t, srv.URL, http.MethodGet, "").tag
+
+	got := callState(t, srv.URL, http.MethodPut, `{"version":1}`, "X-Simple-Rest-Version", version)
+	if got.code != http.StatusPreconditionRequired || got.body != "Missing If-Match. Reload the page." {
+		t.Errorf("no If-Match: %+v", got)
+	}
+	if _, err := os.Stat(a.dataPath); !os.IsNotExist(err) {
+		t.Errorf("PUT without If-Match created the file: %v", err)
+	}
+
+	// Two tabs read the same version; the first save wins.
+	rev, _ := a.revTag()
+	mine := `{"version":1,"collections":[{"id":"a"}]}`
+	first := putState(t, srv.URL, mine, tag)
+	if first.code != http.StatusNoContent || first.tag != stateTag([]byte(mine)) || first.tag == tag {
+		t.Errorf("first PUT: %+v", first)
+	}
+	if r, _ := a.revTag(); r != rev+1 {
+		t.Errorf("rev after a save = %d, want %d", r, rev+1)
+	}
+
+	// The second one gets 412 with an error object and the current ETag, and
+	// the file keeps the first save.
+	second := putState(t, srv.URL, `{"version":1,"collections":[{"id":"b"}]}`, tag)
+	var body map[string]string
+	if err := json.Unmarshal([]byte(second.body), &body); err != nil || len(body) != 1 || body["error"] == "" {
+		t.Errorf("412 body: %q, %v", second.body, err)
+	}
+	if second.code != http.StatusPreconditionFailed || second.tag != first.tag || !strings.HasPrefix(second.ctype, "application/json") {
+		t.Errorf("second PUT with the same If-Match: %+v", second)
+	}
+	if data, _ := os.ReadFile(a.dataPath); string(data) != mine {
+		t.Errorf("a refused PUT changed the file: %s", data)
+	}
+	if r, _ := a.revTag(); r != rev+1 {
+		t.Errorf("rev after a refused save = %d, want %d", r, rev+1)
+	}
+
+	// An outside edit that keeps the size and the mtime slips past
+	// currentTag, but PUT always hashes the file.
+	fi, err := os.Stat(a.dataPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	same := strings.Replace(mine, `"a"`, `"z"`, 1)
+	if err := os.WriteFile(a.dataPath, []byte(same), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chtimes(a.dataPath, fi.ModTime(), fi.ModTime()); err != nil {
+		t.Fatal(err)
+	}
+	if cur, _ := a.currentTag(); cur != first.tag {
+		t.Logf("currentTag saw the edit anyway (%s): the file system changed the stamp", cur)
+	}
+	third := putState(t, srv.URL, `{"version":1,"collections":[{"id":"c"}]}`, first.tag)
+	if third.code != http.StatusPreconditionFailed || third.tag != stateTag([]byte(same)) {
+		t.Errorf("PUT over a hidden outside edit: %+v", third)
+	}
+	if data, _ := os.ReadFile(a.dataPath); string(data) != same {
+		t.Errorf("the outside edit was overwritten: %s", data)
+	}
+
+	// The tag from that answer saves again.
+	last := `{"version":1,"collections":[{"id":"d"}]}`
+	if got := putState(t, srv.URL, last, third.tag); got.code != http.StatusNoContent || got.tag != stateTag([]byte(last)) {
+		t.Errorf("PUT with the current tag: %+v", got)
+	}
+	if _, err := os.Stat(a.dataPath + ".tmp"); !os.IsNotExist(err) {
+		t.Error("temporary file left behind")
 	}
 }
 

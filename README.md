@@ -82,6 +82,25 @@ Wszystko (kolekcje, historia, środowiska, ustawienia) trafia do jednego pliku J
 binarki: `simple-rest-data.json`. Wystarczy przenieść katalog, żeby przenieść dane.
 Aktualizacja nie dotyka tego pliku.
 
+Z tym samym plikiem może pracować kilka kart naraz, także z innych komputerów przy
+`-listen 0.0.0.0:8787`. Karta sprawdza, czy plik się zmienił: co 10 sekund, gdy jest
+widoczna, po powrocie do niej i po zamknięciu okna dialogowego. Nowszą wersję wczytuje
+tylko wtedy, gdy sama nie ma niezapisanych zmian. Otwarte w edytorze zapytanie bez
+niezapisanych zmian też się odświeża, a z niezapisanymi zmianami zostaje i pokazuje
+różnicę względem nowej wersji.
+
+Każdy zapis idzie z nagłówkiem `If-Match`. Jeśli plik zmieniła w międzyczasie inna karta
+albo inny komputer, program odrzuca zapis i plik zostaje bez zmian. Karta pokazuje wtedy
+baner z przyciskiem Reload i do przeładowania niczego nie zapisuje, więc ostatnią zmianę
+trzeba po przeładowaniu zrobić jeszcze raz. Strona otwarta z innej wersji programu (np.
+karta sprzed aktualizacji) dostaje taki sam baner i niczego nie nadpisze.
+
+Wybór środowiska na górnym pasku dotyczy tylko bieżącej karty i przeżywa jej
+przeładowanie. Plik pamięta ostatni wybór jako środowisko startowe nowej karty.
+
+Pola, których ta wersja nie zna, na przykład dopisane przez nowszą wersję, przeżywają
+zapis bez zmian.
+
 ## Budowanie
 
 Potrzebny tylko Go (https://go.dev/dl/), bez CGO i bez zewnętrznych modułów. Numer

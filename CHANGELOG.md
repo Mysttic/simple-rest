@@ -7,6 +7,31 @@ ostatniego wydanego tagu.
 
 ## [Unreleased]
 
+### Dodane
+
+- Karty i komputery pracujące na jednym pliku danych widzą nawzajem swoje zmiany. Karta
+  sprawdza plik co 10 sekund, gdy jest widoczna, po powrocie do niej i po zamknięciu okna
+  dialogowego, a nowszą wersję wczytuje tylko wtedy, gdy sama nie ma niezapisanych zmian.
+  `GET /api/state` zwraca `ETag` (skrót treści pliku) i odpowiada 304 na pasujące
+  `If-None-Match`.
+
+### Zmienione
+
+- `PUT /api/state` wymaga nagłówków `X-Simple-Rest-Version` i `If-Match`. Strona z innej
+  wersji programu dostaje 409, a brak `If-Match` daje 428. Gdy plik zmienił się w innej
+  karcie albo na innym komputerze, zapis dostaje 412 z `{"error": ...}` i plik zostaje bez
+  zmian. W obu przypadkach karta pokazuje baner z przyciskiem Reload i do przeładowania
+  niczego nie zapisuje.
+- Wybór środowiska dotyczy karty i przeżywa jej przeładowanie. Plik pamięta go tylko jako
+  środowisko startowe nowej karty.
+- Klucze, których ta wersja nie zna (na najwyższym poziomie pliku, w ustawieniach,
+  kolekcjach, zapytaniach i środowiskach), przeżywają zapis.
+- Wartości z pliku danych i z importu są sprowadzane do właściwych typów: `null`
+  w zmiennej daje pusty tekst, liczba daje tekst, a ułamkowy timeout jest obcinany.
+- `{{constructor}}` i inne nazwy z prototypu obiektu nie rozwijają się, a `{{__proto__}}`
+  działa jak każda zmienna.
+- Instalacja aktualizacji najpierw zapisuje dane i nie rusza, jeśli zapis się nie udał.
+
 ## [1.1.0] - 2026-09-10
 
 ### Zmienione
