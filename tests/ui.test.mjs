@@ -1,22 +1,18 @@
 // Node tests for the pure parts of ui.html. The script is pulled out of the
-// page and evaluated here without a DOM (the page only starts itself when its
-// markup is present), so only the functions that build requests, parse URLs
-// and import files are exercised.
+// page and evaluated here without a DOM (tests/load-ui.mjs; the page only
+// starts itself when its markup is present), so only the functions that build
+// requests, parse URLs and import files are exercised.
 // Run: node --test "tests/**/*.test.mjs"
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-
-const html = readFileSync(new URL('../ui.html', import.meta.url), 'utf8');
-const src = html.match(/<script>([\s\S]*?)<\/script>/)[1];
-new Function(src)();
-const sr = globalThis.__sr;
+import { sr, loadUI, fakeDom, fakeTimers } from './load-ui.mjs';
 
 const request = (over = {}) => Object.assign(sr.newRequest(), over);
 const header = (h, name) => h.filter(x => x.name.toLowerCase() === name.toLowerCase()).map(x => x.value);
 
 test('the page exposes its pure functions', () => {
-  for (const f of ['splitUrl', 'parseQuery', 'encName', 'encValue', 'subst', 'buildEffective', 'highlightJSON', 'normalizeRequest', 'importPostmanCollection', 'toCurl']) {
+  for (const f of ['splitUrl', 'parseQuery', 'encName', 'encValue', 'subst', 'buildEffective', 'highlightJSON', 'normalizeRequest', 'importPostmanCollection', 'toCurl',
+    'normalizeSchedule', 'requestTexts', 'referencedVars', 'schedulesSetting', 'schedulesUsing', 'varConflicts', 'effectiveVars', 'maskValue', 'isExpired', 'featureState']) {
     assert.equal(typeof sr[f], 'function', f);
   }
 });
@@ -153,4 +149,247 @@ test('Postman collection import maps folders, urls, headers, bodies and auth', (
   assert.deepEqual([login.auth.type, login.auth.username, login.auth.password], ['basic', 'ala', 'kot']);
   assert.deepEqual([key.auth.type, key.auth.keyName, key.auth.keyValue, key.auth.keyIn], ['apikey', 'X-Key', '42', 'query']);
   assert.deepEqual([plain.method, plain.url], ['GET', 'http://h/plain']);
+});
+
+const BEARER = { type: 'bearer', bearer: [{ key: 'token', value: '{{tok}}' }] };
+const BASIC = { type: 'basic', basic: [{ key: 'username', value: 'ala' }, { key: 'password', value: 'kot' }] };
+const NO_AUTH = { type: 'none', username: '', password: '', token: '', keyName: '', keyValue: '', keyIn: 'header' };
+const preRequest = exec => [{ listen: 'prerequest', script: { type: 'text/javascript', exec } }];
+const authOf = c => Object.fromEntries(c.requests.map(r => [r.name, r.auth]));
+
+test('Postman import: a request without auth takes it from the nearest folder, then from the collection', () => {
+  const c = sr.importPostmanCollection({
+    info: { name: 'Shop' }, auth: BEARER,
+    item: [
+      { name: 'Top', request: { method: 'GET', url: 'http://h/top' } },
+      { name: 'Inherit', request: { method: 'GET', url: 'http://h/i', auth: { type: 'inherit' } } },
+      { name: 'Plain', request: 'http://h/plain' },
+      { name: 'Admin', auth: BASIC, item: [
+        { name: 'Users', request: { method: 'GET', url: 'http://h/u' } },
+        { name: 'Deep', item: [{ name: 'Leaf', request: { method: 'GET', url: 'http://h/l', auth: { type: 'inherit' } } }] },
+        { name: 'Own', request: { method: 'GET', url: 'http://h/o', auth: { type: 'apikey', apikey: [{ key: 'key', value: 'K' }, { key: 'value', value: 'V' }] } } },
+      ] },
+      { name: 'Passing', auth: { type: 'inherit' }, item: [{ name: 'Through', request: { method: 'GET', url: 'http://h/t', auth: null } }] },
+    ],
+  });
+  const a = authOf(c);
+  assert.deepEqual(Object.keys(a), ['Top', 'Inherit', 'Plain', 'Admin / Users', 'Admin / Deep / Leaf', 'Admin / Own', 'Passing / Through']);
+  for (const n of ['Top', 'Inherit', 'Plain', 'Passing / Through']) assert.deepEqual([a[n].type, a[n].token], ['bearer', '{{tok}}'], n + ': from the collection');
+  for (const n of ['Admin / Users', 'Admin / Deep / Leaf']) assert.deepEqual([a[n].type, a[n].username, a[n].password], ['basic', 'ala', 'kot'], n + ': from the folder');
+  assert.deepEqual([a['Admin / Own'].type, a['Admin / Own'].keyName, a['Admin / Own'].keyValue], ['apikey', 'K', 'V'], 'its own auth wins');
+  assert.equal(sr.importPostmanCollection({ info: { name: 'Bare' }, item: [{ name: 'X', request: { url: 'http://h' } }] }).requests[0].auth.type, 'none', 'nothing to inherit');
+});
+
+test('Postman import: noauth means no auth and stops the inheritance', () => {
+  const a = authOf(sr.importPostmanCollection({
+    info: { name: 'Open' }, auth: BEARER,
+    item: [
+      { name: 'Health', request: { url: 'http://h/health', auth: { type: 'noauth' } } },
+      { name: 'Public', auth: { type: 'noauth' }, item: [
+        { name: 'List', request: { url: 'http://h/p' } },
+        { name: 'Inner', item: [{ name: 'Deep', request: { url: 'http://h/d', auth: { type: 'inherit' } } }] },
+        { name: 'Mine', request: { url: 'http://h/m', auth: BASIC } },
+      ] },
+    ],
+  }));
+  for (const n of ['Health', 'Public / List', 'Public / Inner / Deep']) assert.deepEqual(a[n], NO_AUTH, n);
+  assert.equal(a['Public / Mine'].type, 'basic', 'a request below noauth may still set its own');
+});
+
+test('Postman import reads auth attributes kept as an object (v2.0) and passes over broken ones', () => {
+  const a = authOf(sr.importPostmanCollection({
+    info: { name: 'V20' }, auth: { type: 'bearer', bearer: { token: 'abc' } },
+    item: [
+      { name: 'Top', request: { url: 'http://h/top' } },
+      { name: 'F', auth: { type: 'basic', basic: { username: 'ala', password: 'kot' } }, item: [{ name: 'In', request: { url: 'http://h/in' } }] },
+      { name: 'Key', request: { url: 'http://h/k', auth: { type: 'apikey', apikey: { key: 'K', value: 'V', in: 'query' } } } },
+      { name: 'Null', request: { url: 'http://h/n', auth: { type: 'basic', basic: [null, 'x', { key: 'username', value: 'u' }] } } },
+      { name: 'Junk', request: { url: 'http://h/j', auth: { type: 'bearer', bearer: 'x' } } },
+    ],
+  }));
+  assert.deepEqual([a.Top.type, a.Top.token], ['bearer', 'abc'], 'from the collection');
+  assert.deepEqual([a['F / In'].type, a['F / In'].username, a['F / In'].password], ['basic', 'ala', 'kot'], 'from the folder');
+  assert.deepEqual([a.Key.type, a.Key.keyName, a.Key.keyValue, a.Key.keyIn], ['apikey', 'K', 'V', 'query']);
+  assert.deepEqual([a.Null.type, a.Null.username, a.Null.password], ['basic', 'u', '']);
+  assert.deepEqual([a.Junk.type, a.Junk.token], ['bearer', '']);
+});
+
+test('Postman import: collection variables become an environment, and an environment file one too', () => {
+  const ui = loadUI();
+  const got = ui.importData({
+    info: { name: 'Shop' }, item: [],
+    variable: [{ key: 'base', value: 'http://h' }, { key: 'n', value: 5, type: 'number' }, { key: 'off', value: 'x', disabled: true }],
+  });
+  assert.deepEqual(got.collections.map(c => c.name), ['Shop']);
+  assert.deepEqual(got.envs.map(e => e.name), ['Shop variables']);
+  assert.deepEqual(got.envs[0].vars, [
+    { enabled: true, name: 'base', value: 'http://h' },
+    { enabled: true, name: 'n', value: '5' },
+    { enabled: false, name: 'off', value: 'x' },
+  ]);
+  assert.ok(got.envs[0].id);
+  assert.deepEqual(ui.importData({ info: { name: 'Shop' }, item: [], variable: [] }).envs, [], 'no variables, no environment');
+  assert.deepEqual(ui.importData({ info: {}, item: [], variable: [{ key: 'a', value: '1' }] }).envs.map(e => e.name), ['Postman import variables']);
+
+  const env = ui.importData({ id: 'x', name: 'Prod', values: [{ key: 'tok', value: 't', enabled: false }, { key: 'base', value: null }], _postman_variable_scope: 'environment' });
+  assert.deepEqual(env.collections, []);
+  assert.deepEqual(env.envs.map(e => [e.name, e.vars]), [['Prod', [{ enabled: false, name: 'tok', value: 't' }, { enabled: true, name: 'base', value: '' }]]]);
+  assert.deepEqual(env.skipped, []);
+});
+
+test('Postman import counts the requests with OAuth 2.0 or a pre-request script and imports them without', () => {
+  const ui = loadUI();
+  const got = ui.importData({
+    info: { name: 'S' },
+    item: [
+      { name: 'OAuth', request: { url: 'http://h/1', auth: { type: 'oauth2', oauth2: [{ key: 'accessToken', value: 'x' }] } } },
+      { name: 'Script', event: preRequest(['pm.environment.set("t", 1);']), request: { url: 'http://h/2' } },
+      { name: 'Blank script', event: preRequest(['', '  ']), request: { url: 'http://h/3' } },
+      { name: 'Off script', event: [{ listen: 'prerequest', disabled: true, script: { exec: ['x()'] } }], request: { url: 'http://h/4' } },
+      { name: 'Tests only', event: [{ listen: 'test', script: { exec: ['pm.test("ok")'] } }], request: { url: 'http://h/5' } },
+      { name: 'F', event: preRequest('console.log(1)'), item: [
+        { name: 'In folder', request: { url: 'http://h/6' } },
+        { name: 'Both', event: preRequest(['y()']), request: { url: 'http://h/7', auth: { type: 'oauth2' } } },
+      ] },
+      { name: 'G', auth: { type: 'oauth2' }, item: [
+        { name: 'Inherits OAuth', request: { url: 'http://h/8' } },
+        { name: 'Own basic', request: { url: 'http://h/9', auth: BASIC } },
+      ] },
+    ],
+  });
+  assert.equal(got.unsupported, 5, 'OAuth, Script, F / In folder, F / Both, G / Inherits OAuth');
+  const reqs = got.collections[0].requests;
+  assert.equal(reqs.length, 9, 'every request is still imported');
+  for (const n of ['OAuth', 'F / Both', 'G / Inherits OAuth']) assert.deepEqual(reqs.find(r => r.name === n).auth, NO_AUTH, n);
+  assert.equal(reqs.find(r => r.name === 'G / Own basic').auth.type, 'basic');
+
+  const all = ui.importData({ info: { name: 'All' }, event: preRequest(['setup()']), item: [{ name: 'A', request: { url: 'http://h/a' } }, { name: 'B', item: [{ name: 'C', request: { url: 'http://h/c' } }] }] });
+  assert.equal(all.unsupported, 2, 'a script of the collection runs before every request');
+  assert.equal(ui.importData({ info: { name: 'None' }, item: [{ name: 'A', request: { url: 'http://h/a', auth: BEARER } }] }).unsupported, 0);
+});
+
+test('importData reads our own format, skips what only a newer version knows and leaves the state alone', () => {
+  const ui = loadUI();
+  ui.state.collections.push({ id: 'mine', name: 'Mine', open: true, requests: [] });
+  const before = JSON.stringify(ui.state);
+  const got = ui.importData({
+    app: 'simple-rest', version: 1, exportedAt: '2026-10-01T00:00:00.000Z',
+    collections: [{ id: 'c1', name: 'API', open: false, requests: [{ id: 'r1', name: 'One', method: 'get', url: 'http://h', note: 'kept' }] }, { name: 'Empty' }, null],
+    envs: [{ id: 'e1', name: 'local', vars: [{ name: 'base', value: 1 }] }],
+    tcp: [{ id: 't1', host: 'h', port: 1 }], future: { x: 1 },
+  });
+  assert.deepEqual(Object.keys(got).sort(), ['collections', 'envs', 'orphans', 'schedules', 'skipped', 'tcp', 'unsupported']);
+  assert.deepEqual(got.skipped, ['tcp', 'future']);
+  assert.deepEqual([got.schedules, got.tcp, got.unsupported, got.orphans], [[], [], 0, 0]);
+  assert.deepEqual(got.collections.map(c => [c.name, c.open, c.requests.length]), [['API', true, 1], ['Empty', true, 0], ['Imported', true, 0]]);
+  const r = got.collections[0].requests[0];
+  assert.deepEqual([r.name, r.method, r.url, r.note], ['One', 'GET', 'http://h', 'kept']);
+  assert.notEqual(got.collections[0].id, 'c1', 'new ids');
+  assert.notEqual(r.id, 'r1');
+  assert.notEqual(got.envs[0].id, 'e1');
+  assert.deepEqual(got.envs.map(e => [e.name, e.vars]), [['local', [{ enabled: true, name: 'base', value: '1' }]]]);
+  assert.equal(JSON.stringify(ui.state), before, 'the state is left alone');
+
+  assert.deepEqual(ui.importData({ app: 'simple-rest', version: 1, tcp: [] }).skipped, ['tcp'], 'an export with nothing this version knows');
+  const dataFile = ui.importData({ version: 1, collections: [{ name: 'A', requests: [] }], history: [{ id: 'h' }], envs: [], activeEnv: '', settings: { timeoutMs: 1 } });
+  assert.deepEqual([dataFile.collections.length, dataFile.skipped], [1, []], 'the keys of the data file are known');
+  const newerFile = ui.importData({ version: 1, collections: [], history: [], envs: [{ name: 'E' }], activeEnv: '', settings: {}, tcp: [] });
+  assert.deepEqual([newerFile.envs.length, newerFile.skipped], [1, ['tcp']], 'a data file of a newer version');
+  // The legacy Postman data dump has a collections array too, but is not ours:
+  // a newer simple-rest would not import the rest of it either.
+  const dump = ui.importData({ version: 1, collections: [{ name: 'Old', requests: [{ url: 'http://h', method: 'GET' }] }], environments: [{ name: 'Prod', values: [] }], headerPresets: [], globals: [] });
+  assert.deepEqual([dump.collections.map(c => c.name), dump.skipped], [['Old'], []], 'a file of another tool');
+  assert.deepEqual(ui.importData({ envs: [{ name: 'E' }], other: 1 }).skipped, []);
+  // There is no document here: a toast from importData would throw.
+  for (const d of [null, 'text', 42, [1, 2], { foo: 1 }, { info: { name: 'x' } }]) {
+    const none = ui.importData(d);
+    assert.deepEqual([none.collections, none.envs, none.skipped, none.unsupported], [[], [], [], 0], JSON.stringify(d));
+  }
+});
+
+test('exportData is a copy of the collections and environments that imports back', () => {
+  const ui = loadUI();
+  ui.state.collections.push({ id: 'c1', name: 'API', open: true, requests: [ui.normalizeRequest({ id: 'r1', name: 'One', url: 'http://h' })] });
+  ui.state.envs.push({ id: 'e1', name: 'local', vars: [{ enabled: true, name: 'base', value: 'http://h' }] });
+  const out = ui.exportData();
+  assert.deepEqual(Object.keys(out), ['app', 'version', 'exportedAt', 'collections', 'envs', 'schedules']);
+  assert.deepEqual(out.schedules, []);
+  assert.deepEqual([out.app, out.version], ['simple-rest', 1]);
+  assert.ok(!Number.isNaN(Date.parse(out.exportedAt)));
+  assert.deepEqual(out.collections, ui.state.collections);
+  assert.deepEqual(out.envs, ui.state.envs);
+  out.collections[0].name = 'Changed';
+  out.envs[0].vars.length = 0;
+  assert.equal(ui.state.collections[0].name, 'API', 'a copy');
+  assert.equal(ui.state.envs[0].vars.length, 1);
+
+  const back = ui.importData(JSON.parse(JSON.stringify(ui.exportData())));
+  assert.deepEqual(back.skipped, []);
+  assert.deepEqual(back.collections.map(c => [c.name, c.requests.map(r => [r.name, r.url])]), [['API', [['One', 'http://h']]]]);
+  assert.deepEqual(back.envs.map(e => [e.name, e.vars]), [['local', ui.state.envs[0].vars]]);
+});
+
+test('importFiles adds what importData found and sums it up in one toast', async t => {
+  const timers = fakeTimers();
+  const ui = loadUI();
+  globalThis.document = fakeDom();
+  t.after(() => { timers.restore(); delete globalThis.document; });
+  const file = (name, data) => ({ name, text: async () => (typeof data === 'string' ? data : JSON.stringify(data)) });
+  const shown = () => globalThis.document.querySelector('#toast').textContent;
+
+  await ui.importFiles([
+    file('newer.json', { app: 'simple-rest', version: 1, collections: [{ name: 'One', requests: [] }], envs: [], tcp: [{}], future: 1 }),
+    file('shop.postman_collection.json', { info: { name: 'Shop' }, item: [{ name: 'Token', request: { url: 'http://h', auth: { type: 'oauth2' } } }, { name: 'Plain', request: 'http://h/p' }], variable: [{ key: 'base', value: 'http://h' }] }),
+    file('newest.json', { app: 'simple-rest', version: 1, tcp: [] }),
+  ]);
+  assert.deepEqual(ui.state.collections.map(c => c.name), ['One', 'Shop']);
+  assert.deepEqual(ui.state.envs.map(e => e.name), ['Shop variables']);
+  assert.equal(shown(), 'Imported 2 collection(s), 1 environment(s). 1 request(s) use OAuth 2.0 or pre-request scripts, which are not imported. Skipped: tcp, future (needs a newer simple-rest)');
+
+  await ui.importFiles([file('newest.json', { app: 'simple-rest', version: 1, tcp: [] })]);
+  assert.equal(shown(), 'Skipped: tcp (needs a newer simple-rest)', 'not "Unrecognized format"');
+  await ui.importFiles([file('other.json', { foo: 1 })]);
+  assert.equal(shown(), 'Unrecognized format: other.json');
+  await ui.importFiles([file('broken.json', '{')]);
+  assert.equal(shown(), 'Not a JSON file: broken.json');
+  assert.deepEqual(ui.state.collections.map(c => c.name), ['One', 'Shop'], 'nothing more came in');
+});
+
+test('importFiles names the files it could not import in the same toast, which stays longer when it says more', async t => {
+  const timers = fakeTimers();
+  const ui = loadUI();
+  globalThis.document = fakeDom();
+  // The save that importFiles schedules fires while the clock runs: without
+  // the program it goes to localStorage.
+  const saved = Object.getOwnPropertyDescriptor(globalThis, 'localStorage');
+  Object.defineProperty(globalThis, 'localStorage', { value: { getItem: () => null, setItem() {} }, configurable: true, writable: true });
+  t.after(() => {
+    timers.restore(); delete globalThis.document;
+    delete globalThis.localStorage; if (saved) Object.defineProperty(globalThis, 'localStorage', saved);
+  });
+  const file = (name, data) => ({ name, text: async () => (typeof data === 'string' ? data : JSON.stringify(data)) });
+  const el = globalThis.document.querySelector('#toast');
+
+  await ui.importFiles([
+    file('good.json', { app: 'simple-rest', version: 1, collections: [{ name: 'Good', requests: [] }], envs: [] }),
+    file('broken.json', '{'),
+    file('other.json', { foo: 1 }),
+    // importData throws on a null query entry; the file adds nothing and the
+    // others still come in.
+    file('bad.postman_collection.json', { info: { name: 'Bad' }, item: [{ name: 'A', request: { url: { raw: 'http://h/a', query: [null] } } }] }),
+    file('v20.postman_collection.json', { info: { name: 'V20' }, auth: { type: 'bearer', bearer: { token: 'abc' } }, item: [{ name: 'A', request: { url: 'http://h/a', auth: { type: 'oauth2' } } }] }),
+  ]);
+  assert.deepEqual(ui.state.collections.map(c => c.name), ['Good', 'V20']);
+  assert.equal(ui.saveInfo().pending, true, 'saved');
+  const text = 'Imported 2 collection(s), 0 environment(s). 1 request(s) use OAuth 2.0 or pre-request scripts, which are not imported. '
+    + 'Not a JSON file: broken.json. Unrecognized format: other.json. Unrecognized format: bad.postman_collection.json';
+  assert.equal(el.textContent, text);
+  await timers.run(2500);
+  assert.ok(el.classList.contains('show'), 'still shown after the usual 2.5 s');
+  await timers.run(text.length * 60 - 2500);
+  assert.ok(!el.classList.contains('show'), 'gone after 60 ms per character');
+
+  await ui.importFiles([file('other.json', { foo: 1 })]);
+  await timers.run(2500);
+  assert.ok(!el.classList.contains('show'), 'a short toast goes after 2.5 s');
 });

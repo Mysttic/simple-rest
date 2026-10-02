@@ -683,7 +683,7 @@ func (u *updater) handle(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if err := u.install(); err != nil {
-			writeJSON(w, http.StatusConflict, map[string]string{"error": err.Error()})
+			jsonError(w, http.StatusConflict, err.Error())
 			return
 		}
 		writeJSON(w, http.StatusAccepted, u.snapshot())

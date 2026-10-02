@@ -1,0 +1,408 @@
+{
+  "about": [
+    "Shared vectors of the request a schedule sends (effective.go) and the one the Send button sends (buildEffective in ui.html).",
+    "effective_test.go and tests/effective.test.mjs run every vector; a change to either side comes with a vector here.",
+    "requests: a request, the settings and the vars (rows of an environment) as the data file holds them. want lists only",
+    "what differs from GET with an empty URL, no headers, no body, a timeout of 30000 ms and every switch on.",
+    "whitespace: the code points of \\s in JavaScript, which String.prototype.trim also removes."
+  ],
+
+  "whitespace": [9, 10, 11, 12, 13, 32, 160, 5760, 8192, 8193, 8194, 8195, 8196, 8197, 8198, 8199, 8200, 8201, 8202, 8232, 8233, 8239, 8287, 12288, 65279],
+
+  "trim": [
+    { "in": "\t\n\u000b\f\r \u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000\ufeffx y\u3000\ufeff", "out": "x y" },
+    { "in": "\u0085x\u0085", "out": "\u0085x\u0085" },
+    { "in": "\u180ex\u200b", "out": "\u180ex\u200b" },
+    { "in": "\u001cx\u001f", "out": "\u001cx\u001f" },
+    { "in": " \u00a0 ", "out": "" },
+    { "in": "", "out": "" }
+  ],
+
+  "encodeURIComponent": [
+    {
+      "in": "\u0000\u0001\u0002\u0003\u0004\u0005\u0006\u0007\b\t\n\u000b\f\r\u000e\u000f\u0010\u0011\u0012\u0013\u0014\u0015\u0016\u0017\u0018\u0019\u001a\u001b\u001c\u001d\u001e\u001f !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~\u007f",
+      "out": "%00%01%02%03%04%05%06%07%08%09%0A%0B%0C%0D%0E%0F%10%11%12%13%14%15%16%17%18%19%1A%1B%1C%1D%1E%1F%20!%22%23%24%25%26'()*%2B%2C-.%2F0123456789%3A%3B%3C%3D%3E%3F%40ABCDEFGHIJKLMNOPQRSTUVWXYZ%5B%5C%5D%5E_%60abcdefghijklmnopqrstuvwxyz%7B%7C%7D~%7F"
+    },
+    { "in": "za\u017c\u00f3\u0142\u0107 g\u0119\u015bl\u0105 ja\u017a\u0144\u00a0\ufeff\u2028\u0085", "out": "za%C5%BC%C3%B3%C5%82%C4%87%20g%C4%99%C5%9Bl%C4%85%20ja%C5%BA%C5%84%C2%A0%EF%BB%BF%E2%80%A8%C2%85" },
+    { "in": "\u20ac\ud83d\ude00\uffff", "out": "%E2%82%AC%F0%9F%98%80%EF%BF%BF" },
+    { "in": "", "out": "" }
+  ],
+
+  "requests": [
+    {
+      "name": "method in upper case, URL trimmed of JavaScript white space",
+      "request": { "method": "patch", "url": "\u00a0\u3000\t http://h/a b \ufeff\u2028\u000b" },
+      "want": { "method": "PATCH", "url": "http://h/a b" }
+    },
+    {
+      "name": "method is not trimmed",
+      "request": { "method": " get ", "url": "http://h" },
+      "want": { "method": " GET ", "url": "http://h" }
+    },
+    {
+      "name": "empty or null method is GET, null URL is empty",
+      "request": { "method": null, "url": null },
+      "want": {}
+    },
+    {
+      "name": "empty method is GET",
+      "request": { "method": "", "url": "http://h" },
+      "want": { "url": "http://h" }
+    },
+    {
+      "name": "a request that is null has every default",
+      "request": null,
+      "want": {}
+    },
+    {
+      "name": "URL keeps what JavaScript does not count as white space",
+      "request": { "url": "\u0085http://h/\u200b\u180e" },
+      "want": { "url": "\u0085http://h/\u200b\u180e" }
+    },
+    {
+      "name": "keys are case sensitive and unknown keys do not matter",
+      "request": { "url": "http://h", "URL": "http://other", "Method": "DELETE", "extra": { "a": 1 }, "headers": [{ "name": "A", "value": "1", "note": 5 }] },
+      "want": { "url": "http://h", "headers": [{ "name": "A", "value": "1" }] }
+    },
+    {
+      "name": "a key given twice: the last one counts",
+      "request": { "url": "http://first", "url": "http://second" },
+      "want": { "url": "http://second" }
+    },
+
+    {
+      "name": "headers: disabled rows and blank names are left out, names trimmed, values kept",
+      "request": { "url": "http://h", "headers": [
+        { "enabled": false, "name": "X-Off", "value": "1" },
+        { "enabled": true, "name": " \t ", "value": "blank" },
+        { "name": "\u3000X-A\u00a0", "value": "  v  " },
+        { "enabled": null, "name": "X-Null", "value": "1" },
+        null,
+        { "enabled": true, "name": "X-Empty", "value": null },
+        { "enabled": true, "name": "\u0085X-Nel", "value": "1" }
+      ] },
+      "want": { "url": "http://h", "headers": [
+        { "name": "X-A", "value": "  v  " },
+        { "name": "X-Empty", "value": "" },
+        { "name": "\u0085X-Nel", "value": "1" }
+      ] }
+    },
+    {
+      "name": "headers: null is no headers",
+      "request": { "url": "http://h", "headers": null },
+      "want": { "url": "http://h" }
+    },
+    {
+      "name": "variables in the URL, header names and header values",
+      "vars": [{ "name": "base", "value": "http://h" }, { "name": "h", "value": "X-Var" }, { "name": "v", "value": "val" }],
+      "request": { "url": " {{base}}/x?k={{ v }}&m={{missing}} ", "headers": [{ "name": " {{h}} ", "value": " {{v}}-{{v}} " }] },
+      "want": { "url": "http://h/x?k=val&m={{missing}}", "headers": [{ "name": "X-Var", "value": " val-val " }] }
+    },
+    {
+      "name": "a header name that is empty only after substitution stays",
+      "vars": [{ "name": "none", "value": "" }],
+      "request": { "url": "http://h", "headers": [{ "name": "{{none}}", "value": "x" }] },
+      "want": { "url": "http://h", "headers": [{ "name": "", "value": "x" }] }
+    },
+
+    {
+      "name": "variables: the last row wins, disabled rows and empty names do not count, names are not trimmed, null is empty",
+      "vars": [
+        { "name": "a", "value": "1" }, { "name": "a", "value": "2" },
+        { "enabled": false, "name": "b", "value": "off" }, { "enabled": null, "name": "b2", "value": "off" },
+        { "name": "", "value": "x" }, { "name": " c", "value": "spaced" },
+        { "name": "d", "value": null }, { "name": "e" }, null
+      ],
+      "request": { "url": "http://h/{{a}}/{{b}}/{{b2}}/{{ c}}/{{c}}/[{{d}}]/[{{e}}]" },
+      "want": { "url": "http://h/2/{{b}}/{{b2}}/{{ c}}/{{c}}/[]/[]" }
+    },
+    {
+      "name": "variables: prototype names, one pass only, $ in a value",
+      "vars": [{ "name": "__proto__", "value": "P" }, { "name": "a", "value": "{{b}}" }, { "name": "b", "value": "B" }, { "name": "dollar", "value": "$& $1 $$" }],
+      "request": { "url": "http://h/{{__proto__}}/{{constructor}}/{{toString}}/{{hasOwnProperty}}/{{a}}/{{b}}/{{dollar}}" },
+      "want": { "url": "http://h/P/{{constructor}}/{{toString}}/{{hasOwnProperty}}/{{b}}/B/$& $1 $$" }
+    },
+    {
+      "name": "variables: white space inside the braces is \\s of JavaScript, names are [A-Za-z0-9_.-]",
+      "vars": [{ "name": "a", "value": "A" }, { "name": "x.y-z_1", "value": "N" }, { "name": "\u00e9", "value": "E" }],
+      "request": { "url": "http://h/{{\u00a0a\u3000}}/{{\u000ba\u2028\t}}/{{\u0085a}}/{{\u200ba}}/{{ a b }}/{{{a}}}/{{a}}}/{{x.y-z_1}}/{{x y}}/{{}}/{{ }}/{{\u00e9}}" },
+      "want": { "url": "http://h/A/A/{{\u0085a}}/{{\u200ba}}/{{ a b }}/{A}/A}/N/{{x y}}/{{}}/{{ }}/{{\u00e9}}" }
+    },
+
+    {
+      "name": "raw JSON body gets application/json",
+      "vars": [{ "name": "n", "value": "5" }],
+      "request": { "method": "POST", "url": "http://h", "body": { "mode": "raw", "raw": "{\"a\": {{n}}}", "rawType": "json" } },
+      "want": { "method": "POST", "url": "http://h", "body": "{\"a\": 5}", "headers": [{ "name": "Content-Type", "value": "application/json" }] }
+    },
+    {
+      "name": "raw XML body",
+      "request": { "url": "http://h", "body": { "mode": "raw", "raw": "<a/>", "rawType": "xml" } },
+      "want": { "url": "http://h", "body": "<a/>", "headers": [{ "name": "Content-Type", "value": "application/xml" }] }
+    },
+    {
+      "name": "raw HTML body",
+      "request": { "url": "http://h", "body": { "mode": "raw", "raw": "<p>", "rawType": "html" } },
+      "want": { "url": "http://h", "body": "<p>", "headers": [{ "name": "Content-Type", "value": "text/html" }] }
+    },
+    {
+      "name": "raw JavaScript body",
+      "request": { "url": "http://h", "body": { "mode": "raw", "raw": "f()", "rawType": "js" } },
+      "want": { "url": "http://h", "body": "f()", "headers": [{ "name": "Content-Type", "value": "application/javascript" }] }
+    },
+    {
+      "name": "raw text body",
+      "request": { "url": "http://h", "body": { "mode": "raw", "raw": "t", "rawType": "text" } },
+      "want": { "url": "http://h", "body": "t", "headers": [{ "name": "Content-Type", "value": "text/plain" }] }
+    },
+    {
+      "name": "raw body without rawType is JSON",
+      "request": { "url": "http://h", "body": { "mode": "raw", "raw": "{}" } },
+      "want": { "url": "http://h", "body": "{}", "headers": [{ "name": "Content-Type", "value": "application/json" }] }
+    },
+    {
+      "name": "raw body with rawType null is text",
+      "request": { "url": "http://h", "body": { "mode": "raw", "raw": null, "rawType": null } },
+      "want": { "url": "http://h", "headers": [{ "name": "Content-Type", "value": "text/plain" }] }
+    },
+    {
+      "name": "raw body with an unknown rawType is text",
+      "request": { "url": "http://h", "body": { "mode": "raw", "raw": "a: 1", "rawType": "yaml" } },
+      "want": { "url": "http://h", "body": "a: 1", "headers": [{ "name": "Content-Type", "value": "text/plain" }] }
+    },
+    {
+      "name": "rawType is case sensitive",
+      "request": { "url": "http://h", "body": { "mode": "raw", "raw": "<a/>", "rawType": "XML" } },
+      "want": { "url": "http://h", "body": "<a/>", "headers": [{ "name": "Content-Type", "value": "text/plain" }] }
+    },
+    {
+      "name": "rawType __proto__ is text",
+      "request": { "url": "http://h", "body": { "mode": "raw", "raw": "x", "rawType": "__proto__" } },
+      "want": { "url": "http://h", "body": "x", "headers": [{ "name": "Content-Type", "value": "text/plain" }] }
+    },
+    {
+      "name": "rawType constructor is text",
+      "request": { "url": "http://h", "body": { "mode": "raw", "raw": "x", "rawType": "constructor" } },
+      "want": { "url": "http://h", "body": "x", "headers": [{ "name": "Content-Type", "value": "text/plain" }] }
+    },
+    {
+      "name": "a Content-Type header in any case keeps the default away",
+      "request": { "url": "http://h", "headers": [{ "name": "CONTENT-TYPE", "value": "text/x" }], "body": { "mode": "raw", "raw": "<a/>", "rawType": "xml" } },
+      "want": { "url": "http://h", "body": "<a/>", "headers": [{ "name": "CONTENT-TYPE", "value": "text/x" }] }
+    },
+    {
+      "name": "a disabled Content-Type header does not count",
+      "request": { "url": "http://h", "headers": [{ "enabled": false, "name": "Content-Type", "value": "text/x" }], "body": { "mode": "raw", "raw": "{}", "rawType": "json" } },
+      "want": { "url": "http://h", "body": "{}", "headers": [{ "name": "Content-Type", "value": "application/json" }] }
+    },
+    {
+      "name": "a header named Content-Type by a variable counts",
+      "vars": [{ "name": "ct", "value": "content-Type" }],
+      "request": { "url": "http://h", "headers": [{ "name": "{{ct}}", "value": "text/y" }], "body": { "mode": "raw", "raw": "{}", "rawType": "json" } },
+      "want": { "url": "http://h", "body": "{}", "headers": [{ "name": "content-Type", "value": "text/y" }] }
+    },
+
+    {
+      "name": "form body: enabled rows with a name, each part through encodeURIComponent",
+      "vars": [{ "name": "k", "value": "K y" }, { "name": "v", "value": "V&W" }],
+      "request": { "method": "POST", "url": "http://h", "body": { "mode": "form", "raw": "ignored", "form": [
+        { "name": "a b", "value": "1&2=3+4" },
+        { "name": "", "value": "x" },
+        { "enabled": false, "name": "off", "value": "1" },
+        { "name": " ", "value": "sp" },
+        { "name": "{{k}}", "value": "{{v}}" },
+        { "name": "\u00fc\u20ac\ud83d\ude00", "value": "!'()*~-_.%/?#[]@" },
+        { "name": "n", "value": null }
+      ] } },
+      "want": { "method": "POST", "url": "http://h",
+        "body": "a%20b=1%262%3D3%2B4&%20=sp&K%20y=V%26W&%C3%BC%E2%82%AC%F0%9F%98%80=!'()*~-_.%25%2F%3F%23%5B%5D%40&n=",
+        "headers": [{ "name": "Content-Type", "value": "application/x-www-form-urlencoded" }] }
+    },
+    {
+      "name": "form body with its own Content-Type",
+      "request": { "url": "http://h", "headers": [{ "name": "content-type", "value": "application/x-www-form-urlencoded; charset=utf-8" }], "body": { "mode": "form", "form": [{ "name": "a", "value": "1" }] } },
+      "want": { "url": "http://h", "body": "a=1", "headers": [{ "name": "content-type", "value": "application/x-www-form-urlencoded; charset=utf-8" }] }
+    },
+    {
+      "name": "form body without rows still gets the Content-Type",
+      "request": { "url": "http://h", "body": { "mode": "form", "form": null } },
+      "want": { "url": "http://h", "headers": [{ "name": "Content-Type", "value": "application/x-www-form-urlencoded" }] }
+    },
+    {
+      "name": "no body for mode none",
+      "request": { "url": "http://h", "body": { "mode": "none", "raw": "x", "rawType": "json", "form": [{ "name": "a", "value": "1" }] } },
+      "want": { "url": "http://h" }
+    },
+    {
+      "name": "no body for an unknown mode",
+      "request": { "url": "http://h", "body": { "mode": "binary", "raw": "x" } },
+      "want": { "url": "http://h" }
+    },
+    {
+      "name": "no body for mode null",
+      "request": { "url": "http://h", "body": { "mode": null, "raw": "x" } },
+      "want": { "url": "http://h" }
+    },
+    {
+      "name": "no body for a body without mode, or null",
+      "request": { "url": "http://h", "body": null },
+      "want": { "url": "http://h" }
+    },
+
+    {
+      "name": "basic auth replaces every Authorization header, UTF-8 in base64",
+      "vars": [{ "name": "u", "value": "user" }, { "name": "p", "value": "pa ss" }],
+      "request": { "url": "http://h",
+        "headers": [{ "name": "authorization", "value": "old" }, { "name": "X-Keep", "value": "1" }, { "name": "AUTHORIZATION", "value": "old2" }],
+        "auth": { "type": "basic", "username": "{{u}}", "password": "za\u017c\u00f3\u0142\u0107:{{p}}" } },
+      "want": { "url": "http://h", "headers": [{ "name": "X-Keep", "value": "1" }, { "name": "Authorization", "value": "Basic dXNlcjp6YcW8w7PFgsSHOnBhIHNz" }] }
+    },
+    {
+      "name": "basic auth with nothing set",
+      "request": { "url": "http://h", "auth": { "type": "basic" } },
+      "want": { "url": "http://h", "headers": [{ "name": "Authorization", "value": "Basic Og==" }] }
+    },
+    {
+      "name": "bearer auth; a header whose name only looks like Authorization stays",
+      "vars": [{ "name": "t", "value": "T0k" }],
+      "request": { "url": "http://h",
+        "headers": [{ "name": "Author\u0130zation", "value": "kept" }, { "name": " Authorization ", "value": "dropped" }],
+        "auth": { "type": "bearer", "token": "{{t}}" } },
+      "want": { "url": "http://h", "headers": [{ "name": "Author\u0130zation", "value": "kept" }, { "name": "Authorization", "value": "Bearer T0k" }] }
+    },
+    {
+      "name": "bearer auth without a token",
+      "request": { "url": "http://h", "auth": { "type": "bearer", "token": null } },
+      "want": { "url": "http://h", "headers": [{ "name": "Authorization", "value": "Bearer " }] }
+    },
+    {
+      "name": "auth type null drops the Authorization headers and adds none",
+      "request": { "url": "http://h", "headers": [{ "name": "Authorization", "value": "x" }], "auth": { "type": null, "token": "t" } },
+      "want": { "url": "http://h" }
+    },
+    {
+      "name": "an unknown auth type drops the Authorization headers and adds none",
+      "request": { "url": "http://h", "headers": [{ "name": "Authorization", "value": "x" }], "auth": { "type": "digest", "username": "u" } },
+      "want": { "url": "http://h" }
+    },
+    {
+      "name": "auth none keeps an Authorization header",
+      "request": { "url": "http://h", "headers": [{ "name": "Authorization", "value": "Basic x" }], "auth": { "type": "none", "token": "t" } },
+      "want": { "url": "http://h", "headers": [{ "name": "Authorization", "value": "Basic x" }] }
+    },
+    {
+      "name": "auth null is no auth",
+      "request": { "url": "http://h", "headers": [{ "name": "Authorization", "value": "Basic x" }], "auth": null },
+      "want": { "url": "http://h", "headers": [{ "name": "Authorization", "value": "Basic x" }] }
+    },
+    {
+      "name": "API key in a header, the name trimmed before substitution",
+      "vars": [{ "name": "kn", "value": "X-Key" }, { "name": "kv", "value": "K V" }],
+      "request": { "url": "http://h", "auth": { "type": "apikey", "keyName": " {{kn}}\u00a0", "keyValue": " {{kv}} " } },
+      "want": { "url": "http://h", "headers": [{ "name": "X-Key", "value": " K V " }] }
+    },
+    {
+      "name": "API key with keyIn null goes to a header",
+      "request": { "url": "http://h", "auth": { "type": "apikey", "keyName": "k", "keyValue": null, "keyIn": null } },
+      "want": { "url": "http://h", "headers": [{ "name": "k", "value": "" }] }
+    },
+    {
+      "name": "an API key header named Content-Type keeps the default away",
+      "request": { "url": "http://h", "auth": { "type": "apikey", "keyName": "content-type", "keyValue": "text/plain; k=1", "keyIn": "cookie" }, "body": { "mode": "raw", "raw": "{}" } },
+      "want": { "url": "http://h", "body": "{}", "headers": [{ "name": "content-type", "value": "text/plain; k=1" }] }
+    },
+    {
+      "name": "API key in the query, name and value escaped for a query string",
+      "vars": [{ "name": "v", "value": "v&#x y=%+" }],
+      "request": { "url": "http://h/a", "auth": { "type": "apikey", "keyName": "api key=%&#", "keyValue": "{{v}}", "keyIn": "query" } },
+      "want": { "url": "http://h/a?api%20key%3D%25%26%23=v%26%23x%20y=%+" }
+    },
+    {
+      "name": "API key in the query after a ? that comes from a variable",
+      "vars": [{ "name": "base", "value": "http://h/a?x=1" }],
+      "request": { "url": "{{base}}", "auth": { "type": "apikey", "keyName": "k", "keyValue": "", "keyIn": "query" } },
+      "want": { "url": "http://h/a?x=1&k=" }
+    },
+    {
+      "name": "an API key with a blank name adds nothing but drops Authorization",
+      "request": { "url": "http://h", "headers": [{ "name": "Authorization", "value": "x" }, { "name": "X", "value": "1" }], "auth": { "type": "apikey", "keyName": " \u3000", "keyValue": "v", "keyIn": "query" } },
+      "want": { "url": "http://h", "headers": [{ "name": "X", "value": "1" }] }
+    },
+    {
+      "name": "an API key whose name is empty only after substitution",
+      "vars": [{ "name": "none", "value": "" }],
+      "request": { "url": "http://h", "auth": { "type": "apikey", "keyName": "{{none}}", "keyValue": "v" } },
+      "want": { "url": "http://h", "headers": [{ "name": "", "value": "v" }] }
+    },
+
+    {
+      "name": "options: a request without options takes the settings",
+      "settings": { "timeoutMs": 5000, "followRedirects": false, "verifyTls": false, "cookies": false },
+      "request": { "url": "http://h" },
+      "want": { "url": "http://h", "timeoutMs": 5000, "followRedirects": false, "verifyTls": false, "cookies": false }
+    },
+    {
+      "name": "options: what a request lacks comes from the settings, a fraction is cut off",
+      "settings": { "timeoutMs": 5000, "followRedirects": false, "verifyTls": false, "cookies": false },
+      "request": { "url": "http://h", "options": { "timeoutMs": 1.5, "cookies": true } },
+      "want": { "url": "http://h", "timeoutMs": 1, "followRedirects": false, "verifyTls": false, "cookies": true }
+    },
+    {
+      "name": "options: null takes the settings",
+      "settings": { "timeoutMs": 1234, "verifyTls": false },
+      "request": { "url": "http://h", "options": null },
+      "want": { "url": "http://h", "timeoutMs": 1234, "verifyTls": false }
+    },
+    {
+      "name": "options: a negative timeout gives 30000",
+      "request": { "url": "http://h", "options": { "timeoutMs": -5 } },
+      "want": { "url": "http://h" }
+    },
+    {
+      "name": "options: timeout 0.9 is cut off to 0, which gives 30000",
+      "settings": { "timeoutMs": 5000 },
+      "request": { "url": "http://h", "options": { "timeoutMs": 0.9 } },
+      "want": { "url": "http://h" }
+    },
+    {
+      "name": "options: timeout null gives 30000, not the settings",
+      "settings": { "timeoutMs": 5000 },
+      "request": { "url": "http://h", "options": { "timeoutMs": null } },
+      "want": { "url": "http://h" }
+    },
+    {
+      "name": "options: a timeout with an exponent",
+      "request": { "url": "http://h", "options": { "timeoutMs": 2.5e6 } },
+      "want": { "url": "http://h", "timeoutMs": 2500000 }
+    },
+    {
+      "name": "options: switches null are off",
+      "request": { "url": "http://h", "options": { "followRedirects": null, "verifyTls": null, "cookies": null } },
+      "want": { "url": "http://h", "followRedirects": false, "verifyTls": false, "cookies": false }
+    },
+    {
+      "name": "settings: null values",
+      "settings": { "timeoutMs": null, "followRedirects": null, "verifyTls": null, "cookies": null },
+      "request": { "url": "http://h" },
+      "want": { "url": "http://h", "followRedirects": false, "verifyTls": false, "cookies": false }
+    },
+    {
+      "name": "settings: a fractional timeout is cut off",
+      "settings": { "timeoutMs": 999.99 },
+      "request": { "url": "http://h" },
+      "want": { "url": "http://h", "timeoutMs": 999 }
+    },
+    {
+      "name": "settings: a negative timeout gives 30000",
+      "settings": { "timeoutMs": -1 },
+      "request": { "url": "http://h" },
+      "want": { "url": "http://h" }
+    },
+    {
+      "name": "settings: null",
+      "settings": null,
+      "request": { "url": "http://h" },
+      "want": { "url": "http://h" }
+    }
+  ]
+}
