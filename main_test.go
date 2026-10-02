@@ -360,6 +360,28 @@ func TestGuard(t *testing.T) {
 	if got := status("", "not a url"); got != http.StatusForbidden {
 		t.Errorf("garbage Origin = %d", got)
 	}
+	// The TCP console and the event stream sit behind the same guard: an
+	// EventSource of another site sends its Origin and gets 403, one of this
+	// page sends none.
+	for _, path := range []string{"/api/tcp", "/api/events"} {
+		for _, c := range []struct{ host, origin string }{{"", "http://evil.example"}, {"evil.example:8787", ""}} {
+			r, _ := http.NewRequest(http.MethodGet, srv.URL+path, nil)
+			if c.host != "" {
+				r.Host = c.host
+			}
+			if c.origin != "" {
+				r.Header.Set("Origin", c.origin)
+			}
+			res, err := http.DefaultClient.Do(r)
+			if err != nil {
+				t.Fatal(err)
+			}
+			res.Body.Close()
+			if res.StatusCode != http.StatusForbidden {
+				t.Errorf("%s, Host %q, Origin %q: %d", path, c.host, c.origin, res.StatusCode)
+			}
+		}
+	}
 
 	open := newApp(filepath.Join(t.TempDir(), "d.json"), false)
 	srv2 := httptest.NewServer(routes(open, nil))
@@ -376,6 +398,11 @@ func TestGuard(t *testing.T) {
 	res.Body.Close()
 	if res.StatusCode != http.StatusForbidden {
 		t.Errorf("foreign Origin on an open listener = %d", res.StatusCode)
+	}
+	for _, path := range []string{"/api/tcp", "/api/events"} {
+		if code, _ := hostStatusOf(t, srv2, path, "evil.example:8787"); code != http.StatusForbidden {
+			t.Errorf("%s on an open listener, Host evil.example: %d", path, code)
+		}
 	}
 }
 
@@ -443,7 +470,13 @@ func TestHostAllowlist(t *testing.T) {
 // hostStatus sends GET /api/info to srv with the given Host header.
 func hostStatus(t *testing.T, srv *httptest.Server, host string) (int, string) {
 	t.Helper()
-	r, _ := http.NewRequest(http.MethodGet, srv.URL+"/api/info", nil)
+	return hostStatusOf(t, srv, "/api/info", host)
+}
+
+// hostStatusOf sends GET path to srv with the given Host header.
+func hostStatusOf(t *testing.T, srv *httptest.Server, path, host string) (int, string) {
+	t.Helper()
+	r, _ := http.NewRequest(http.MethodGet, srv.URL+path, nil)
 	r.Host = host
 	res, err := http.DefaultClient.Do(r)
 	if err != nil {

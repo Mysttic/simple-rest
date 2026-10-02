@@ -7,7 +7,7 @@ ostatniego wydanego tagu.
 
 ## [Unreleased]
 
-## [1.2.0] - 2026-10-01
+## [1.2.0] - 2026-10-02
 
 ### Dodane
 
@@ -47,16 +47,82 @@ ostatniego wydanego tagu.
   najwyżej 25 sekund). Gdy to trwa dłużej niż 300 ms, status pokazuje `Refreshing token…`.
   Brak odpowiedzi nie blokuje wysyłki, a powiadomienie mówi, gdy wartość może być stara
   albo jej brak, bo harmonogram stoi, się nie udał, jest wyłączony albo wartość wygasła.
-- Karta pyta program o harmonogramy co 2 sekundy przy otwartym oknie Schedules albo
-  Environments, co 10 sekund, gdy jest widoczna, od razu po akcji i po powrocie do karty,
-  a w tle wcale. Odpowiedź niesie też znacznik pliku danych, więc karta pobiera plik tylko
-  wtedy, gdy się zmienił. Po restarcie programu karta mówi, że harmonogramy są wyłączone,
-  o ile któryś był włączony albo miał wartości.
+- Widoczna karta dostaje zmiany harmonogramów strumieniem zdarzeń (`GET /api/events`,
+  opisany niżej) i pyta program o harmonogramy od razu po akcji, po otwarciu okna i po
+  powrocie do karty. Bez strumienia (np. w czasie restartu programu) karta odpytuje program
+  co 2 sekundy przy otwartym oknie Schedules albo Environments i w widoku TCP, co 10 sekund
+  w pozostałych przypadkach, a w tle wcale. Odpowiedź niesie też znacznik pliku danych,
+  więc karta pobiera plik tylko wtedy, gdy się zmienił. Po restarcie programu karta mówi,
+  że harmonogramy są wyłączone, o ile któryś był włączony albo miał wartości.
 - Bez programu, a także ze strony z innej wersji programu, okno Schedules pokazuje
   definicje tylko do odczytu, z banerem, a akcje harmonogramów i odświeżanie wartości przed
   Send są wyłączone. Send działa dalej.
 - Błąd `no such host` dla nazwy `.local` przy ręcznym Send w programie na Linuksie dostaje
   tę samą podpowiedź co harmonogram: wersje linuksowe nie rozwiązują nazw mDNS.
+- Konsola TCP w programie. Program łączy się jako klient z urządzeniem albo systemem
+  w sieci (nazwa DNS, IPv4 albo IPv6, także ze strefą) i utrzymuje połączenie do
+  rozłączenia; nigdy nie nasłuchuje. Keepalive
+  wykrywa martwe urządzenie po około 30 sekundach, a na Linuksie także przy danych
+  w drodze (`TCP_USER_TIMEOUT`). Ramkowanie: None (domyślne, surowe bajty dzielone po
+  ciszy `idleMs`), LF, CRLF, MLLP (`0B`, treść, `1C 0D`) i STX/ETX. Wysyłka dokłada ramkę,
+  chyba że komunikat już ją ma. Odbiór dzieli bajty na komunikaty, bajty spoza ramki
+  (np. ACK albo NAK) trafiają do logu osobno, a ramka ponad 1 MB jest ucinana. Wysyłki
+  z wielu kart idą na kabel w kolejności numerów w logu. Wait for reply bierze za
+  odpowiedź pierwszy wpis, który zaczął przychodzić po wysłaniu, i mierzy czas, bez
+  trzymania połączenia HTTP. API: `GET /api/tcp`, `POST /api/tcp/{id}/connect`,
+  `.../send` i `.../disconnect`, `DELETE /api/tcp/{id}/wait`, `GET` i
+  `DELETE /api/tcp/{id}/log` oraz `DELETE /api/tcp/{id}`.
+- Zmienne w komunikatach TCP oraz w hoście i porcie połączenia podstawia program z tego
+  samego źródła co w harmonogramach: wiersze środowiska wybranego przy Connect, a nad
+  nimi nakładka harmonogramów. Połączenie wysyła zawsze ze swoim środowiskiem, niezależnie
+  od karty. Zmienna bez wartości zostaje w komunikacie dosłownie i jest zgłaszana,
+  a w hoście albo porcie blokuje Connect.
+- Połączenia TCP i ich log (najwyżej 1000 wpisów albo 2 MB na połączenie) są tylko
+  w pamięci programu i wspólne dla wszystkich kart i komputerów. Po każdym starcie
+  programu, także po aktualizacji, żadne połączenie nie jest otwarte. Zamknięcie programu
+  i restart po aktualizacji zamykają wszystkie połączenia (FIN). Konsola programu podaje
+  Connect i Disconnect z adresem, z którego przyszły, ale nigdy treść komunikatów ani
+  wartości zmiennych.
+- Strumień zdarzeń `GET /api/events` (server-sent events), jeden na widoczną kartę:
+  zdarzenia konsoli TCP, `state.changed` po zmianie pliku danych i `sched.changed` po
+  zmianie harmonogramów (najwyżej jedno na 250 ms). Dopóki strumień działa, karta nie
+  odpytuje programu cyklicznie. Karta w tle zamyka strumień, a gdy wraca z identyfikatorem
+  ostatniego zdarzenia, dostaje to, co ją ominęło, a po restarcie programu albo przy
+  dużej zaległości stan bieżący. Gdy programu nie ma (np. w czasie restartu), karta
+  ponawia strumień co 2 sekundy przez 30 sekund, potem co 30 sekund, a do tego czasu
+  odpytuje program.
+- Okno konsoli TCP: zakładka TCP na pasku bocznym z listą połączeń i liczbą otwartych oraz
+  widok połączenia. Widok ma pola Host i Port (ze `{{zmiennymi}}`; wklejone
+  `tcp://host:port` albo `host:port` rozdziela się na oba pola), Connect, Disconnect
+  i Reconnect, stan z czasem połączenia, adresy, środowisko połączenia, liczniki bajtów
+  i adres, z którego połączenie otwarto. Ramkowanie wybiera się z listy (None, LF, CR LF,
+  MLLP, STX/ETX) obok bajtów ramki, z Wrap outgoing i Split on silence. Log pokazuje czas,
+  kierunek, rozmiar i numer wpisu, treść jako tekst z nazwami znaków sterujących (`<VT>`,
+  `<CR>`) albo hex, z wyborem kodowania odbioru (UTF-8, Windows-1250, ISO-8859-2,
+  Latin-1), z dopiskami (`outside frame`, `incomplete`, `cut at 1 MB`,
+  `reply to #N in X ms`, `by <adres>`) i z przyciskami Copy, Copy escaped i To editor.
+  Edytor komunikatu ma tryb Text (escape'y `\r \n \t \\ \xHH`, wybór bajtów dla Enter)
+  i Hex, `{{zmienne}}` w obu, podgląd bajtów po podstawieniu i ramkowaniu (`Sends:`),
+  liczbę bajtów i podpowiedzi (nieznana zmienna, błędny hex, ukośnik w JSON przy
+  escape'ach). Wait for reply pokazuje wynik (`Reply in 59 ms`, `No reply within 5 s`,
+  `Connection closed while waiting`) i ma Cancel. Komunikaty zapisuje się przy połączeniu
+  (Save as…, Ctrl+S) i wysyła jednym kliknięciem; Ctrl+Enter wysyła komunikat z edytora.
+  Tekst edytora jest szkicem przeglądarki (localStorage), a widok i wybrane połączenie
+  przeżywają przeładowanie karty.
+- Connect i Send najpierw zapisują zmiany karty i odświeżają wartości z harmonogramów
+  (`POST /api/vars/ensure`): Connect w środowisku karty, Send w środowisku połączenia.
+  Podpowiedzi w konsoli mówią, że karta ma inne środowisko niż połączenie, że zmiany
+  definicji albo ramkowania zadziałają po Reconnect, że ramka czeka na swój koniec i że
+  zmienna hosta albo portu nie ma wartości, a przy `no such host` dla nazwy `.local` na
+  Linuksie dają tę samą podpowiedź co Send HTTP. Połączenie, którego definicję usunięto
+  w innej karcie, dalej widać jako `(not saved)` z Disconnect.
+- Definicje połączeń TCP z zapisanymi komunikatami leżą w pliku danych pod kluczem `tcp`
+  (czasy spoza zakresu są przycinane, nieznany preset ramkowania daje None, nieznane pola
+  zostają) i trafiają do eksportu. Import nadaje im nowe identyfikatory i podaje ich
+  liczbę w powiadomieniu. Uwaga: po cofnięciu do 1.1.0 pierwszy zapis z karty usuwa
+  z pliku klucz `tcp`.
+- Bez programu, a także ze strony z innej wersji programu, konsola TCP pokazuje definicje
+  tylko do odczytu, z banerem, a Connect, Send i Disconnect są wyłączone.
 - Import kolekcji Postmana: zapytanie bez własnego auth albo z typem `inherit` dostaje auth
   najbliższego folderu, a potem kolekcji, a `noauth` daje brak auth. Zmienne kolekcji
   (`variable`) trafiają do nowego środowiska `<nazwa kolekcji> variables`. OAuth 2.0
@@ -70,14 +136,15 @@ ostatniego wydanego tagu.
   rebinding, a program ostrzega o tym przy starcie. Gwiazdka w cudzysłowie podwójnym
   działa w cmd, PowerShell i sh.
 - Import pliku z nowszej wersji importuje to, co ta wersja zna, a o reszcie mówi
-  w powiadomieniu, np. `Skipped: tcp (needs a newer simple-rest)`, zamiast
+  w powiadomieniu, np. `Skipped: udp (needs a newer simple-rest)`, zamiast
   `Unrecognized format`.
 - Jedno powiadomienie po imporcie podsumowuje wszystkie wybrane pliki, także te, których
   nie udało się zaimportować, i znika tym później, im jest dłuższe. Plik, którego nie da
   się odczytać, nie przerywa importu pozostałych.
-- Karty i komputery pracujące na jednym pliku danych widzą nawzajem swoje zmiany. Karta
-  sprawdza plik co 10 sekund, gdy jest widoczna, po powrocie do niej i po zamknięciu okna
-  dialogowego, a nowszą wersję wczytuje tylko wtedy, gdy sama nie ma niezapisanych zmian.
+- Karty i komputery pracujące na jednym pliku danych widzą nawzajem swoje zmiany. Widoczna
+  karta dowiaduje się o zmianie pliku ze strumienia zdarzeń, a bez strumienia sprawdza plik
+  co 10 sekund. Sprawdza go też po powrocie do niej i po zamknięciu okna dialogowego,
+  a nowszą wersję wczytuje tylko wtedy, gdy sama nie ma niezapisanych zmian.
   `GET /api/state` zwraca `ETag` (skrót treści pliku) i odpowiada 304 na pasujące
   `If-None-Match`.
 
@@ -118,7 +185,8 @@ ostatniego wydanego tagu.
   porządnie, tak jak Ctrl+C: zapytania harmonogramów w locie są przerywane, a konsola
   dostaje zaległe linie. To samo dzieje się przed restartem po aktualizacji.
 - Instalacja aktualizacji najpierw zapisuje dane i nie rusza, jeśli zapis się nie udał.
-  Przy włączonych harmonogramach najpierw pyta, bo restart je wyłącza.
+  Przy włączonych harmonogramach albo otwartych połączeniach TCP najpierw pyta (z liczbą
+  połączeń), bo restart wyłącza harmonogramy i zamyka połączenia.
 - Potwierdzenia usunięcia zapytania, kolekcji i środowiska wymieniają harmonogramy, które
   z nich korzystają.
 - `GET /api/info` zwraca pole `boot`, nowe przy każdym starcie programu.

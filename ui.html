@@ -187,6 +187,58 @@ table.kv.rules td.opt { width: 34px; text-align: center; }
 #envOverlay td { padding: 3px 6px; border-bottom: 1px solid var(--line); }
 #envOverlay td:last-child { white-space: nowrap; text-align: right; }
 
+/* TCP console: the work area shows either the HTTP editor or #tcpView */
+#tcpView { display: none; flex: 1; flex-direction: column; min-height: 0; min-width: 0; overflow-x: hidden; overflow-y: auto; }
+.work.view-tcp > .request, .work.view-tcp > .splitter, .work.view-tcp > .response { display: none; }
+.work.view-tcp > #tcpView { display: flex; }
+/* In a short window the log keeps some lines and the view scrolls. */
+#tcpMain { display: flex; flex-direction: column; flex: 1; min-height: 560px; }
+#tcpMain[hidden] { display: none; }
+#tcpView .bar { flex-wrap: wrap; padding: 5px 12px; }
+#tcpView .modal-note { margin: 8px 12px 0; }
+#tcpName { flex: 1; background: transparent; border-color: transparent; font-weight: 600; font-size: 14px; }
+#tcpName:hover, #tcpName:focus { border-color: var(--line); background: var(--bg2); }
+#tcpHost { flex: 1; min-width: 140px; font-family: var(--mono); }
+#tcpPort { width: 80px; font-family: var(--mono); }
+#tcpIdle { width: 70px; }
+#tcpWaitSec { width: 56px; }
+.tcpstat { font-family: var(--mono); font-size: 12px; }
+.tcpmeta { padding: 0 12px 4px; font: 12px var(--mono); color: var(--fg2); word-break: break-all; }
+#tcpHints { padding: 0 12px; }
+#tcpHints .warn-hint { margin: 2px 0; }
+.tcploghead { border-top: 1px solid var(--line); }
+.seg { display: inline-flex; }
+.seg button { border-radius: 0; padding: 2px 8px; font-size: 12px; }
+.seg button:first-child { border-radius: 5px 0 0 5px; }
+.seg button:last-child { border-radius: 0 5px 5px 0; border-left: 0; }
+.seg button.active { background: var(--bg4); color: var(--fg); }
+.tcplog { flex: 1; min-height: 90px; overflow: auto; background: var(--bg); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); font: 12px/1.45 var(--mono); padding: 4px 0; }
+.tle { display: grid; grid-template-columns: 92px 30px 64px minmax(0, 1fr); gap: 0 8px; padding: 2px 12px; }
+.tle:hover { background: var(--bg2); }
+.tle .t, .tle .n { color: var(--fg2); white-space: nowrap; }
+.tle .n { text-align: right; }
+.tle .d { font-weight: 700; color: var(--fg2); }
+.tle.tx .d { color: var(--warn); } .tle.rx .d { color: var(--ok); } .tle.error .d, .tle.error .x { color: var(--err); }
+.tle .x { white-space: pre; display: block; overflow-x: auto; }
+.tcplog.wrap .tle .x { white-space: pre-wrap; word-break: break-all; }
+.tle .m { color: var(--fg2); font-family: var(--sans); font-size: 11px; display: flex; flex-wrap: wrap; gap: 2px 10px; align-items: center; }
+.tle .m .lb { color: var(--purple); }
+.tle .m .wn { color: var(--warn); }
+.tle .acts { visibility: hidden; display: inline-flex; gap: 4px; }
+.tle:hover .acts { visibility: visible; }
+.tle .acts button { padding: 0 6px; font-size: 11px; }
+.tcppending { padding: 2px 12px; color: var(--warn); }
+.tchips { display: inline-flex; flex-wrap: wrap; gap: 6px; }
+.tchip { display: inline-flex; }
+.tchip button { border-radius: 0; padding: 1px 7px; font-size: 12px; }
+.tchip button:first-child { border-radius: 5px 0 0 5px; }
+.tchip button + button { border-left: 0; }
+.tchip button:last-child { border-radius: 0 5px 5px 0; color: var(--fg2); }
+#tcpData { flex: none; height: 100px; min-height: 60px; margin: 0 12px; font-size: 12px; }
+.tcpsends { padding: 4px 12px 0; font: 12px var(--mono); color: var(--fg2); white-space: pre-wrap; word-break: break-all; max-height: 3em; overflow: hidden; }
+#tcpNote .warn-hint { display: inline; margin: 0 8px 0 0; }
+#tcpEmpty { flex: 1; }
+
 @media (max-width: 800px) {
   body { grid-template-columns: 1fr; }
   .sidebar { position: fixed; top: 44px; bottom: 0; left: 0; width: min(320px, 85vw); z-index: 5; transform: translateX(-100%); transition: transform .15s; }
@@ -195,12 +247,14 @@ table.kv.rules td.opt { width: 34px; text-align: center; }
   .topbar .hide-sm { display: none; }
   .envlayout { grid-template-columns: 1fr; }
   .envlist { border: 0; padding: 0; }
+  .tle { grid-template-columns: 76px 28px minmax(0, 1fr); }
+  .tle .n { display: none; }
 }
 </style>
 </head>
 <body>
 <header class="topbar">
-  <button id="menuBtn" class="icon" title="Collections">&#9776;</button>
+  <button id="menuBtn" class="icon" title="Menu">&#9776;</button>
   <div class="brand">simple<span>-rest</span></div>
   <span id="modeBadge" class="badge">...</span>
   <button id="updateBadge" class="badge warn" title="A newer release is available, open Settings" hidden></button>
@@ -208,8 +262,8 @@ table.kv.rules td.opt { width: 34px; text-align: center; }
   <select id="envSelect" title="Active environment"><option value="">No environment</option></select>
   <button id="envBtn" title="Manage environments">Environments</button>
   <button id="schedBtn" title="Schedules">&#10227;<span class="hide-sm"> Schedules</span><span class="count" id="schedCount"></span></button>
-  <button id="importBtn" class="hide-sm" title="Import collections, environments and schedules (own JSON or Postman v2.1)">Import</button>
-  <button id="exportBtn" class="hide-sm" title="Export collections, environments and schedules to JSON">Export</button>
+  <button id="importBtn" class="hide-sm" title="Import collections, environments, schedules and TCP connections (own JSON or Postman v2.1)">Import</button>
+  <button id="exportBtn" class="hide-sm" title="Export collections, environments, schedules and TCP connections to JSON">Export</button>
   <button id="settingsBtn" class="icon" title="Settings">&#9881;</button>
   <input type="file" id="importFile" accept=".json,application/json" multiple hidden>
 </header>
@@ -218,14 +272,17 @@ table.kv.rules td.opt { width: 34px; text-align: center; }
   <div class="tabs">
     <button data-side="coll" class="active">Collections</button>
     <button data-side="hist">History</button>
+    <button data-side="tcp" title="TCP console: the number of open connections">TCP<span class="count" id="tcpTabCount"></span></button>
   </div>
   <div class="search">
     <input type="text" id="sideSearch" placeholder="Filter...">
     <button id="addCollBtn" title="New collection">+</button>
     <button id="clearHistBtn" class="danger" title="Clear history" hidden>Clear</button>
+    <button id="addTcpBtn" title="New TCP connection" hidden>+</button>
   </div>
   <div class="list" id="collList"></div>
   <div class="list hist" id="histList" hidden></div>
+  <div class="list" id="tcpList" hidden></div>
 </aside>
 
 <main class="work">
@@ -323,6 +380,69 @@ table.kv.rules td.opt { width: 34px; text-align: center; }
       <pre class="out" id="respOut">Send a request to see the response here.</pre>
       <div id="respHeaders" hidden></div>
       <div id="respPreview" hidden style="height:100%"></div>
+    </div>
+  </section>
+
+  <section id="tcpView">
+    <div class="modal-note" id="tcpBanner" role="alert" hidden></div>
+    <div class="empty" id="tcpEmpty">No TCP connection open. Pick one in the TCP tab of the sidebar, or press + there.</div>
+    <div id="tcpMain" hidden>
+      <div class="bar name">
+        <input type="text" id="tcpName" placeholder="Connection name" data-commit="change">
+        <button id="tcpDupBtn" title="Duplicate this connection">Duplicate</button>
+        <button id="tcpDelBtn" class="danger" title="Delete this connection">Delete</button>
+      </div>
+      <div class="bar">
+        <label for="tcpHost">Host</label>
+        <input type="text" id="tcpHost" placeholder="10.0.0.5, lab-pc or {{lab_host}}" spellcheck="false" autocomplete="off" data-commit="change">
+        <label for="tcpPort">Port</label>
+        <input type="text" id="tcpPort" placeholder="2575" spellcheck="false" autocomplete="off" data-commit="change">
+        <button id="tcpConnBtn" class="primary">Connect</button>
+        <span class="tcpstat" id="tcpStatus"></span>
+        <span class="spacer" style="flex:1"></span>
+        <span class="badge" id="tcpLive" title="Changes come in as they happen" hidden>Live</span>
+      </div>
+      <div class="tcpmeta" id="tcpMeta"></div>
+      <div class="bar">
+        <label for="tcpFraming">Framing</label>
+        <select id="tcpFraming"></select>
+        <span class="hint mono" id="tcpFramingBytes"></span>
+        <label><input type="checkbox" id="tcpWrapOut"> Wrap outgoing</label>
+        <label id="tcpIdleBox" title="Bytes outside a frame make one entry until this much silence; 0 makes one entry of each read">Split on silence <input type="number" id="tcpIdle" min="0" max="5000" step="10" data-commit="change"> ms</label>
+      </div>
+      <div id="tcpHints"></div>
+      <div class="bar tcploghead">
+        <b>Log</b><span class="hint" id="tcpCount"></span>
+        <span class="spacer" style="flex:1"></span>
+        <label for="tcpCharset">RX charset</label>
+        <select id="tcpCharset"><option value="utf-8">UTF-8</option><option value="windows-1250">Windows-1250</option><option value="iso-8859-2">ISO-8859-2</option><option value="latin1">Latin-1</option></select>
+        <span class="seg"><button data-logview="text" class="active">Text</button><button data-logview="hex">Hex</button></span>
+        <button id="tcpLogWrapBtn" title="Toggle line wrap">Wrap</button>
+        <button id="tcpClearBtn" title="Clear the log of this connection, for every tab">Clear</button>
+      </div>
+      <div class="tcplog" id="tcpLog"></div>
+      <div class="tcppending" id="tcpPending" hidden></div>
+      <div class="bar"><span class="hint">Saved:</span><span class="tchips" id="tcpChips"></span><span class="spacer" style="flex:1"></span>
+        <button id="tcpSaveAsBtn" title="Save the message in the editor with this connection (Ctrl+S)">Save as…</button></div>
+      <div class="bar">
+        <label><input type="radio" name="tcpMode" value="text"> Text</label>
+        <label><input type="radio" name="tcpMode" value="hex"> Hex</label>
+        <label class="tcp-text">Enter inserts <select id="tcpNewline"><option value="lf">LF</option><option value="cr">CR</option><option value="crlf">CR LF</option></select></label>
+        <label class="tcp-text"><input type="checkbox" id="tcpEscapes"> Escapes (\r \n \t \\ \xHH)</label>
+      </div>
+      <textarea id="tcpData" spellcheck="false" placeholder="The message. {{variables}} come from the environment the connection was opened with."></textarea>
+      <div class="tcpsends" id="tcpSends"></div>
+      <div class="bar">
+        <span class="hint" id="tcpBytes"></span>
+        <span id="tcpNote"></span>
+        <span class="spacer" style="flex:1"></span>
+        <label><input type="checkbox" id="tcpWait"> Wait for reply</label>
+        <label><input type="number" id="tcpWaitSec" min="0.1" max="60" step="1" data-commit="change"> s</label>
+        <span class="hint" id="tcpReply"></span>
+        <button id="tcpCancelWait" hidden>Cancel</button>
+        <button id="tcpSendBtn" class="primary" title="Send (Ctrl+Enter)">Send</button>
+        <span class="hint">Ctrl+Enter</span>
+      </div>
     </div>
   </section>
 </main>
@@ -432,12 +552,12 @@ const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;'
 const clone = o => JSON.parse(JSON.stringify(o));
 const RAW_TYPES = { json: 'application/json', text: 'text/plain', xml: 'application/xml', html: 'text/html', js: 'application/javascript' };
 const DEFAULT_SETTINGS = { timeoutMs: 30000, followRedirects: true, verifyTls: true, cookies: true, history: true };
-const STATE_KEYS = ['version', 'collections', 'history', 'envs', 'activeEnv', 'settings', 'schedules'];
+const STATE_KEYS = ['version', 'collections', 'history', 'envs', 'activeEnv', 'settings', 'schedules', 'tcp'];
 
 // ---------------------------------------------------------------- state
 // state is refilled in place (applyState) and never replaced, so references to
 // it, such as __sr.state, stay valid.
-const state = { version: 1, collections: [], history: [], envs: [], activeEnv: '', settings: { ...DEFAULT_SETTINGS }, schedules: [] };
+const state = { version: 1, collections: [], history: [], envs: [], activeEnv: '', settings: { ...DEFAULT_SETTINGS }, schedules: [], tcp: [] };
 let extraKeys = {};        // top-level keys of the data file this version does not know, saved back as they came
 let MODE = 'standalone'; // 'server' when served by the Go binary
 let info = {};
@@ -535,10 +655,49 @@ function normalizeSchedule(x, seen = new Set()) {
     extract: arr(s.extract).slice(0, MAX_RULES).map(normalizeRule),
   });
 }
+// The framing presets of the TCP console: the bytes a frame starts and ends
+// with. They have twins in tcpframe.go (framingPresets); change them only
+// together and with a vector in testdata/tcp-framing.json, which
+// tests/tcp.test.mjs and tcpframe_test.go both run.
+const TCP_PRESETS = {
+  none: { label: 'None (raw bytes)', start: [], end: [] },
+  lf: { label: 'LF', start: [], end: [0x0A] },
+  crlf: { label: 'CR LF', start: [], end: [0x0D, 0x0A] },
+  mllp: { label: 'MLLP (HL7)', start: [0x0B], end: [0x1C, 0x0D] },
+  stxetx: { label: 'STX/ETX', start: [0x02], end: [0x03] },
+};
+const presetOf = name => TCP_PRESETS[Object.hasOwn(TCP_PRESETS, name) ? name : 'none'];
+const TCP_MODES = ['text', 'hex'], TCP_NEWLINES = ['lf', 'cr', 'crlf'], RX_CHARSETS = ['utf-8', 'windows-1250', 'iso-8859-2', 'latin1'];
+const oneOf = (v, list, def) => (list.includes(v) ? v : def);
+function normalizeTcpMessage(x) {
+  const m = assignOwn({}, obj(x));
+  return Object.assign(m, { id: str(m.id) || uid(), name: str(m.name), mode: oneOf(m.mode, TCP_MODES, 'text'), data: str(m.data) });
+}
+// normalizeTcp reads a TCP connection of the data file: times are cut to a
+// whole number of milliseconds within their range, a field of another type
+// gets its default and so does an unknown framing preset (none). The host
+// and the port are templates, so a number there becomes its text. Like a
+// schedule, a connection gets a new id when its own is not one the routes of
+// the program take or seen holds it. Unknown fields stay as they are.
+function normalizeTcp(x, seen = new Set()) {
+  const d = assignOwn({}, obj(x));
+  let id = txt(d.id);
+  if (!SCHED_ID.test(id) || seen.has(id)) id = uid();
+  seen.add(id);
+  const framing = assignOwn({}, obj(d.framing));
+  if (!Object.hasOwn(TCP_PRESETS, framing.preset)) framing.preset = 'none';
+  return Object.assign(d, {
+    id, name: str(d.name), host: str(d.host), port: str(d.port),
+    connectTimeoutMs: secs(d.connectTimeoutMs, 10000, 100, 60000), framing, idleMs: secs(d.idleMs, 50, 0, 5000),
+    wrap: flag(d.wrap, true), waitReply: flag(d.waitReply, false), replyTimeoutMs: secs(d.replyTimeoutMs, 5000, 100, 60000),
+    mode: oneOf(d.mode, TCP_MODES, 'text'), newline: oneOf(d.newline, TCP_NEWLINES, 'lf'), escapes: flag(d.escapes, true),
+    rxCharset: oneOf(d.rxCharset, RX_CHARSETS, 'utf-8'), messages: arr(d.messages).map(normalizeTcpMessage),
+  });
+}
 // normalizeDoc turns a parsed data file (or null) into a complete document.
 // Top-level keys this version does not know go to extra, so a save writes
-// them back; unknown fields of collections, environments, requests, schedules
-// and rows stay on their objects.
+// them back; unknown fields of collections, environments, requests,
+// schedules, TCP connections and rows stay on their objects.
 function normalizeDoc(data) {
   const d = obj(data);
   const settings = assignOwn({ ...DEFAULT_SETTINGS }, obj(d.settings));
@@ -555,11 +714,13 @@ function normalizeDoc(data) {
   const activeEnv = str(d.activeEnv);
   const seen = new Set();
   const schedules = arr(d.schedules).map(x => normalizeSchedule(x, seen));
+  const seenTcp = new Set();
+  const tcp = arr(d.tcp).map(x => normalizeTcp(x, seenTcp));
   const extra = {};
   for (const k of Object.keys(d)) if (!STATE_KEYS.includes(k)) setOwn(extra, k, d[k]);
   return {
     version: 1, collections, history: arr(d.history).slice(0, 200), envs,
-    activeEnv: envs.some(e => e.id === activeEnv) ? activeEnv : '', settings, schedules, extra,
+    activeEnv: envs.some(e => e.id === activeEnv) ? activeEnv : '', settings, schedules, tcp, extra,
   };
 }
 // applyState refills state from a normalized document. keepEnv keeps the
@@ -607,6 +768,7 @@ function setSaveState(s) {
   $('#staleBanner').hidden = s !== 'stale';
   $('#conflictBanner').hidden = s !== 'conflict';
   if (s === 'stale' && isOpen('#schedModal')) renderSchedMode();
+  if (s === 'stale' && view === 'tcp') renderTcpView();
 }
 function persist() {
   if (savingOff()) return;
@@ -727,22 +889,24 @@ async function syncNow(hintTag) {
   redrawAfterSync();
   return 'applied';
 }
-// heldField is the focused field of an open modal when it holds typed text
-// the model does not have yet: fields that write to the model on change carry
-// data-commit="change" and get data-held while typed into (see wire).
+// heldField is the focused field of an open modal or of the TCP console when
+// it holds typed text the model does not have yet: fields that write to the
+// model on change carry data-commit="change" and get data-held while typed
+// into (see wire).
 function heldField() {
   const el = document.activeElement;
-  return el && el.dataset && el.dataset.held && el.closest('.modal-bg.open') ? el : null;
+  return el && el.dataset && el.dataset.held && (el.closest('.modal-bg.open') || el.closest('#tcpView')) ? el : null;
 }
 function redrawAfterSync() {
   const focus = saveFocus();
   syncEditor();
-  renderCollections(); renderHistory(); renderEnvSelect(); renderSchedBtn();
+  renderCollections(); renderHistory(); renderEnvSelect(); renderSchedBtn(); renderTcpList();
   if ($('#envModal').classList.contains('open')) {
     if (!findEnv(envEditId)) envEditId = state.envs[0] ? state.envs[0].id : null;
     renderEnvModal();
   }
   if (isOpen('#schedModal')) renderSchedModal();
+  if (view === 'tcp') renderTcpView();
   restoreFocus(focus);
 }
 // syncEditor follows a change of the open request made elsewhere. A clean
@@ -1095,9 +1259,10 @@ function mdnsHint(res, url) {
 }
 // noteToast shows one note of an ensure answer, the one that matters most.
 const NOTE_ORDER = ['stopped', 'failed', 'config', 'missing', 'running', 'expired', 'off'];
+const topNote = notes => arr(notes).map(obj).filter(x => NOTE_ORDER.includes(x.state))
+  .sort((a, b) => NOTE_ORDER.indexOf(a.state) - NOTE_ORDER.indexOf(b.state))[0];
 function noteToast(notes, names, envId) {
-  const n = arr(notes).map(obj).filter(x => NOTE_ORDER.includes(x.state))
-    .sort((a, b) => NOTE_ORDER.indexOf(a.state) - NOTE_ORDER.indexOf(b.state))[0];
+  const n = topNote(notes);
   const text = n ? noteText(n, names, envId) : '';
   if (text) toast(text, Math.max(4000, text.length * 60));
 }
@@ -1306,13 +1471,20 @@ const isDirty = () => $('#dirty').classList.contains('on');
 function openRequest(r, collId) {
   if (isDirty() && !confirm('Discard unsaved changes in the current request?')) return;
   loadRequest(r, collId);
+  setView('http');
   $('#sidebar').classList.remove('open');
 }
+// The tabs of the sidebar: the list each shows and the button next to the
+// filter that goes with it.
+const SIDE_TABS = {
+  coll: { list: '#collList', button: '#addCollBtn' },
+  hist: { list: '#histList', button: '#clearHistBtn' },
+  tcp: { list: '#tcpList', button: '#addTcpBtn' },
+};
 function setSideTab(t) {
-  sideTab = t;
-  $$('[data-side]').forEach(b => b.classList.toggle('active', b.dataset.side === t));
-  $('#collList').hidden = t !== 'coll'; $('#histList').hidden = t !== 'hist';
-  $('#addCollBtn').hidden = t !== 'coll'; $('#clearHistBtn').hidden = t !== 'hist';
+  sideTab = Object.hasOwn(SIDE_TABS, t) ? t : 'coll';
+  $$('[data-side]').forEach(b => b.classList.toggle('active', b.dataset.side === sideTab));
+  for (const [k, v] of Object.entries(SIDE_TABS)) { $(v.list).hidden = k !== sideTab; $(v.button).hidden = k !== sideTab; }
 }
 
 // ---------------------------------------------------------------- save / new
@@ -1352,6 +1524,7 @@ function saveAs(collId) {
 function startNew() {
   if (isDirty() && !confirm('Discard unsaved changes?')) return;
   loadRequest(newRequest(), null);
+  setView('http');
   $('#url').focus();
 }
 
@@ -1479,23 +1652,33 @@ const jobsOn = () => (schedSnap ? Object.values(schedSnap.jobs).filter(j => obj(
 // program). Only ok allows actions; the others show the definitions read only.
 const featureState = () => (MODE !== 'server' ? 'nobin' : saveState === 'stale' ? 'stale' : 'ok');
 
+// With the event stream live (see openEvents) the timer polls nothing: the
+// stream brings every change. A forced tick (an action, a window that opens,
+// sched.changed) still asks for the schedules.
 function tick(force = false) {
   if (MODE !== 'server' || (!force && document.visibilityState !== 'visible')) return Promise.resolve();
-  const fast = isOpen('#schedModal') || isOpen('#envModal');
+  const fast = isOpen('#schedModal') || isOpen('#envModal') || view === 'tcp';
   if (fast) updateLive();
+  if (streamLive && !force) return Promise.resolve();
   if (polling) { if (force) pollAgain = true; return polling; }
   if (!force && Date.now() - lastPoll < (fast ? 1500 : 9500)) return Promise.resolve();
   polling = (async () => {
-    do { pollAgain = false; lastPoll = Date.now(); await poll(); } while (pollAgain);
+    do {
+      pollAgain = false; lastPoll = Date.now();
+      // A poll gives up before the next one is due: a connection to a
+      // computer that went away may hang for minutes, and the button shows ?
+      // meanwhile.
+      const signal = AbortSignal.timeout(8000);
+      await poll(signal);
+      if (!streamLive) await pollTcp(signal);
+    } while (pollAgain);
   })().finally(() => { polling = null; });
   return polling;
 }
-async function poll() {
+async function poll(signal) {
   let r = null;
-  // A poll gives up before the next one is due: a connection to a computer
-  // that went away may hang for minutes, and the button shows ? meanwhile.
   try {
-    r = await fetch('/api/schedules' + (schedSnap ? '?since=' + encodeURIComponent(schedSnap.boot + '.' + schedSnap.gen) : ''), { cache: 'no-store', signal: AbortSignal.timeout(8000) });
+    r = await fetch('/api/schedules' + (schedSnap ? '?since=' + encodeURIComponent(schedSnap.boot + '.' + schedSnap.gen) : ''), { cache: 'no-store', signal });
   } catch (e) { /* the program is away, maybe restarting */ }
   if (r && r.status === 200) {
     let snap = null;
@@ -1654,6 +1837,7 @@ async function deleteSched(s) {
 function addSchedule(r) {
   if (featureState() !== 'ok') return null;
   $('#schedAddHint').textContent = '';
+  if (!r && view === 'tcp') { $('#schedAddHint').textContent = 'Open an HTTP request to schedule it.'; return null; }
   if (!r) {
     const c = curCollId && state.collections.find(x => x.id === curCollId);
     r = c && c.requests.find(x => x.id === cur.id);
@@ -1946,6 +2130,1047 @@ function renderSchedRun() {
   updateLive();
 }
 
+// ---------------------------------------------------------------- TCP: bytes and framing
+// The console works on bytes (Uint8Array), and text goes on the wire as
+// UTF-8. The program fills the variables in and frames what it sends
+// (tcp.go); the page shows the same bytes before (Sends:) and checks the
+// target before Connect, so tcpWrap and tcpTarget have twins there (see
+// TCP_PRESETS).
+const MAX_TCP_MESSAGE = 1 << 20, MAX_TCP_SRC = 64 << 10, MAX_TCP_LOG = 1000, TCP_SHOWN = 4096;
+const utf8 = s => new TextEncoder().encode(s);
+function concatBytes(list) {
+  let n = 0;
+  for (const b of list) n += b.length;
+  const out = new Uint8Array(n);
+  let at = 0;
+  for (const b of list) { out.set(b, at); at += b.length; }
+  return out;
+}
+// latin1Text, bytesToB64 and b64ToBytes go in pieces, so a message of 1 MB
+// does not overflow the stack of String.fromCharCode.
+function latin1Text(b) {
+  let s = '';
+  for (let i = 0; i < b.length; i += 0x8000) s += String.fromCharCode.apply(null, b.subarray(i, i + 0x8000));
+  return s;
+}
+const bytesToB64 = b => btoa(latin1Text(b));
+function b64ToBytes(s) {
+  let bin = '';
+  try { bin = atob(str(s)); } catch (e) { /* not base64: no bytes */ }
+  const out = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+  return out;
+}
+const hex2 = x => x.toString(16).toUpperCase().padStart(2, '0');
+const sameAt = (data, marker, at) => marker.every((x, i) => data[at + i] === x);
+// tcpWrap frames data for sending as wrap in tcpframe.go does and says
+// whether it added anything: a message that already starts with the start
+// marker and ends with the end one goes as it is, and LF and CR LF, which
+// have no start marker, only get an end that is missing.
+function tcpWrap(data, preset) {
+  const { start, end } = presetOf(preset);
+  if (!end.length) return { bytes: data, wrapped: false };
+  if (data.length >= start.length + end.length && sameAt(data, start, 0) && sameAt(data, end, data.length - end.length)) return { bytes: data, wrapped: false };
+  return { bytes: concatBytes([Uint8Array.from(start), data, Uint8Array.from(end)]), wrapped: true };
+}
+// tcpUnwrap takes the framing of preset off data, when data has it.
+function tcpUnwrap(data, preset) {
+  const { start, end } = presetOf(preset);
+  if (!end.length || data.length < start.length + end.length || !sameAt(data, start, 0) || !sameAt(data, end, data.length - end.length)) return data;
+  return data.subarray(start.length, data.length - end.length);
+}
+const framingBytes = preset => { const p = presetOf(preset); return p.end.length ? [p.start.map(hex2).join(' '), '...', p.end.map(hex2).join(' ')].join(' ').trim() : ''; };
+// Split on silence works on the bytes outside a frame, which LF and CR LF do
+// not have.
+const idleApplies = preset => preset === 'none' || presetOf(preset).start.length > 0;
+
+// parseIP tells whether s is an IP address as ParseAddr of Go's net/netip
+// reads one (the twin of tcpTarget uses it), and gives its zone.
+function parseIP(s) {
+  for (const c of s) {
+    if (c === '.') return ipv4Text(s) ? { zone: '' } : null;
+    if (c === ':') return parseIPv6(s);
+    if (c === '%') return null;
+  }
+  return null;
+}
+const ipv4Text = s => { const f = s.split('.'); return f.length === 4 && f.every(x => /^(0|[1-9][0-9]{0,2})$/.test(x) && +x <= 255); };
+function parseIPv6(input) {
+  let s = input, zone = '';
+  const z = s.indexOf('%');
+  if (z >= 0) { zone = s.slice(z + 1); s = s.slice(0, z); if (!zone) return null; }
+  const halves = s.split('::');
+  if (halves.length > 2) return null;
+  const groups = halves.flatMap(h => (h === '' ? [] : h.split(':')));
+  let n = 0;
+  for (let i = 0; i < groups.length; i++) {
+    const g = groups[i];
+    if (/^[0-9A-Fa-f]{1,4}$/.test(g)) n += 1;
+    else if (i === groups.length - 1 && ipv4Text(g)) n += 2; // an IPv4 address takes the last two groups
+    else return null;
+  }
+  // :: stands for at least one group of zeros.
+  return (halves.length === 2 ? n < 8 : n === 8) ? { zone } : null;
+}
+// tcpTarget checks the host and the port of a connection once the variables
+// are in, as its twin in tcp.go does: a name, an IPv4 address or an IPv6 one,
+// in brackets or not and with a zone or not, and a port from 1 to 65535. It
+// gives {host, port, addr}, addr as Connect dials it, or {error: 'host' or
+// 'port', msg}.
+const HOST_NAME = /^[A-Za-z0-9_][A-Za-z0-9_.-]*$/, IP_ZONE = /^[A-Za-z0-9_.-]{1,64}$/;
+function tcpTarget(host, port) {
+  let h = str(host).trim();
+  if (h.startsWith('[') && h.endsWith(']')) h = h.slice(1, -1);
+  const ip = parseIP(h), bad = { error: 'host', msg: `Host ${JSON.stringify(str(host))} is not a host name or an IP address.` };
+  if (ip) { if (ip.zone && !IP_ZONE.test(ip.zone)) return bad; }
+  else if (h === '') return { error: 'host', msg: 'The host is empty.' };
+  else if (h.replace(/\.$/, '').length > 253 || !HOST_NAME.test(h)) return bad;
+  const p = str(port).trim();
+  if (p === '') return { error: 'port', msg: 'The port is empty.' };
+  const n = /^[0-9]+$/.test(p) ? Number(p) : NaN;
+  if (!(n >= 1 && n <= 65535)) return { error: 'port', msg: `Port ${JSON.stringify(str(port))} is not a number from 1 to 65535.` };
+  return { host: h, port: n, addr: (h.includes(':') ? `[${h}]` : h) + ':' + n };
+}
+// splitTarget takes a pasted tcp://host:port or host:port apart; a host
+// alone loses only tcp://. It gives null for anything else.
+function splitTarget(text) {
+  const t = str(text).trim(), bare = t.replace(/^tcp:\/\//i, '');
+  const m = bare.match(/^\[([^\]]+)\]:([0-9]+)$/) || bare.match(/^([^:\s]+):([0-9]+)$/);
+  if (m) return { host: m[1], port: m[2] };
+  return bare !== t ? { host: bare, port: '' } : null;
+}
+
+// tcpEncode turns the text of the message editor into the parts a send
+// carries: {b64} for bytes as they are and {v} for a variable, which the
+// program fills in from the environment of the connection (tcp.go). In Text
+// mode the text goes as UTF-8, Enter gives the bytes newline names, and with
+// escapes on \r \n \t \\ and \xHH give their bytes (\xHH one byte) while any
+// other backslash stays as it is. In Hex mode the text is hex digits, with
+// white space between them as it comes. {{name}} is a variable in both. src
+// is the text itself, the template the log keeps, unless it is over 64 KB.
+const ESCAPE_TOKEN = /\\(?:[rnt\\]|x[0-9A-Fa-f]{2})|\r\n|\r|\n/g, NEWLINE_TOKEN = /\r\n|\r|\n/g;
+const ESCAPED = { r: 0x0D, n: 0x0A, t: 0x09, '\\': 0x5C };
+const NEWLINES = { lf: [0x0A], cr: [0x0D], crlf: [0x0D, 0x0A] };
+function tcpEncode(text, opts) {
+  const { chunks, error } = encodeChunks(text, opts), s = str(text);
+  return {
+    parts: chunks.map(c => (c instanceof Uint8Array ? { b64: bytesToB64(c) } : { v: c.v })),
+    src: s.length <= MAX_TCP_SRC && utf8(s).length <= MAX_TCP_SRC ? s : '', error,
+  };
+}
+// encodeChunks is tcpEncode before base64: byte arrays, the ones next to
+// each other joined, and {v} for the variables.
+function encodeChunks(text, { mode = 'text', newline = 'lf', escapes = true } = {}) {
+  const s = str(text), raw = [];
+  let error = '', last = 0;
+  const piece = p => {
+    if (!p) return;
+    if (mode !== 'hex') { textBytes(p, NEWLINES[newline] || NEWLINES.lf, escapes, raw); return; }
+    const h = parseHex(p);
+    if (h.error && !error) error = h.error;
+    raw.push(h.bytes);
+  };
+  for (const m of s.matchAll(VAR_REF)) {
+    if (!VAR_NAME.test(m[1])) continue; // not a name the program takes: text
+    piece(s.slice(last, m.index));
+    raw.push({ v: m[1] });
+    last = m.index + m[0].length;
+  }
+  piece(s.slice(last));
+  const chunks = [];
+  let run = [];
+  for (const c of raw) {
+    if (c instanceof Uint8Array) { if (c.length) run.push(c); continue; }
+    if (run.length) { chunks.push(concatBytes(run)); run = []; }
+    chunks.push(c);
+  }
+  if (run.length) chunks.push(concatBytes(run));
+  return { chunks, error };
+}
+function textBytes(s, newline, escapes, out) {
+  let last = 0;
+  for (const m of s.matchAll(escapes ? ESCAPE_TOKEN : NEWLINE_TOKEN)) {
+    if (m.index > last) out.push(utf8(s.slice(last, m.index)));
+    const t = m[0];
+    out.push(Uint8Array.from(t[0] !== '\\' ? newline : t[1] === 'x' ? [parseInt(t.slice(2), 16)] : [ESCAPED[t[1]]]));
+    last = m.index + t.length;
+  }
+  if (last < s.length) out.push(utf8(s.slice(last)));
+}
+// parseHex reads hex digits, with any white space between them.
+function parseHex(text) {
+  const t = str(text).replace(/\s+/g, ''), bad = t.match(/[^0-9A-Fa-f]/);
+  if (bad) return { bytes: new Uint8Array(0), error: `Hex: "${bad[0]}" is not a hex digit.` };
+  if (t.length % 2) return { bytes: new Uint8Array(0), error: 'Hex: an odd number of digits, so the last byte is not whole.' };
+  const out = new Uint8Array(t.length / 2);
+  for (let i = 0; i < out.length; i++) out[i] = parseInt(t.substr(2 * i, 2), 16);
+  return { bytes: out, error: '' };
+}
+// hexText writes bytes for the editor in Hex mode, 16 to a line.
+function hexText(b) {
+  const lines = [];
+  for (let o = 0; o < b.length; o += 16) lines.push(Array.from(b.subarray(o, o + 16), hex2).join(' '));
+  return lines.join('\n');
+}
+// utf8At reads the UTF-8 character at i of b: [code point, length], or null
+// when no valid one starts there.
+function utf8At(b, i) {
+  const c = b[i];
+  const [n, min, bits] = c >= 0xC2 && c <= 0xDF ? [2, 0x80, c & 0x1F] : c >= 0xE0 && c <= 0xEF ? [3, 0x800, c & 0x0F] : c >= 0xF0 && c <= 0xF4 ? [4, 0x10000, c & 0x07] : [0];
+  if (!n || i + n > b.length) return null;
+  let cp = bits;
+  for (let k = 1; k < n; k++) {
+    if ((b[i + k] & 0xC0) !== 0x80) return null;
+    cp = (cp << 6) | (b[i + k] & 0x3F);
+  }
+  return cp < min || cp > 0x10FFFF || (cp >= 0xD800 && cp <= 0xDFFF) ? null : [cp, n];
+}
+// escapeBytes writes bytes as text that tcpEncode turns back into the same
+// bytes with escapes on: printable characters of valid UTF-8 stay, \ CR LF
+// and TAB get their escapes, any other byte becomes \xHH, and so does a {
+// before another one, so no {{name}} appears.
+function escapeBytes(b) {
+  let out = '';
+  for (let i = 0; i < b.length;) {
+    const c = b[i];
+    if (c < 0x80) {
+      out += c === 0x5C ? '\\\\' : c === 0x0D ? '\\r' : c === 0x0A ? '\\n' : c === 0x09 ? '\\t'
+        : c === 0x7B && b[i + 1] === 0x7B ? '\\x7B' : c >= 0x20 && c < 0x7F ? String.fromCharCode(c) : '\\x' + hex2(c);
+      i++;
+      continue;
+    }
+    const u = utf8At(b, i);
+    if (u && u[0] >= 0xA0 && u[0] !== 0xFEFF && u[0] !== 0x2028 && u[0] !== 0x2029) { out += String.fromCodePoint(u[0]); i += u[1]; }
+    else { out += '\\x' + hex2(c); i++; }
+  }
+  return out;
+}
+// decodeBytes is the text of bytes in charset; a BOM stays a character.
+function decodeBytes(b, charset = 'utf-8') {
+  if (charset === 'latin1') return latin1Text(b);
+  try { return new TextDecoder(charset, { ignoreBOM: true }).decode(b); } catch (e) { return new TextDecoder('utf-8', { ignoreBOM: true }).decode(b); }
+}
+const CTRL_NAMES = 'NUL SOH STX ETX EOT ENQ ACK BEL BS HT LF VT FF CR SO SI DLE DC1 DC2 DC3 DC4 NAK SYN ETB CAN EM SUB ESC FS GS RS US'.split(' ');
+const CTRL_CHAR = /[\x00-\x1F\x7F]/;
+// tcpVisible shows bytes as text of charset: a control character by its
+// name (<CR>), a BOM as <BOM>, and with breaks a line ends after a <CR> or
+// <LF> that text follows. The result is text, which the page shows only
+// through textContent or esc.
+function tcpVisible(b, charset = 'utf-8', { breaks = true } = {}) {
+  const s = decodeBytes(b, charset);
+  return s.replace(/[\x00-\x1F\x7F-\x9F\uFEFF]/g, (c, i) => {
+    const n = c.charCodeAt(0), next = s[i + 1];
+    const name = n < 0x20 ? CTRL_NAMES[n] : n === 0x7F ? 'DEL' : n === 0xFEFF ? 'BOM' : hex2(n);
+    const brk = breaks && (n === 0x0A || (n === 0x0D && next !== '\n')) && next !== undefined && !CTRL_CHAR.test(next);
+    return `<${name}>` + (brk ? '\n' : '');
+  });
+}
+// hexDump shows bytes 16 to a line: the offset, the bytes and the printable ones.
+function hexDump(b) {
+  const lines = [];
+  for (let o = 0; o < b.length; o += 16) {
+    const row = b.subarray(o, o + 16), hex = Array.from(row, hex2);
+    const bytes = hex.slice(0, 8).join(' ') + (hex.length > 8 ? '  ' + hex.slice(8).join(' ') : '');
+    lines.push(o.toString(16).toUpperCase().padStart(4, '0') + '  ' + bytes.padEnd(48) + '  '
+      + Array.from(row, x => (x >= 0x20 && x < 0x7F ? String.fromCharCode(x) : '.')).join(''));
+  }
+  return lines.join('\n');
+}
+// previewBytes are the bytes a send of text in definition d puts on the
+// wire: the variables as the program fills them in, from the environment of
+// the connection when it is open (si) and else of this tab, with the
+// overlay (ovl) over its rows, and the framing of the connection. missing
+// names the variables without a value, which go as {{name}}.
+function previewBytes(text, d, si = null) {
+  const open = isOpenInfo(si);
+  const envId = open ? str(si.envId) : state.activeEnv, preset = open ? str(obj(si.framing).preset) : d.framing.preset;
+  const { chunks, error } = encodeChunks(text, d), vars = effectiveVars(envId), missing = [];
+  const raw = concatBytes(chunks.map(c => {
+    if (c instanceof Uint8Array) return c;
+    if (Object.hasOwn(vars, c.v)) return utf8(vars[c.v]);
+    if (!missing.includes(c.v)) missing.push(c.v);
+    return utf8('{{' + c.v + '}}');
+  }));
+  const w = d.wrap ? tcpWrap(raw, preset) : { bytes: raw, wrapped: false };
+  return { bytes: w.bytes, wrapped: w.wrapped, already: d.wrap && !w.wrapped && presetOf(preset).end.length > 0, preset, envId, missing, error };
+}
+
+// ---------------------------------------------------------------- TCP: what the program says
+// tcpRT is what the program said of its TCP connections, which every tab and
+// computer shares: its boot, the address this tab comes from (client), the
+// state of each connection by id (sessions) and when that came, on the
+// monotonic clock of this computer (seen), the log of the connection the
+// console shows (logs; no other is kept) and the last reply of each.
+const newTcpRT = () => ({ boot: '', client: '', sessions: new Map(), seen: new Map(), logs: new Map(), replies: new Map() });
+const tcpRT = newTcpRT();
+const newTcpLog = () => ({ entries: [], last: 0, clearedAt: 0, loaded: false });
+function trackLog(rt, id) {
+  if (!rt.logs.has(id)) rt.logs.set(id, newTcpLog());
+  return rt.logs.get(id);
+}
+const nowMono = () => performance.now();
+const isOpenInfo = si => !!si && (si.state === 'connected' || si.state === 'connecting');
+// setInfo keeps si as the state of its connection, unless the one kept is newer.
+function setInfo(rt, si) {
+  const id = str(si.id), old = rt.sessions.get(id);
+  if (!id || (old && Number(old.rev) > Number(si.rev))) return false;
+  rt.sessions.set(id, si);
+  rt.seen.set(id, nowMono());
+  return true;
+}
+// noteReply keeps the newest entry that ends a wait for a reply: the reply,
+// or the note that none came.
+function noteReply(rt, id, e) {
+  const old = rt.replies.get(id);
+  if (e.replyTo && (!old || old.seq < Number(e.seq))) {
+    rt.replies.set(id, { seq: Number(e.seq), tx: Number(e.replyTo), dir: str(e.dir), rttMs: Number(e.rttMs) || 0, text: str(e.text), timedOut: !!e.timedOut, closed: !!e.closed });
+  }
+}
+// tcpReduce takes an event of the stream into rt, or the answer of
+// GET /api/tcp as tcp.snapshot; eventId is the id of the event,
+// <boot>.<seq>. A snapshot of another boot (the program restarted) starts
+// over, and any other event of another boot is left out. A state counts
+// unless the one kept has a newer rev, an entry only once and only when no
+// clear came after it. It returns the id of the connection that changed,
+// '*' for a snapshot, or null when nothing did.
+function tcpReduce(rt, name, data, eventId = '') {
+  const d = obj(data), id = str(d.id), boot = str(eventId).split('.')[0];
+  if (name === 'tcp.snapshot') {
+    if (str(d.boot) !== rt.boot) {
+      rt.boot = str(d.boot);
+      rt.sessions.clear(); rt.seen.clear(); rt.replies.clear();
+      for (const k of rt.logs.keys()) rt.logs.set(k, newTcpLog());
+    }
+    if (d.client) rt.client = str(d.client);
+    const ids = new Set();
+    for (const x of arr(d.sessions)) { const si = obj(x); ids.add(str(si.id)); setInfo(rt, si); }
+    for (const k of [...rt.sessions.keys()]) if (!ids.has(k)) { rt.sessions.delete(k); rt.seen.delete(k); rt.replies.delete(k); }
+    // A connection the program no longer has took its log along.
+    for (const k of [...rt.logs.keys()]) if (!ids.has(k)) rt.logs.set(k, newTcpLog());
+    return '*';
+  }
+  if ((boot && boot !== rt.boot) || !id) return null;
+  switch (name) {
+    case 'tcp.state': return setInfo(rt, d) ? id : null;
+    case 'tcp.entry': {
+      const e = obj(d.entry), si = rt.sessions.get(id), log = rt.logs.get(id), seq = Number(e.seq) || 0;
+      // The counters only grow within a connection: an entry a snapshot has
+      // counted already does not take them back.
+      if (si && Number(e.conn) === Number(si.conn)) {
+        si.bytesIn = Math.max(Number(si.bytesIn) || 0, Number(d.bytesIn) || 0);
+        si.bytesOut = Math.max(Number(si.bytesOut) || 0, Number(d.bytesOut) || 0);
+      }
+      noteReply(rt, id, e);
+      if (log && seq > log.last && seq > log.clearedAt) {
+        log.entries.push(e);
+        log.last = seq;
+        if (log.entries.length > MAX_TCP_LOG) log.entries.splice(0, log.entries.length - MAX_TCP_LOG);
+      }
+      return id;
+    }
+    case 'tcp.cleared': {
+      const log = rt.logs.get(id);
+      if (log) {
+        log.clearedAt = Math.max(log.clearedAt, Number(d.seq) || 0);
+        log.entries = log.entries.filter(e => Number(e.seq) > log.clearedAt);
+      }
+      return id;
+    }
+    case 'tcp.removed':
+      rt.sessions.delete(id); rt.seen.delete(id); rt.replies.delete(id);
+      if (rt.logs.has(id)) rt.logs.set(id, newTcpLog());
+      return id;
+  }
+  return null;
+}
+// tcpMergeLog takes the answer of GET /api/tcp/{id}/log into the log of
+// connection id. What came meanwhile as events stays, every entry once and in
+// order; replace (a poll, without the stream) takes the answer as the whole
+// log. It returns false for the log of another boot.
+function tcpMergeLog(rt, id, data, replace = false) {
+  const d = obj(data);
+  if (rt.boot && str(d.boot) && str(d.boot) !== rt.boot) return false;
+  const log = trackLog(rt, id), got = arr(d.entries).map(obj);
+  let list = got;
+  if (!replace) {
+    const bySeq = new Map(log.entries.map(e => [Number(e.seq), e]));
+    for (const e of got) bySeq.set(Number(e.seq), e);
+    list = [...bySeq.values()].sort((a, b) => Number(a.seq) - Number(b.seq));
+  }
+  log.entries = list.filter(e => Number(e.seq) > log.clearedAt).slice(-MAX_TCP_LOG);
+  for (const e of log.entries) { log.last = Math.max(log.last, Number(e.seq) || 0); noteReply(rt, id, e); }
+  log.loaded = true;
+  return true;
+}
+
+// ---------------------------------------------------------------- live updates
+// In the program a visible tab keeps one event stream, GET /api/events
+// (events.go): the TCP console, state.changed when the data file has a new
+// tag and sched.changed when the schedules changed. While it is live (ready
+// came) the tab polls nothing; without it the tab polls as before (tick). A
+// hidden tab closes the stream and opens it again with the id of the last
+// event it saw, so it gets what it missed, or a snapshot. A stream the
+// program does not give (503 while it restarts) is tried again every 2 s for
+// 30 s, then every 30 s, and at once on focus, online and a return to the tab.
+let events = null;         // the EventSource
+let streamLive = false;    // the stream is up to date
+let lastEventId = '';      // <boot>.<seq> of the last event seen
+let reopenTimer = null, downSince = 0;
+const STREAM_EVENTS = ['tcp.snapshot', 'tcp.state', 'tcp.entry', 'tcp.cleared', 'tcp.removed', 'state.changed', 'sched.changed', 'ready'];
+function openEvents() {
+  if (MODE !== 'server' || events || typeof EventSource !== 'function' || document.visibilityState !== 'visible') return false;
+  clearTimeout(reopenTimer); reopenTimer = null;
+  const es = new EventSource('/api/events' + (lastEventId ? '?after=' + encodeURIComponent(lastEventId) : ''));
+  events = es;
+  for (const name of STREAM_EVENTS) es.addEventListener(name, e => { if (events === es) onStreamEvent(name, e); });
+  es.addEventListener('error', () => {
+    if (events !== es) return;
+    setStreamLive(false);
+    // CLOSED: the program answered with something other than a stream.
+    // Otherwise the browser tries again by itself, with Last-Event-ID.
+    if (es.readyState === 2) { es.close(); events = null; reopenLater(); }
+  });
+  return true;
+}
+function closeEvents() {
+  clearTimeout(reopenTimer); reopenTimer = null;
+  if (events) { events.close(); events = null; }
+  setStreamLive(false);
+}
+function reopenLater() {
+  if (!downSince) downSince = Date.now();
+  clearTimeout(reopenTimer);
+  reopenTimer = setTimeout(() => { reopenTimer = null; openEvents(); }, Date.now() - downSince < 30000 ? 2000 : 30000);
+}
+// retryEvents opens a stream that is down at once.
+function retryEvents() { if (!events) openEvents(); }
+function setStreamLive(on) {
+  if (streamLive === on) return;
+  streamLive = on;
+  if (view === 'tcp') { renderTcpSession(); renderTcpEditor(); }
+}
+function onStreamEvent(name, e) {
+  const id = str(e.lastEventId);
+  if (id) lastEventId = id;
+  let data;
+  try { data = obj(JSON.parse(e.data)); } catch (err) { return; }
+  switch (name) {
+    case 'ready':
+      downSince = 0;
+      setStreamLive(true);
+      // Another boot: the program restarted, which the schedules tell.
+      if (schedSnap && data.boot && data.boot !== schedSnap.boot) tick(true);
+      return;
+    case 'state.changed': syncIfBehind(str(data.tag) || undefined); return;
+    case 'sched.changed':
+      if (!schedSnap || schedSnap.boot !== id.split('.')[0] || schedSnap.gen !== Number(data.gen)) tick(true);
+      return;
+  }
+  applyTcpEvent(name, data, id);
+}
+// applyTcpEvent takes a TCP event into tcpRT and shows what changed. After a
+// snapshot the console asks for the log of its connection, which may have
+// missed entries.
+function applyTcpEvent(name, data, eventId = '') {
+  const before = tcpRT.boot, id = tcpReduce(tcpRT, name, data, eventId);
+  if (id === null) return;
+  if (name !== 'tcp.entry') renderTcpList();
+  if (id === '*') {
+    if (before && tcpRT.boot !== before) tick(true);
+    if (view === 'tcp') { renderTcpView(); if (tcpId) loadTcpLog(tcpId); }
+    return;
+  }
+  if (view !== 'tcp' || id !== tcpId) return;
+  if (name === 'tcp.entry') appendTcpEntry(obj(data).entry); else renderTcpLog();
+  renderTcpSession(); renderTcpEditor();
+}
+// pollTcp is the TCP part of a poll while the stream is not live: the
+// connections, and the log of the one the console shows when it changed.
+async function pollTcp(signal) {
+  let list = null;
+  try {
+    const r = await fetch('/api/tcp', { cache: 'no-store', signal });
+    if (r.status === 200) list = await r.json();
+  } catch (e) { /* the program is away, maybe restarting */ }
+  if (!list || streamLive) return;
+  const mark = () => { const si = tcpRT.sessions.get(tcpId); return si ? [si.rev, si.conn, si.state, si.bytesIn, si.bytesOut, si.waiting, si.pending].join() : ''; };
+  const before = mark(), boot = tcpRT.boot;
+  tcpReduce(tcpRT, 'tcp.snapshot', list);
+  renderTcpList();
+  if (view !== 'tcp' || !tcpId) return;
+  renderTcpSession(); renderTcpEditor();
+  const log = tcpRT.logs.get(tcpId);
+  if (mark() !== before || boot !== tcpRT.boot || !log || !log.loaded) await loadTcpLog(tcpId, { replace: true, signal });
+}
+// loadTcpLog asks the program for the log of connection id, the one the
+// console shows. A connection the program does not have (404, or none in
+// the last snapshot) has no log.
+async function loadTcpLog(id, { replace = false, signal } = {}) {
+  if (MODE !== 'server') return;
+  let data = tcpRT.boot && !tcpRT.sessions.has(id) ? { entries: [] } : null;
+  if (!data) {
+    try {
+      const r = await fetch(`/api/tcp/${encodeURIComponent(id)}/log?limit=${MAX_TCP_LOG}`, { cache: 'no-store', signal });
+      if (r.status === 200) data = await r.json();
+      else if (r.status === 404) data = { entries: [] };
+    } catch (e) { /* the program is away; the next poll or snapshot asks again */ }
+  }
+  if (!data || id !== tcpId || !tcpMergeLog(tcpRT, id, data, replace)) return;
+  if (view === 'tcp') { renderTcpLog(); renderTcpEditor(); }
+}
+
+// ---------------------------------------------------------------- TCP: the console
+// The work area shows the HTTP editor or the TCP console (view); the console
+// shows one connection (tcpId): its definition from the data file, what the
+// program says of it, its log and the message editor. The editor text is a
+// draft of this browser (localStorage), not part of the data file.
+let view = 'http';
+let tcpId = null;
+let tcpLogHex = false;     // the log shows hex dumps
+let tcpBusy = false;       // a Connect or Disconnect of this tab is on its way
+let tcpSending = null;     // {id, out}: a send of this tab on its way, and bytesOut when it left
+let tcpMsg = { id: null, text: '', bad: false };   // what the last action said
+let tcpNote = { id: null, text: '' };              // the note of the last ensure
+let tcpLogKey = '';        // what the log on the page shows
+const findTcp = id => state.tcp.find(d => d.id === id);
+const tcpOpenCount = () => [...tcpRT.sessions.values()].filter(isOpenInfo).length;
+const draftKey = id => 'simple-rest-tcp-draft:' + id;
+function loadDraft(id) {
+  try { return (id && localStorage.getItem(draftKey(id))) || ''; } catch (e) { return ''; }
+}
+function saveDraft(id, text) {
+  try { if (text) localStorage.setItem(draftKey(id), text); else localStorage.removeItem(draftKey(id)); } catch (e) { /* no room or no storage: the draft lasts until a reload */ }
+}
+function loadTabView() {
+  try { return obj(JSON.parse(sessionStorage.getItem('simple-rest-view') || 'null')); } catch (e) { return {}; }
+}
+// setView shows the HTTP editor or the console of connection id. The tab
+// keeps the choice over a reload, as after an update.
+function setView(v, id = tcpId) {
+  view = v === 'tcp' ? 'tcp' : 'http';
+  if (view === 'tcp' && id !== tcpId) {
+    tcpId = id;
+    tcpMsg = { id: null, text: '', bad: false }; tcpNote = { id: null, text: '' };
+    for (const k of [...tcpRT.logs.keys()]) if (k !== id) tcpRT.logs.delete(k);
+    $('#tcpData').value = loadDraft(id);
+  }
+  $('.work').classList.toggle('view-tcp', view === 'tcp');
+  try { sessionStorage.setItem('simple-rest-view', JSON.stringify({ view, tcpId })); } catch (e) { /* no storage: the view lasts until a reload */ }
+  renderTcpList();
+  if (view !== 'tcp') return;
+  if (tcpId) trackLog(tcpRT, tcpId);
+  tcpLogKey = '';
+  renderTcpView();
+  if (tcpId) loadTcpLog(tcpId);
+}
+const targetText = (h, p) => (str(h) || str(p) ? `${str(h)}:${str(p)}` : '');
+function tcpGlyph(si) {
+  if (!si) return { glyph: '○', cls: 'st-off', title: 'Not connected' };
+  if (si.state === 'connected') return { glyph: '●', cls: 'st-ok', title: 'Connected' };
+  if (si.state === 'connecting') return { glyph: '◌', cls: 'st-warn', title: 'Connecting' };
+  return si.error ? { glyph: '○', cls: 'st-err', title: 'Closed: ' + si.error } : { glyph: '○', cls: 'st-off', title: 'Closed' };
+}
+// renderTcpList fills the TCP tab of the sidebar: the definitions, then the
+// connections of the program whose definition is gone, and counts the open ones.
+function renderTcpList() {
+  const filter = $('#sideSearch').value.trim().toLowerCase(), ids = state.tcp.map(d => d.id);
+  for (const id of tcpRT.sessions.keys()) if (!findTcp(id)) ids.push(id);
+  let connected = 0;
+  const items = [];
+  for (const id of ids) {
+    const d = findTcp(id), si = tcpRT.sessions.get(id) || null, g = tcpGlyph(si);
+    if (si && si.state === 'connected') connected++;
+    const name = d ? d.name || 'Untitled' : '(not saved)', target = d ? targetText(d.host, d.port) : targetText(si.hostTpl, si.portTpl);
+    if (filter && !(name + ' ' + target).toLowerCase().includes(filter)) continue;
+    items.push(`<div class="item${view === 'tcp' && id === tcpId ? ' active' : ''}" data-tcp="${esc(id)}" title="${esc(g.title)}"><span class="sglyph ${g.cls}">${g.glyph}</span>`
+      + `<span class="name">${esc(name)}</span><span class="url">${esc(target)}</span></div>`);
+  }
+  setHTML($('#tcpList'), items.join('') || (ids.length ? '' : '<div class="empty">No TCP connections yet.<br>Press + to add one.</div>'));
+  $('#tcpTabCount').textContent = connected ? String(connected) : '';
+}
+const fmtDuration = ms => { const s = Math.max(0, Math.floor(ms / 1000)); return [Math.floor(s / 3600), Math.floor(s / 60) % 60, s % 60].map(x => String(x).padStart(2, '0')).join(':'); };
+function tcpStatusText(si) {
+  if (!si) return 'Not connected';
+  if (si.state === 'connecting') return 'Connecting…';
+  if (si.state === 'connected') return 'Connected ' + fmtDuration((Number(si.connectedForMs) || 0) + nowMono() - (tcpRT.seen.get(str(si.id)) ?? nowMono()));
+  return si.error ? 'Closed: ' + si.error : 'Closed';
+}
+// tcpClock moves the time of an open connection on.
+function tcpClock() {
+  const si = view === 'tcp' && document.visibilityState === 'visible' && tcpRT.sessions.get(tcpId);
+  if (si && si.state === 'connected') $('#tcpStatus').textContent = '● ' + tcpStatusText(si);
+}
+const addrOf = si => (str(si.host).includes(':') ? `[${si.host}]` : str(si.host)) + ':' + si.port;
+function tcpMetaText(si) {
+  if (!si) return '';
+  const parts = [si.remote ? `${si.local} -> ${si.remote}` : addrOf(si), si.envId ? `env ${si.envName}` : 'no environment',
+    `TX ${fmtSize(Number(si.bytesOut) || 0)}`, `RX ${fmtSize(Number(si.bytesIn) || 0)}`];
+  if (si.openedBy) parts.push('opened by ' + (si.openedBy === tcpRT.client ? 'you' : si.openedBy));
+  return parts.join(' · ');
+}
+// connectCheck says what keeps definition d from connecting in envId, the
+// environment of this tab: a variable of the host or the port without a
+// value, or a host or port that is not one (as the program says it).
+function connectCheck(d, envId = state.activeEnv) {
+  const vars = effectiveVars(envId), env = findEnv(envId);
+  for (const n of referencedVars([d.host, d.port])) {
+    if (!Object.hasOwn(vars, n)) return { error: env ? `Variable {{${n}}} is not set in "${env.name}".` : `Variable {{${n}}} is not set: no environment is picked.` };
+  }
+  const t = tcpTarget(subst(d.host, vars), subst(d.port, vars));
+  return t.error ? { error: t.msg } : { target: t };
+}
+// tcpChanges tells whether the open connection si differs from definition d:
+// framing, the preset; other, the host or port (as templates, or their value
+// in the environment of the connection) or the silence that splits.
+function tcpChanges(d, si) {
+  if (!d || !isOpenInfo(si)) return { framing: false, other: false };
+  const vars = effectiveVars(str(si.envId)), t = tcpTarget(subst(d.host, vars), subst(d.port, vars));
+  return {
+    framing: d.framing.preset !== str(obj(si.framing).preset),
+    other: d.host !== str(si.hostTpl) || d.port !== str(si.portTpl) || !!t.error || t.host !== str(si.host) || t.port !== Number(si.port) || d.idleMs !== Number(si.idleMs),
+  };
+}
+// mdnsTcpHint is what a failed lookup of a .local name gets, as Send does.
+function mdnsTcpHint(si) {
+  if (info.os !== 'linux' || !/no such host/.test(str(si.error)) || !str(si.host).toLowerCase().replace(/\.$/, '').endsWith('.local')) return '';
+  return 'This build cannot resolve .local names (mDNS). Use the IP address.';
+}
+const envLabel = id => { const e = id && findEnv(id); return e ? `"${e.name}"` : 'no environment'; };
+// The fields of a definition, which only the program of this version may change.
+const TCP_FIELDS = ['tcpName', 'tcpHost', 'tcpPort', 'tcpFraming', 'tcpWrapOut', 'tcpIdle', 'tcpWait', 'tcpWaitSec', 'tcpNewline', 'tcpEscapes', 'tcpCharset'];
+const setVal = (sel, v) => { const el = $(sel); if (!(el.dataset && el.dataset.held) && el.value !== v) el.value = v; };
+// renderTcpView fills the console with the connection shown: the fields of
+// its definition, what the program says of it, the log and the editor.
+// Without the program, or from another version of it, the definition is
+// there to read and nothing acts (featureState).
+function renderTcpView() {
+  const d = findTcp(tcpId), si = tcpRT.sessions.get(tcpId) || null, fs = featureState(), banner = $('#tcpBanner');
+  banner.hidden = fs === 'ok';
+  banner.textContent = fs === 'nobin' ? 'TCP needs the simple-rest program: browsers cannot open raw TCP sockets.'
+    : 'This page comes from another simple-rest version than the running program. Reload the page.';
+  $('#tcpEmpty').hidden = !!(d || si);
+  $('#tcpMain').hidden = !(d || si);
+  if (!d && !si) return;
+  const ro = fs !== 'ok' || !d;
+  const def = d || normalizeTcp({ id: tcpId, host: si.hostTpl, port: si.portTpl, framing: si.framing, idleMs: si.idleMs });
+  setVal('#tcpName', d ? d.name : '(not saved)');
+  setVal('#tcpHost', def.host); setVal('#tcpPort', def.port);
+  $('#tcpFraming').value = def.framing.preset;
+  $('#tcpFramingBytes').textContent = framingBytes(def.framing.preset);
+  $('#tcpWrapOut').checked = def.wrap;
+  setVal('#tcpIdle', String(def.idleMs));
+  $('#tcpIdleBox').hidden = !idleApplies(def.framing.preset);
+  $('#tcpWait').checked = def.waitReply;
+  setVal('#tcpWaitSec', String(def.replyTimeoutMs / 1000));
+  $$('input[name=tcpMode]').forEach(r => { r.checked = r.value === def.mode; });
+  $('#tcpNewline').value = def.newline;
+  $('#tcpEscapes').checked = def.escapes;
+  $$('#tcpView .tcp-text').forEach(el => { el.hidden = def.mode !== 'text'; });
+  $('#tcpCharset').value = def.rxCharset;
+  for (const f of TCP_FIELDS) $('#' + f).disabled = ro;
+  $$('input[name=tcpMode]').forEach(r => { r.disabled = ro; });
+  $('#tcpDupBtn').disabled = ro;
+  $('#tcpDelBtn').disabled = fs !== 'ok';
+  $('#tcpSaveAsBtn').disabled = ro;
+  renderTcpSaved(d, ro);
+  renderTcpSession();
+  renderTcpLog();
+  renderTcpEditor();
+}
+// renderTcpSession shows what the program says of the connection shown: its
+// state, addresses and counters, the button that fits it and the hints.
+function renderTcpSession() {
+  if (view !== 'tcp') return;
+  const d = findTcp(tcpId), si = tcpRT.sessions.get(tcpId) || null, fs = featureState(), g = tcpGlyph(si);
+  const st = $('#tcpStatus'), btn = $('#tcpConnBtn'), now = si ? si.state : 'closed';
+  st.textContent = g.glyph + ' ' + tcpStatusText(si);
+  st.className = 'tcpstat ' + g.cls;
+  btn.textContent = now === 'connected' ? 'Disconnect' : now === 'connecting' ? 'Cancel' : 'Connect';
+  btn.className = now === 'closed' ? 'primary' : '';
+  const check = d && now === 'closed' ? connectCheck(d) : null;
+  btn.disabled = fs !== 'ok' || tcpBusy || (now === 'closed' && (!check || !!check.error));
+  $('#tcpMeta').textContent = tcpMetaText(si);
+  $('#tcpLive').hidden = !streamLive;
+  const pending = si && si.state === 'connected' ? Number(si.pending) || 0 : 0;
+  $('#tcpPending').hidden = !pending;
+  $('#tcpPending').textContent = pending ? `Waiting for the end of a frame: ${fmtSize(pending)}` : '';
+  $('#tcpClearBtn').disabled = fs !== 'ok' || !si;
+  const out = [];
+  if (tcpMsg.id === tcpId && tcpMsg.text) out.push(warnLine(tcpMsg.text, '', tcpMsg.bad));
+  if (!d) out.push(warnLine('This connection is not in the data file any more: it was deleted in another tab or on another computer.'));
+  if (check && check.error) out.push(warnLine(check.error));
+  if (isOpenInfo(si)) {
+    if (str(si.envId) !== state.activeEnv) out.push(warnLine(`This tab uses ${envLabel(state.activeEnv)}. This connection was opened with ${si.envId ? `"${si.envName}"` : 'no environment'} and sends with its values.`));
+    const ch = tcpChanges(d, si), again = ' <button data-act="reconnect">Reconnect</button>';
+    if (ch.other) out.push(warnLine(`${si.state === 'connected' ? 'Connected to' : 'Connecting to'} ${addrOf(si)}. Reconnect to apply changes.`, again));
+    else if (ch.framing) out.push(warnLine('Framing changes apply after Reconnect.', again));
+  } else if (si && mdnsTcpHint(si)) out.push(warnLine(mdnsTcpHint(si), '', true));
+  setHTML($('#tcpHints'), out.join(''));
+}
+function renderTcpSaved(d, ro) {
+  const chips = d ? d.messages.map(m => `<span class="tchip" data-msg="${esc(m.id)}"><button data-act="load" title="Put it into the editor">${esc(m.name || 'Untitled')}</button>`
+    + `<button data-act="send" title="Send it">&#9654;</button><button data-act="del" title="Delete this saved message"${ro ? ' disabled' : ''}>&#10005;</button></span>`) : [];
+  setHTML($('#tcpChips'), chips.join('') || '<span class="hint">none</span>');
+}
+const fmtTime = at => { const t = new Date(Number(at) || 0); return t.toTimeString().slice(0, 8) + '.' + String(t.getMilliseconds()).padStart(3, '0'); };
+const tcpLogCtx = () => { const d = findTcp(tcpId); return { hex: tcpLogHex, charset: d ? d.rxCharset : 'utf-8', client: tcpRT.client }; };
+// tcpEntryHTML is one entry of the log. Times are those of the computer that
+// runs the program. What came from the device is shown as text only, through esc.
+function tcpEntryHTML(e, ctx) {
+  const dir = str(e.dir), seq = Number(e.seq) || 0, data = dir === 'tx' || dir === 'rx', meta = [];
+  let body = str(e.text), size = '';
+  const label = (cls, text) => meta.push(`<span${cls ? ` class="${cls}"` : ''}>${esc(text)}</span>`);
+  if (data) {
+    const b = b64ToBytes(e.data), shown = b.subarray(0, TCP_SHOWN);
+    body = ctx.hex ? hexDump(shown) : tcpVisible(shown, dir === 'rx' ? ctx.charset : 'utf-8');
+    size = fmtSize(b.length);
+    label('', '#' + seq);
+    if (b.length > shown.length) label('wn', `the log shows ${fmtSize(shown.length)} of ${fmtSize(b.length)}: use Copy`);
+    if (e.outside) label('lb', 'outside frame');
+    if (e.incomplete) label('lb', `incomplete (${str(e.incomplete)})`);
+    if (e.cut) label('lb', 'cut at 1 MB');
+    if (dir === 'rx' && e.replyTo) label('lb', `reply to #${e.replyTo} in ${fmtMs(Number(e.rttMs) || 0)}`);
+    if (arr(e.missing).length) label('wn', 'sent as typed, not set: ' + arr(e.missing).map(n => `{{${str(n)}}}`).join(', '));
+  }
+  if (e.by && e.by !== ctx.client) label('', 'by ' + str(e.by));
+  if (data) meta.push('<span class="acts"><button data-act="copy">Copy</button><button data-act="copyesc">Copy escaped</button><button data-act="edit">To editor</button></span>');
+  const tag = { tx: 'TX', rx: 'RX', info: '··', error: 'ERR' }[dir] || dir;
+  return `<div class="tle ${esc(dir)}" data-seq="${seq}"><span class="t">${esc(fmtTime(e.at))}</span><span class="d">${esc(tag)}</span><span class="n">${esc(size)}</span>`
+    + `<div class="b"><span class="x">${esc(body)}</span>${meta.length ? `<div class="m">${meta.join('')}</div>` : ''}</div></div>`;
+}
+const logKey = (entries, ctx) => [tcpId, ctx.hex, ctx.charset, ctx.client, entries.length, entries.length && entries[0].seq, entries.length && entries[entries.length - 1].seq].join();
+// renderTcpLog draws the log of the connection shown, the last 1000
+// entries, unless the page shows them already.
+function renderTcpLog() {
+  if (view !== 'tcp') return;
+  const log = tcpRT.logs.get(tcpId), entries = log ? log.entries : [], ctx = tcpLogCtx(), el = $('#tcpLog'), key = logKey(entries, ctx);
+  $('#tcpCount').textContent = ` ${entries.length} entr${entries.length === 1 ? 'y' : 'ies'}`;
+  if (key === tcpLogKey) return;
+  tcpLogKey = key;
+  el.innerHTML = entries.map(e => tcpEntryHTML(e, ctx)).join('') || '<div class="empty">Nothing sent or received yet.</div>';
+  el.scrollTop = el.scrollHeight;
+}
+// appendTcpEntry adds the entry that just came to the log on the page, or
+// draws the log again when the page does not show the entries before it.
+function appendTcpEntry(e) {
+  const log = tcpRT.logs.get(tcpId), el = $('#tcpLog');
+  if (!log || log.entries[log.entries.length - 1] !== e) return;
+  const n = log.entries.length, rows = el.children.length, atEnd = el.scrollHeight - el.scrollTop - el.clientHeight < 40;
+  if (tcpLogKey && (rows === n - 1 || (rows === MAX_TCP_LOG && n === MAX_TCP_LOG))) {
+    if (rows === MAX_TCP_LOG) el.children[0].remove();
+    const ctx = tcpLogCtx(), box = document.createElement('div');
+    box.innerHTML = tcpEntryHTML(e, ctx);
+    el.appendChild(box.firstElementChild || box);
+    tcpLogKey = logKey(log.entries, ctx);
+    $('#tcpCount').textContent = ` ${n} entr${n === 1 ? 'y' : 'ies'}`;
+  } else { tcpLogKey = ''; renderTcpLog(); }
+  if (atEnd) el.scrollTop = el.scrollHeight;
+}
+// replyText says how the wait for a reply to the last message ended.
+function replyText(si) {
+  const r = si && tcpRT.replies.get(tcpId), log = tcpRT.logs.get(tcpId), tx = log && log.entries.findLast(e => e.dir === 'tx');
+  if (!r || !tx || Number(tx.seq) !== r.tx) return '';
+  if (r.dir === 'rx') return `Reply in ${fmtMs(r.rttMs)}`;
+  if (r.closed) return 'Connection closed while waiting';
+  return r.text ? r.text[0].toUpperCase() + r.text.slice(1) : '';
+}
+// renderTcpEditor shows what Send would do with the text in the editor: the
+// bytes after the variables and the framing (Sends:), their count, what is
+// wrong with them, and the state of Send and of the wait for a reply.
+function renderTcpEditor() {
+  if (view !== 'tcp') return;
+  const d = findTcp(tcpId), si = tcpRT.sessions.get(tcpId) || null, fs = featureState(), text = $('#tcpData').value, notes = [];
+  let sends = '', count = '', sendable = false;
+  if (d) {
+    const p = previewBytes(text, d, si), n = p.bytes.length;
+    if (p.error) notes.push(warnLine(p.error, '', true));
+    else {
+      if (n) sends = 'Sends: ' + tcpVisible(p.bytes.subarray(0, 600), 'utf-8', { breaks: false }) + (n > 600 ? '…' : '')
+        + (p.wrapped ? `   (wrapped: ${presetOf(p.preset).label})` : p.already ? '   (already framed, sent as is)' : '');
+      count = `${n} byte${n === 1 ? '' : 's'}`;
+      if (p.missing.length) notes.push(warnLine('unknown variable: ' + p.missing.map(x => `{{${x}}}`).join(', ')));
+      if (n > MAX_TCP_MESSAGE) notes.push(warnLine('The message is over 1 MB.', '', true));
+      sendable = n > 0 && n <= MAX_TCP_MESSAGE;
+    }
+    if (d.mode === 'text' && d.escapes && /^\s*[[{]/.test(text) && text.includes('\\')) notes.push(warnLine('Escapes are on: a \\ in this JSON starts an escape. Turn Escapes off to send it as typed.'));
+  }
+  if (MODE === 'server' && !streamLive) notes.push(warnLine('Live updates are off: values may be stale.'));
+  if (tcpNote.id === tcpId && tcpNote.text) notes.push(warnLine(tcpNote.text));
+  $('#tcpSends').textContent = sends;
+  $('#tcpBytes').textContent = count;
+  setHTML($('#tcpNote'), notes.join(''));
+  const btn = $('#tcpSendBtn'), waiting = si && si.state === 'connected' ? Number(si.waiting) || 0 : 0, mine = !!tcpSending && tcpSending.id === tcpId;
+  btn.textContent = waiting ? 'Waiting for reply…' : mine ? 'Sending…' + (si ? ' ' + fmtSize(Math.max(0, (Number(si.bytesOut) || 0) - tcpSending.out)) : '') : 'Send';
+  btn.disabled = fs !== 'ok' || !sendable || !si || si.state !== 'connected' || !!waiting || mine;
+  $('#tcpCancelWait').hidden = !waiting;
+  $('#tcpCancelWait').disabled = fs !== 'ok';
+  $('#tcpReply').textContent = waiting ? '' : replyText(si);
+}
+function setTcpMsg(text, bad = false) {
+  tcpMsg = { id: tcpId, text, bad };
+  renderTcpSession();
+}
+function applyTcpInfo(si) {
+  if (tcpReduce(tcpRT, 'tcp.state', si) !== null) renderTcpList();
+}
+const ensureNoteText = (notes, names, envId) => { const n = topNote(notes); return n ? noteText(n, names, envId) : ''; };
+
+// ---------------------------------------------------------------- TCP: actions
+// tcpConnect opens the connection shown with the environment of this tab.
+// The program reads the variables from the data file, so what this tab
+// changed is saved first, and the values schedules set are refreshed
+// (ensure). The program dials in the background: the result comes as an
+// event, or with the next poll.
+async function tcpConnect() {
+  const id = tcpId, d = findTcp(id), envId = state.activeEnv;
+  if (featureState() !== 'ok' || !d || tcpBusy) return null;
+  const names = referencedVars([d.host, d.port]);
+  let res = null;
+  tcpBusy = true;
+  setTcpMsg('');
+  try {
+    await flushPersist();
+    const { notes } = await freshVars(names, envId, () => setTcpMsg('Refreshing token…'));
+    tcpNote = { id, text: ensureNoteText(notes, names, envId) };
+    const check = connectCheck(d, envId);
+    if (check.error) { tcpMsg = { id, text: check.error, bad: true }; return null; }
+    res = await postJSON(`/api/tcp/${encodeURIComponent(id)}/connect`, {
+      envId, host: d.host, port: d.port, timeoutMs: d.connectTimeoutMs, framing: { preset: d.framing.preset }, idleMs: d.idleMs,
+    }, 15000);
+  } finally {
+    tcpBusy = false;
+    if (!res) renderTcpSession();
+  }
+  tcpMsg = { id, text: '', bad: false };
+  if (res.status === 202) applyTcpInfo(res.body);
+  else if (res.status === 409 && str(res.body.error) === 'already connected') toast('Already connected (another tab or computer?)');
+  else tcpMsg = { id, text: actionError(res), bad: true };
+  renderTcpSession(); renderTcpEditor();
+  if (!streamLive) tick(true);
+  return res;
+}
+async function tcpDisconnect(id = tcpId) {
+  if (featureState() !== 'ok' || !id || tcpBusy) return null;
+  let res;
+  tcpBusy = true;
+  try { res = await postJSON(`/api/tcp/${encodeURIComponent(id)}/disconnect`, {}, 15000); } finally { tcpBusy = false; }
+  if (res.status === 200) { applyTcpInfo(res.body); tcpMsg = { id, text: '', bad: false }; }
+  else tcpMsg = { id, text: actionError(res), bad: true };
+  renderTcpSession(); renderTcpEditor();
+  if (!streamLive) tick(true);
+  return res;
+}
+// tcpReconnect applies the changes of the definition: Disconnect, then
+// Connect in the environment of this tab.
+async function tcpReconnect() {
+  const res = await tcpDisconnect();
+  return res && res.status === 200 ? tcpConnect() : res;
+}
+// tcpSend sends text (the editor, or a saved message in its own mode) over
+// the connection shown. The program fills the variables in from the
+// environment the connection was opened with, so this tab saves first and
+// refreshes the values schedules set there (ensure). The answer comes once
+// the bytes are written, the entry itself as an event.
+async function tcpSend(text = $('#tcpData').value, mode = '') {
+  const id = tcpId, d = findTcp(id), si = tcpRT.sessions.get(id);
+  if (featureState() !== 'ok' || !d || (tcpSending && tcpSending.id === id)) return null;
+  if (!si || si.state !== 'connected') { setTcpMsg('Not connected: press Connect first.', true); return null; }
+  if (Number(si.waiting)) { setTcpMsg(`Waiting for the reply to #${si.waiting}. Press Cancel to stop waiting.`, true); return null; }
+  const enc = tcpEncode(text, { mode: mode || d.mode, newline: d.newline, escapes: d.escapes });
+  if (enc.error) { setTcpMsg(enc.error, true); return null; }
+  const names = [...new Set(enc.parts.filter(p => p.v).map(p => p.v))], envId = str(si.envId);
+  let res;
+  tcpSending = { id, out: Number(si.bytesOut) || 0 };
+  tcpNote = { id, text: '' };
+  setTcpMsg('');
+  renderTcpEditor();
+  try {
+    await flushPersist();
+    const { notes } = await freshVars(names, envId, () => setTcpMsg('Refreshing token…'));
+    tcpNote = { id, text: ensureNoteText(notes, names, envId) };
+    const body = { parts: enc.parts, wrap: d.wrap, waitReply: d.waitReply, replyTimeoutMs: d.replyTimeoutMs };
+    if (enc.src) body.src = enc.src;
+    res = await postJSON(`/api/tcp/${encodeURIComponent(id)}/send`, body, 600000);
+  } finally { tcpSending = null; }
+  const a = res.body;
+  tcpMsg = res.status === 200 && !a.error ? { id, text: '', bad: false }
+    : { id, text: res.status === 200 ? 'Send failed: ' + str(a.error) : actionError(res), bad: true };
+  renderTcpSession(); renderTcpEditor();
+  if (!streamLive) tick(true);
+  return res;
+}
+async function tcpCancelWait() {
+  if (featureState() !== 'ok' || !tcpId) return;
+  try { await fetch(`/api/tcp/${encodeURIComponent(tcpId)}/wait`, { method: 'DELETE' }); } catch (e) { toast('Could not stop waiting: ' + e.message); }
+  if (!streamLive) tick(true);
+}
+// tcpClearLog empties the log of the connection shown in the program, so
+// for every tab.
+async function tcpClearLog() {
+  const id = tcpId;
+  if (featureState() !== 'ok' || !id) return;
+  let r;
+  try { r = await fetch(`/api/tcp/${encodeURIComponent(id)}/log`, { method: 'DELETE' }); } catch (e) { toast('Could not clear the log: ' + e.message); return; }
+  if (r.status !== 204 && r.status !== 404) { toast('Could not clear the log: ' + (r.status === 503 ? 'simple-rest is shutting down.' : 'HTTP ' + r.status)); return; }
+  const log = tcpRT.logs.get(id);
+  if (log) { log.clearedAt = Math.max(log.clearedAt, log.last); log.entries = []; }
+  tcpRT.replies.delete(id);
+  renderTcpLog(); renderTcpEditor();
+}
+// tcpSaveAs saves the message in the editor with the connection shown,
+// under a name the user gives (Save as…, Ctrl+S in the console).
+function tcpSaveAs() {
+  const d = findTcp(tcpId), text = $('#tcpData').value;
+  if (!d || featureState() !== 'ok') return null;
+  if (!text) { setTcpMsg('Type a message first.'); return null; }
+  const name = prompt('Message name', text.split(/\r\n|\r|\n/)[0].trim().slice(0, 40) || 'Message');
+  if (name === null) return null;
+  const m = normalizeTcpMessage({ id: uid(), name: name.trim() || 'Message', mode: d.mode, data: text });
+  d.messages.push(m);
+  persist();
+  renderTcpSaved(d, false);
+  return m;
+}
+function tcpMessageAction(act, msgId) {
+  const d = findTcp(tcpId), m = d && d.messages.find(x => x.id === msgId), ok = featureState() === 'ok';
+  if (!m) return;
+  if (act === 'send') { tcpSend(m.data, m.mode); return; }
+  if (act === 'del') {
+    if (!ok || !confirm(`Delete the saved message "${m.name || 'Untitled'}"?`)) return;
+    d.messages = d.messages.filter(x => x !== m);
+    persist();
+  } else if (act === 'load') {
+    if (ok && d.mode !== m.mode) { d.mode = m.mode; persist(); }
+    $('#tcpData').value = m.data;
+    saveDraft(tcpId, m.data);
+  }
+  renderTcpView();
+}
+// tcpToEditor puts a message of the log into the editor: the template it
+// was sent from, or else its bytes, without the framing a send added, as
+// hex in Hex mode and as escapes in Text mode.
+function tcpToEditor(e) {
+  const d = findTcp(tcpId), ok = featureState() === 'ok';
+  if (!d) return;
+  let text = str(e.src);
+  if (text) {
+    // A template typed in Text mode is no hex.
+    if (d.mode === 'hex' && encodeChunks(text, { mode: 'hex' }).error && ok) { d.mode = 'text'; persist(); }
+  } else {
+    let b = b64ToBytes(e.data);
+    if (e.wrapped) { const si = tcpRT.sessions.get(tcpId); b = tcpUnwrap(b, si ? str(obj(si.framing).preset) : d.framing.preset); }
+    if (d.mode === 'hex') text = hexText(b);
+    else {
+      text = escapeBytes(b);
+      if (!d.escapes && text.includes('\\') && ok) { d.escapes = true; persist(); }
+    }
+  }
+  $('#tcpData').value = text;
+  saveDraft(tcpId, text);
+  renderTcpView();
+}
+function addTcp() {
+  if (featureState() !== 'ok') return null;
+  const d = normalizeTcp({ name: 'New TCP connection' }, new Set(state.tcp.map(x => x.id)));
+  state.tcp.push(d);
+  persist();
+  setSideTab('tcp');
+  setView('tcp', d.id);
+  $('#tcpName').focus(); $('#tcpName').select();
+  return d;
+}
+function tcpDuplicate() {
+  const d = findTcp(tcpId);
+  if (!d || featureState() !== 'ok') return null;
+  const c = normalizeTcp(Object.assign(clone(d), { id: '', name: (d.name || 'Untitled') + ' copy' }), new Set(state.tcp.map(x => x.id)));
+  for (const m of c.messages) m.id = uid();
+  state.tcp.splice(state.tcp.indexOf(d) + 1, 0, c);
+  persist();
+  setView('tcp', c.id);
+  return c;
+}
+// tcpDelete deletes the definition shown and, when the program has its
+// connection, the connection with its log (DELETE /api/tcp/{id}), which
+// closes it. A connection whose definition is gone goes the same way.
+async function tcpDelete() {
+  const id = tcpId, d = findTcp(id), si = tcpRT.sessions.get(id);
+  if (featureState() !== 'ok' || (!d && !si)) return;
+  const ask = d ? `Delete TCP connection "${d.name || 'Untitled'}"?` + (isOpenInfo(si) ? ' It is open and gets disconnected.' : '')
+    : 'Close this connection and remove it with its log from simple-rest?';
+  if (!confirm(ask)) return;
+  if (si) {
+    let r;
+    try { r = await fetch(`/api/tcp/${encodeURIComponent(id)}`, { method: 'DELETE' }); } catch (e) { toast('Could not remove the connection: ' + e.message); return; }
+    if (r.status !== 204 && r.status !== 404) { toast('Could not remove the connection: ' + (r.status === 503 ? 'simple-rest is shutting down.' : 'HTTP ' + r.status)); return; }
+    applyTcpEvent('tcp.removed', { id });
+  }
+  if (d) { state.tcp = state.tcp.filter(x => x !== d); persist(); saveDraft(id, ''); }
+  setView('tcp', state.tcp[0] ? state.tcp[0].id : null);
+}
+// wireTcp: the fields of the definition write to it on change, which a save
+// takes to the data file; the buttons ask the program directly.
+function wireTcp() {
+  $('#tcpFraming').innerHTML = Object.entries(TCP_PRESETS).map(([k, p]) => `<option value="${k}">${esc(p.label)}</option>`).join('');
+  $('#addTcpBtn').addEventListener('click', addTcp);
+  $('#tcpList').addEventListener('click', e => {
+    const it = e.target.closest('[data-tcp]');
+    if (it) { setView('tcp', it.dataset.tcp); $('#sidebar').classList.remove('open'); }
+  });
+  const edit = fn => e => {
+    if (e && e.target && e.target.dataset) delete e.target.dataset.held;
+    const d = findTcp(tcpId);
+    if (d && featureState() === 'ok') { fn(d); persist(); renderTcpList(); }
+    renderTcpView();
+  };
+  $('#tcpName').addEventListener('change', edit(d => { d.name = $('#tcpName').value; }));
+  $('#tcpHost').addEventListener('change', edit(d => {
+    const v = $('#tcpHost').value, t = splitTarget(v);
+    d.host = t ? t.host : v.trim();
+    if (t && t.port) d.port = t.port;
+  }));
+  $('#tcpPort').addEventListener('change', edit(d => { d.port = $('#tcpPort').value.trim(); }));
+  $('#tcpFraming').addEventListener('change', edit(d => { d.framing.preset = $('#tcpFraming').value; }));
+  $('#tcpWrapOut').addEventListener('change', edit(d => { d.wrap = $('#tcpWrapOut').checked; }));
+  $('#tcpIdle').addEventListener('change', edit(d => { const v = $('#tcpIdle').value; d.idleMs = secs(v === '' ? null : +v, d.idleMs, 0, 5000); }));
+  $('#tcpWait').addEventListener('change', edit(d => { d.waitReply = $('#tcpWait').checked; }));
+  $('#tcpWaitSec').addEventListener('change', edit(d => {
+    const v = parseFloat($('#tcpWaitSec').value);
+    d.replyTimeoutMs = secs(Number.isFinite(v) ? Math.round(v * 1000) : null, d.replyTimeoutMs, 100, 60000);
+  }));
+  $$('input[name=tcpMode]').forEach(r => r.addEventListener('change', edit(d => { d.mode = r.value; })));
+  $('#tcpNewline').addEventListener('change', edit(d => { d.newline = $('#tcpNewline').value; }));
+  $('#tcpEscapes').addEventListener('change', edit(d => { d.escapes = $('#tcpEscapes').checked; }));
+  $('#tcpCharset').addEventListener('change', edit(d => { d.rxCharset = $('#tcpCharset').value; }));
+  $('#tcpData').addEventListener('input', () => { if (tcpId) saveDraft(tcpId, $('#tcpData').value); renderTcpEditor(); });
+  $('#tcpConnBtn').addEventListener('click', () => { if (isOpenInfo(tcpRT.sessions.get(tcpId))) tcpDisconnect(); else tcpConnect(); });
+  $('#tcpSendBtn').addEventListener('click', () => tcpSend());
+  $('#tcpCancelWait').addEventListener('click', tcpCancelWait);
+  $('#tcpClearBtn').addEventListener('click', tcpClearLog);
+  $('#tcpSaveAsBtn').addEventListener('click', tcpSaveAs);
+  $('#tcpDupBtn').addEventListener('click', tcpDuplicate);
+  $('#tcpDelBtn').addEventListener('click', tcpDelete);
+  $('#tcpLogWrapBtn').addEventListener('click', () => $('#tcpLog').classList.toggle('wrap'));
+  $$('[data-logview]').forEach(b => b.addEventListener('click', () => {
+    tcpLogHex = b.dataset.logview === 'hex';
+    $$('[data-logview]').forEach(x => x.classList.toggle('active', x === b));
+    renderTcpLog();
+  }));
+  $('#tcpHints').addEventListener('click', e => { if (e.target.dataset && e.target.dataset.act === 'reconnect') tcpReconnect(); });
+  $('#tcpChips').addEventListener('click', e => {
+    const act = e.target.dataset && e.target.dataset.act, chip = e.target.closest('[data-msg]');
+    if (act && chip) tcpMessageAction(act, chip.dataset.msg);
+  });
+  $('#tcpLog').addEventListener('click', e => {
+    const act = e.target.dataset && e.target.dataset.act, row = e.target.closest('[data-seq]'), log = tcpRT.logs.get(tcpId);
+    const entry = act && row && log && log.entries.find(x => String(x.seq) === row.dataset.seq);
+    if (!entry) return;
+    const b = b64ToBytes(entry.data);
+    if (act === 'copy') copyText(decodeBytes(b, entry.dir === 'rx' ? tcpLogCtx().charset : 'utf-8'));
+    else if (act === 'copyesc') copyText(escapeBytes(b));
+    else if (act === 'edit') tcpToEditor(entry);
+  });
+}
+
 // ---------------------------------------------------------------- import / export
 function download(name, content, type) {
   const blob = content instanceof Blob ? content : new Blob([content], { type: type || 'application/octet-stream' });
@@ -1958,11 +3183,12 @@ function download(name, content, type) {
 // a file comes from a newer version and is skipped.
 const EXPORT_KEYS = ['app', 'exportedAt', ...STATE_KEYS];
 // exportData is what Export writes: a copy, so the caller may change it. The
-// schedules go as definitions; the overlay stays in the program.
+// schedules go as definitions, the overlay stays in the program; the TCP
+// connections go with their saved messages, but without their log.
 function exportData() {
   return {
     app: 'simple-rest', version: 1, exportedAt: new Date().toISOString(),
-    collections: clone(state.collections), envs: clone(state.envs), schedules: clone(state.schedules),
+    collections: clone(state.collections), envs: clone(state.envs), schedules: clone(state.schedules), tcp: clone(state.tcp),
   };
 }
 function exportAll() {
@@ -1974,20 +3200,20 @@ function exportAll() {
 // import included, in one toast that stays longer the more it says.
 async function importFiles(files) {
   const texts = await Promise.all(files.map(f => f.text().catch(() => '')));
-  let nc = 0, ne = 0, ns = 0, orphans = 0, unsupported = 0;
+  let nc = 0, ne = 0, ns = 0, nt = 0, orphans = 0, unsupported = 0;
   const skipped = [], failed = [];
   files.forEach((f, i) => {
     let data; try { data = JSON.parse(texts[i]); } catch (e) { failed.push('Not a JSON file: ' + f.name); return; }
     // importData leaves the state alone, so a file it throws on adds nothing.
     let got = null; try { got = importData(data); } catch (e) { /* reported below */ }
-    if (!got || (!got.collections.length && !got.envs.length && !got.schedules.length && !got.orphans && !got.skipped.length)) { failed.push('Unrecognized format: ' + f.name); return; }
-    state.collections.push(...got.collections); state.envs.push(...got.envs); state.schedules.push(...got.schedules);
-    nc += got.collections.length; ne += got.envs.length; ns += got.schedules.length; orphans += got.orphans; unsupported += got.unsupported;
+    if (!got || (!got.collections.length && !got.envs.length && !got.schedules.length && !got.tcp.length && !got.orphans && !got.skipped.length)) { failed.push('Unrecognized format: ' + f.name); return; }
+    state.collections.push(...got.collections); state.envs.push(...got.envs); state.schedules.push(...got.schedules); state.tcp.push(...got.tcp);
+    nc += got.collections.length; ne += got.envs.length; ns += got.schedules.length; nt += got.tcp.length; orphans += got.orphans; unsupported += got.unsupported;
     for (const k of got.skipped) if (!skipped.includes(k)) skipped.push(k);
   });
-  persist(); renderCollections(); renderEnvSelect();
+  persist(); renderCollections(); renderEnvSelect(); renderTcpList();
   const msg = [];
-  if (nc || ne || ns) msg.push(`Imported ${nc} collection(s), ${ne} environment(s)` + (ns ? `, ${ns} schedule(s)` : ''));
+  if (nc || ne || ns || nt) msg.push(`Imported ${nc} collection(s), ${ne} environment(s)` + (ns ? `, ${ns} schedule(s)` : '') + (nt ? `, ${nt} TCP connection(s)` : ''));
   if (orphans) msg.push(`${orphans} schedule(s) not imported: their request or environment is not in the file`);
   if (unsupported) msg.push(`${unsupported} request(s) use OAuth 2.0 or pre-request scripts, which are not imported`);
   if (skipped.length) msg.push(`Skipped: ${skipped.join(', ')} (needs a newer simple-rest)`);
@@ -2004,7 +3230,9 @@ function paramsFromUrl(r) {
 // alone and gives back what to add, with new ids. A schedule comes along with
 // the request and the environment it uses, by their new ids; orphans counts
 // the schedules whose request or environment is not in the file, which stay
-// out. skipped names the top-level keys of our format that only a newer
+// out. A TCP connection comes with its saved messages; its host and port
+// name variables, not an environment, so nothing ties it to the file.
+// skipped names the top-level keys of our format that only a newer
 // version knows; unsupported counts the Postman requests that use OAuth 2.0
 // or pre-request scripts, which are not imported. Nothing recognized gives
 // empty lists.
@@ -2036,6 +3264,11 @@ function importData(d) {
       const s = normalizeSchedule(x);
       if (!reqIds.has(s.requestId) || !envIds.has(s.envId)) { out.orphans++; continue; }
       out.schedules.push(Object.assign(s, { id: uid(), requestId: reqIds.get(s.requestId), envId: envIds.get(s.envId) }));
+    }
+    for (const x of arr(d.tcp)) {
+      const c = normalizeTcp(x);
+      for (const m of c.messages) m.id = uid();
+      out.tcp.push(Object.assign(c, { id: uid() }));
     }
     if (ours) out.skipped = Object.keys(d).filter(k => !EXPORT_KEYS.includes(k));
   } else if (d.info && Array.isArray(d.item)) {
@@ -2175,9 +3408,11 @@ async function checkUpdate() {
   btn.disabled = false; renderUpdate();
 }
 async function installUpdate() {
-  // Every start of the program turns the schedules off.
-  const on = jobsOn();
-  if (on && !confirm(`Installing restarts the program: ${on} schedule(s) turn off. Continue?`)) return;
+  // Every start of the program turns the schedules off and finds no TCP
+  // connection open.
+  const on = jobsOn(), open = tcpOpenCount();
+  const lost = [on && `${on} schedule(s) turn off`, open && `${open} TCP connection(s) close`].filter(Boolean);
+  if (lost.length && !confirm(`Installing restarts the program: ${lost.join(' and ')}. Continue?`)) return;
   // The restart must not take unsaved changes with it.
   if (!(await persistNow())) { toast('Update not installed: your last changes could not be saved.'); return; }
   try {
@@ -2220,6 +3455,25 @@ function pollUpdate() {
 // ---------------------------------------------------------------- events
 // Closing a modal is also a moment to pick up what changed elsewhere.
 function closeModal(m) { m.classList.remove('open'); syncIfBehind(); }
+const isEnter = e => e.key === 'Enter' || e.keyCode === 13;
+// keyAction runs the shortcuts of the page for view: Ctrl+Enter sends and
+// Ctrl+S saves, in the TCP console the message (Save as…) and never the HTTP
+// request. It returns what it did.
+function keyAction(e, v = view) {
+  const mod = e.ctrlKey || e.metaKey;
+  if (mod && isEnter(e)) {
+    e.preventDefault();
+    if (v === 'tcp') tcpSend(); else sendRequest();
+    return 'send';
+  }
+  if (mod && str(e.key).toLowerCase() === 's') {
+    e.preventDefault();
+    if (v === 'tcp') tcpSaveAs(); else save();
+    return 'save';
+  }
+  if (e.key === 'Escape') { $$('.modal-bg.open').forEach(m => closeModal(m)); return 'close'; }
+  return '';
+}
 function wire() {
   $('#setAutoUpdate').addEventListener('change', async e => {
     try {
@@ -2253,13 +3507,8 @@ function wire() {
   $('#saveBtn').addEventListener('click', save);
   $('#saveAsBtn').addEventListener('click', () => saveAs());
   $('#newBtn').addEventListener('click', startNew);
-  const isEnter = e => e.key === 'Enter' || e.keyCode === 13;
   $('#url').addEventListener('keydown', e => { if (isEnter(e)) { e.preventDefault(); sendRequest(); } });
-  document.addEventListener('keydown', e => {
-    if ((e.ctrlKey || e.metaKey) && isEnter(e)) { e.preventDefault(); sendRequest(); }
-    else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') { e.preventDefault(); save(); }
-    else if (e.key === 'Escape') $$('.modal-bg.open').forEach(m => closeModal(m));
-  });
+  document.addEventListener('keydown', e => keyAction(e, view));
 
   $$('.tabs.inner button').forEach(b => b.addEventListener('click', () => {
     $$('.tabs.inner button').forEach(x => x.classList.toggle('active', x === b));
@@ -2274,7 +3523,7 @@ function wire() {
   $('#dlRespBtn').addEventListener('click', downloadResponse);
 
   $$('[data-side]').forEach(b => b.addEventListener('click', () => setSideTab(b.dataset.side)));
-  $('#sideSearch').addEventListener('input', () => { renderCollections(); renderHistory(); });
+  $('#sideSearch').addEventListener('input', () => { renderCollections(); renderHistory(); renderTcpList(); });
   $('#addCollBtn').addEventListener('click', () => {
     const n = prompt('Collection name', 'New collection'); if (n === null) return;
     state.collections.push({ id: uid(), name: n.trim() || 'New collection', open: true, requests: [] }); persist(); renderCollections();
@@ -2382,6 +3631,7 @@ function wire() {
   sp.addEventListener('touchstart', e => { drag = true; }, { passive: true });
   window.addEventListener('touchmove', e => { if (drag) move(e.touches[0].clientY); }, { passive: true });
   window.addEventListener('touchend', () => { drag = false; });
+  wireTcp();
 }
 
 // ---------------------------------------------------------------- init
@@ -2394,26 +3644,37 @@ async function init() {
   renderEnvSelect();
   loadRequest(newRequest(), null);
   renderHistory();
-  setSideTab('coll');
+  // The view and the TCP connection shown outlive a reload of the tab, as
+  // after an update.
+  const tv = loadTabView();
+  if (tv.view === 'tcp' && findTcp(str(tv.tcpId))) { setSideTab('tcp'); setView('tcp', str(tv.tcpId)); }
+  else { setSideTab('coll'); setView('http'); }
   showRespTab('body');
   renderSchedBtn();
   fetchUpdateStatus();
   setInterval(fetchUpdateStatus, 15 * 60 * 1000);
-  // Another tab or computer may save the data file, and the program runs the
-  // schedules: the tab asks every 10 s while it is visible (every 2 s with
-  // Schedules or Environments open; see tick) and whenever the user comes back
-  // to it. The snapshot of the schedules carries the ETag of the file.
-  if (MODE === 'server') { setInterval(tick, 2000); tick(true); }
+  // Another tab or computer may save the data file, the program runs the
+  // schedules and keeps the TCP connections: the event stream brings every
+  // change (openEvents). Without it the tab asks every 10 s while it is
+  // visible (every 2 s with Schedules or Environments open or in the TCP
+  // console; see tick) and whenever the user comes back to it. The snapshot
+  // of the schedules carries the ETag of the file.
+  if (MODE === 'server') { setInterval(tick, 2000); tick(true); openEvents(); setInterval(tcpClock, 1000); }
   else window.addEventListener('storage', e => { if (e.key === 'simple-rest') syncIfBehind(); });
-  document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible') { syncIfBehind(); checkPageVersion(); tick(true); }
-  });
-  window.addEventListener('focus', () => syncIfBehind());
+  document.addEventListener('visibilitychange', onVisibility);
+  window.addEventListener('focus', () => { syncIfBehind(); retryEvents(); });
+  window.addEventListener('online', retryEvents);
+}
+// onVisibility: a hidden tab closes its event stream; one that comes back
+// opens it again and catches up.
+function onVisibility() {
+  if (document.visibilityState === 'visible') { syncIfBehind(); checkPageVersion(); retryEvents(); tick(true); }
+  else closeEvents();
 }
 
 // The pure parts are exposed for the Node tests in tests/; the page itself
-// starts only when the markup is there. saveInfo, editorInfo and schedInfo let
-// the tests look at the save, editor and schedule state.
+// starts only when the markup is there. saveInfo, editorInfo, schedInfo and
+// tcpInfo let the tests look at the save, editor, schedule and TCP state.
 globalThis.__sr = {
   state, splitUrl, parseQuery, encName, encValue, subst, activeVars, buildEffective, highlightJSON, normalizeRequest, newRequest, paramsFromUrl, importPostmanCollection, fromPostmanRequest, toCurl,
   importData, exportData,
@@ -2422,9 +3683,13 @@ globalThis.__sr = {
   renderBody,
   normalizeSchedule, findRequest, requestTexts, referencedVars, schedulesSetting, schedulesUsing, varConflicts, missingVars, effectiveVars,
   maskValue, isExpired, featureState, applySnapshot, tick, ensureVars, sendFlow, copyCurl, schedAction, turnAllOff, deleteSched, addSchedule, clearVar, openSchedModal,
+  TCP_PRESETS, normalizeTcp, tcpEncode, parseHex, escapeBytes, decodeBytes, tcpVisible, hexDump, hexText, bytesToB64, b64ToBytes, tcpTarget, splitTarget, tcpWrap, tcpUnwrap,
+  previewBytes, newTcpRT, tcpReduce, tcpMergeLog, tcpEntryHTML, setView, keyAction, openRequest, openEvents, closeEvents, onVisibility, applyTcpEvent, pollTcp, loadTcpLog,
+  tcpConnect, tcpDisconnect, tcpReconnect, tcpSend, tcpCancelWait, tcpClearLog, tcpSaveAs, tcpToEditor, addTcp, tcpDuplicate, tcpDelete, renderTcpView, renderTcpList,
   saveInfo: () => ({ saveState, lastTag, lastSynced, pending: savePending() }),
   editorInfo: () => ({ cur, collId: curCollId, saved: savedSnapshot }),
   schedInfo: () => ({ snap: schedSnap, ovl, skew, seenTag, down: schedDown }),
+  tcpInfo: () => ({ rt: tcpRT, view, tcpId, live: streamLive, lastEventId, busy: tcpBusy, msg: tcpMsg.text, note: tcpNote.text }),
 };
 if (typeof document !== 'undefined' && document.querySelector('#url')) init();
 })();

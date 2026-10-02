@@ -29,7 +29,8 @@
   <h1>A REST client<br>that is one file</h1>
   <p class="lead">
     Collections, environments, history and a response viewer, like the big
-    tools, without the installer, the account or the cloud.
+    tools, without the installer, the account or the cloud. Schedules keep
+    tokens fresh, and a TCP console talks to devices on your network.
   </p>
   <p class="claim">Download one file, run it, the browser opens. That is the whole setup.</p>
   <img class="banner" src="img/promo.png" alt="simple-rest with a collection on the left and a JSON answer filling the window">
@@ -101,7 +102,8 @@
       binary.
     </p>
 
-    <div class="features">
+    <!-- Eight cards: two columns keep the rows even, the shared grid would lay out 3, 3 and 2. -->
+    <div class="features" style="grid-template-columns: repeat(auto-fit, minmax(min(400px, 100%), 1fr))">
       <div class="feature">
         <h3>No CORS in the way</h3>
         <p>
@@ -132,6 +134,16 @@
           no browser open, and puts the token from the answer into
           <code>{{token}}</code>. Values stay in memory, and every start of the
           program turns the schedules off.
+        </p>
+      </div>
+      <div class="feature">
+        <h3>A TCP console for devices</h3>
+        <p>
+          The program connects as a client to a device or system anywhere on
+          your local network and keeps the connection open until you
+          disconnect. Framing presets None, MLLP, STX/ETX, LF and CR LF,
+          <code>{{variables}}</code> in messages, and Wait for reply that times
+          the answer.
         </p>
       </div>
       <div class="feature">
@@ -181,6 +193,10 @@
   <figure class="shot-wide">
     <img src="img/schedules.png" alt="The Schedules window with a token refresh that is on, its last run and the values it set" loading="lazy" decoding="async">
     <figcaption>A schedule that logs in and keeps {{token}} fresh</figcaption>
+  </figure>
+  <figure class="shot-wide">
+    <img src="img/tcp.png" alt="The TCP console connected to a lab analyzer: an HL7 order sent over MLLP and the ACK that came back" loading="lazy" decoding="async">
+    <figcaption>The TCP console: an HL7 order over MLLP and the ACK it got back</figcaption>
   </figure>
 </section>
 

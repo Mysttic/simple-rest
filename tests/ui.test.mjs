@@ -12,7 +12,8 @@ const header = (h, name) => h.filter(x => x.name.toLowerCase() === name.toLowerC
 
 test('the page exposes its pure functions', () => {
   for (const f of ['splitUrl', 'parseQuery', 'encName', 'encValue', 'subst', 'buildEffective', 'highlightJSON', 'normalizeRequest', 'importPostmanCollection', 'toCurl',
-    'normalizeSchedule', 'requestTexts', 'referencedVars', 'schedulesSetting', 'schedulesUsing', 'varConflicts', 'effectiveVars', 'maskValue', 'isExpired', 'featureState']) {
+    'normalizeSchedule', 'requestTexts', 'referencedVars', 'schedulesSetting', 'schedulesUsing', 'varConflicts', 'effectiveVars', 'maskValue', 'isExpired', 'featureState',
+    'normalizeTcp', 'tcpEncode', 'parseHex', 'escapeBytes', 'tcpVisible', 'hexDump', 'bytesToB64', 'tcpTarget', 'tcpWrap', 'previewBytes', 'tcpReduce', 'setView', 'keyAction']) {
     assert.equal(typeof sr[f], 'function', f);
   }
 });
@@ -276,10 +277,10 @@ test('importData reads our own format, skips what only a newer version knows and
     app: 'simple-rest', version: 1, exportedAt: '2026-10-01T00:00:00.000Z',
     collections: [{ id: 'c1', name: 'API', open: false, requests: [{ id: 'r1', name: 'One', method: 'get', url: 'http://h', note: 'kept' }] }, { name: 'Empty' }, null],
     envs: [{ id: 'e1', name: 'local', vars: [{ name: 'base', value: 1 }] }],
-    tcp: [{ id: 't1', host: 'h', port: 1 }], future: { x: 1 },
+    udp: [{ id: 'u1', host: 'h', port: 1 }], future: { x: 1 },
   });
   assert.deepEqual(Object.keys(got).sort(), ['collections', 'envs', 'orphans', 'schedules', 'skipped', 'tcp', 'unsupported']);
-  assert.deepEqual(got.skipped, ['tcp', 'future']);
+  assert.deepEqual(got.skipped, ['udp', 'future']);
   assert.deepEqual([got.schedules, got.tcp, got.unsupported, got.orphans], [[], [], 0, 0]);
   assert.deepEqual(got.collections.map(c => [c.name, c.open, c.requests.length]), [['API', true, 1], ['Empty', true, 0], ['Imported', true, 0]]);
   const r = got.collections[0].requests[0];
@@ -290,11 +291,12 @@ test('importData reads our own format, skips what only a newer version knows and
   assert.deepEqual(got.envs.map(e => [e.name, e.vars]), [['local', [{ enabled: true, name: 'base', value: '1' }]]]);
   assert.equal(JSON.stringify(ui.state), before, 'the state is left alone');
 
-  assert.deepEqual(ui.importData({ app: 'simple-rest', version: 1, tcp: [] }).skipped, ['tcp'], 'an export with nothing this version knows');
+  assert.deepEqual(ui.importData({ app: 'simple-rest', version: 1, udp: [] }).skipped, ['udp'], 'an export with nothing this version knows');
+  assert.deepEqual(ui.importData({ app: 'simple-rest', version: 1, tcp: [] }).skipped, [], 'tcp is known');
   const dataFile = ui.importData({ version: 1, collections: [{ name: 'A', requests: [] }], history: [{ id: 'h' }], envs: [], activeEnv: '', settings: { timeoutMs: 1 } });
   assert.deepEqual([dataFile.collections.length, dataFile.skipped], [1, []], 'the keys of the data file are known');
-  const newerFile = ui.importData({ version: 1, collections: [], history: [], envs: [{ name: 'E' }], activeEnv: '', settings: {}, tcp: [] });
-  assert.deepEqual([newerFile.envs.length, newerFile.skipped], [1, ['tcp']], 'a data file of a newer version');
+  const newerFile = ui.importData({ version: 1, collections: [], history: [], envs: [{ name: 'E' }], activeEnv: '', settings: {}, tcp: [], udp: [] });
+  assert.deepEqual([newerFile.envs.length, newerFile.skipped], [1, ['udp']], 'a data file of a newer version');
   // The legacy Postman data dump has a collections array too, but is not ours:
   // a newer simple-rest would not import the rest of it either.
   const dump = ui.importData({ version: 1, collections: [{ name: 'Old', requests: [{ url: 'http://h', method: 'GET' }] }], environments: [{ name: 'Prod', values: [] }], headerPresets: [], globals: [] });
@@ -312,8 +314,8 @@ test('exportData is a copy of the collections and environments that imports back
   ui.state.collections.push({ id: 'c1', name: 'API', open: true, requests: [ui.normalizeRequest({ id: 'r1', name: 'One', url: 'http://h' })] });
   ui.state.envs.push({ id: 'e1', name: 'local', vars: [{ enabled: true, name: 'base', value: 'http://h' }] });
   const out = ui.exportData();
-  assert.deepEqual(Object.keys(out), ['app', 'version', 'exportedAt', 'collections', 'envs', 'schedules']);
-  assert.deepEqual(out.schedules, []);
+  assert.deepEqual(Object.keys(out), ['app', 'version', 'exportedAt', 'collections', 'envs', 'schedules', 'tcp']);
+  assert.deepEqual([out.schedules, out.tcp], [[], []]);
   assert.deepEqual([out.app, out.version], ['simple-rest', 1]);
   assert.ok(!Number.isNaN(Date.parse(out.exportedAt)));
   assert.deepEqual(out.collections, ui.state.collections);
@@ -338,16 +340,16 @@ test('importFiles adds what importData found and sums it up in one toast', async
   const shown = () => globalThis.document.querySelector('#toast').textContent;
 
   await ui.importFiles([
-    file('newer.json', { app: 'simple-rest', version: 1, collections: [{ name: 'One', requests: [] }], envs: [], tcp: [{}], future: 1 }),
+    file('newer.json', { app: 'simple-rest', version: 1, collections: [{ name: 'One', requests: [] }], envs: [], udp: [{}], future: 1 }),
     file('shop.postman_collection.json', { info: { name: 'Shop' }, item: [{ name: 'Token', request: { url: 'http://h', auth: { type: 'oauth2' } } }, { name: 'Plain', request: 'http://h/p' }], variable: [{ key: 'base', value: 'http://h' }] }),
-    file('newest.json', { app: 'simple-rest', version: 1, tcp: [] }),
+    file('newest.json', { app: 'simple-rest', version: 1, udp: [] }),
   ]);
   assert.deepEqual(ui.state.collections.map(c => c.name), ['One', 'Shop']);
   assert.deepEqual(ui.state.envs.map(e => e.name), ['Shop variables']);
-  assert.equal(shown(), 'Imported 2 collection(s), 1 environment(s). 1 request(s) use OAuth 2.0 or pre-request scripts, which are not imported. Skipped: tcp, future (needs a newer simple-rest)');
+  assert.equal(shown(), 'Imported 2 collection(s), 1 environment(s). 1 request(s) use OAuth 2.0 or pre-request scripts, which are not imported. Skipped: udp, future (needs a newer simple-rest)');
 
-  await ui.importFiles([file('newest.json', { app: 'simple-rest', version: 1, tcp: [] })]);
-  assert.equal(shown(), 'Skipped: tcp (needs a newer simple-rest)', 'not "Unrecognized format"');
+  await ui.importFiles([file('newest.json', { app: 'simple-rest', version: 1, udp: [] })]);
+  assert.equal(shown(), 'Skipped: udp (needs a newer simple-rest)', 'not "Unrecognized format"');
   await ui.importFiles([file('other.json', { foo: 1 })]);
   assert.equal(shown(), 'Unrecognized format: other.json');
   await ui.importFiles([file('broken.json', '{')]);
