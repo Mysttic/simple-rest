@@ -9,9 +9,9 @@ ostatniego wydanego tagu.
 
 ### Dodane
 
-- Konsola TCP w programie, na razie tylko jako API (okno w UI dochodzi osobno). Program
-  łączy się jako klient z urządzeniem albo systemem w sieci (nazwa DNS, IPv4 albo IPv6,
-  także ze strefą) i utrzymuje połączenie do rozłączenia; nigdy nie nasłuchuje. Keepalive
+- Konsola TCP w programie. Program łączy się jako klient z urządzeniem albo systemem
+  w sieci (nazwa DNS, IPv4 albo IPv6, także ze strefą) i utrzymuje połączenie do
+  rozłączenia; nigdy nie nasłuchuje. Keepalive
   wykrywa martwe urządzenie po około 30 sekundach, a na Linuksie także przy danych
   w drodze (`TCP_USER_TIMEOUT`). Ramkowanie: None (domyślne, surowe bajty dzielone po
   ciszy `idleMs`), LF, CRLF, MLLP (`0B`, treść, `1C 0D`) i STX/ETX. Wysyłka dokłada ramkę,
@@ -37,7 +37,49 @@ ostatniego wydanego tagu.
   zdarzenia konsoli TCP, `state.changed` po zmianie pliku danych i `sched.changed` po
   zmianie harmonogramów (najwyżej jedno na 250 ms). Karta, która wraca z identyfikatorem
   ostatniego zdarzenia, dostaje to, co ją ominęło, a po restarcie programu albo przy
-  dużej zaległości stan bieżący. Na razie karty dalej odpytują program co kilka sekund.
+  dużej zaległości stan bieżący.
+- Okno konsoli TCP: zakładka TCP na pasku bocznym z listą połączeń i liczbą otwartych oraz
+  widok połączenia. Widok ma pola Host i Port (ze `{{zmiennymi}}`; wklejone
+  `tcp://host:port` albo `host:port` rozdziela się na oba pola), Connect, Disconnect
+  i Reconnect, stan z czasem połączenia, adresy, środowisko połączenia, liczniki bajtów
+  i adres, z którego połączenie otwarto. Ramkowanie wybiera się z listy (None, LF, CR LF,
+  MLLP, STX/ETX) obok bajtów ramki, z Wrap outgoing i Split on silence. Log pokazuje czas,
+  kierunek, rozmiar i numer wpisu, treść jako tekst z nazwami znaków sterujących (`<VT>`,
+  `<CR>`) albo hex, z wyborem kodowania odbioru (UTF-8, Windows-1250, ISO-8859-2,
+  Latin-1), z dopiskami (`outside frame`, `incomplete`, `cut at 1 MB`,
+  `reply to #N in X ms`, `by <adres>`) i z przyciskami Copy, Copy escaped i To editor.
+  Edytor komunikatu ma tryb Text (escape'y `\r \n \t \\ \xHH`, wybór bajtów dla Enter)
+  i Hex, `{{zmienne}}` w obu, podgląd bajtów po podstawieniu i ramkowaniu (`Sends:`),
+  liczbę bajtów i podpowiedzi (nieznana zmienna, błędny hex, ukośnik w JSON przy
+  escape'ach). Wait for reply pokazuje wynik (`Reply in 59 ms`, `No reply within 5 s`,
+  `Connection closed while waiting`) i ma Cancel. Komunikaty zapisuje się przy połączeniu
+  (Save as…, Ctrl+S) i wysyła jednym kliknięciem; Ctrl+Enter wysyła komunikat z edytora.
+  Tekst edytora jest szkicem przeglądarki (localStorage), a widok i wybrane połączenie
+  przeżywają przeładowanie karty.
+- Connect i Send najpierw zapisują zmiany karty i odświeżają wartości z harmonogramów
+  (`POST /api/vars/ensure`): Connect w środowisku karty, Send w środowisku połączenia.
+  Podpowiedzi w konsoli mówią, że karta ma inne środowisko niż połączenie, że zmiany
+  definicji albo ramkowania zadziałają po Reconnect, że ramka czeka na swój koniec i że
+  zmienna hosta albo portu nie ma wartości, a przy `no such host` dla nazwy `.local` na
+  Linuksie dają tę samą podpowiedź co Send HTTP. Połączenie, którego definicję usunięto
+  w innej karcie, dalej widać jako `(not saved)` z Disconnect.
+- Definicje połączeń TCP z zapisanymi komunikatami leżą w pliku danych pod kluczem `tcp`
+  (czasy spoza zakresu są przycinane, nieznany preset ramkowania daje None, nieznane pola
+  zostają) i trafiają do eksportu. Import nadaje im nowe identyfikatory i podaje ich
+  liczbę w powiadomieniu. Uwaga: po cofnięciu do 1.1.0 pierwszy zapis z karty usuwa
+  z pliku klucz `tcp`.
+- Bez programu, a także ze strony z innej wersji programu, konsola TCP pokazuje definicje
+  tylko do odczytu, z banerem, a Connect, Send i Disconnect są wyłączone.
+- Install and restart pyta o zgodę także przy otwartych połączeniach TCP i podaje ich
+  liczbę, bo restart je zamyka.
+
+### Zmienione
+
+- Widoczna karta dostaje zmiany pliku danych, harmonogramów i konsoli TCP strumieniem
+  zdarzeń zamiast odpytywania programu co 2 albo 10 sekund. Karta w tle zamyka strumień
+  i po powrocie nadrabia zaległość. Gdy programu nie ma (np. w czasie restartu), karta
+  ponawia strumień co 2 sekundy przez 30 sekund, potem co 30 sekund, a do tego czasu
+  odpytuje program jak wcześniej.
 
 ## [1.2.0] - 2026-10-01
 
@@ -102,7 +144,7 @@ ostatniego wydanego tagu.
   rebinding, a program ostrzega o tym przy starcie. Gwiazdka w cudzysłowie podwójnym
   działa w cmd, PowerShell i sh.
 - Import pliku z nowszej wersji importuje to, co ta wersja zna, a o reszcie mówi
-  w powiadomieniu, np. `Skipped: tcp (needs a newer simple-rest)`, zamiast
+  w powiadomieniu, np. `Skipped: udp (needs a newer simple-rest)`, zamiast
   `Unrecognized format`.
 - Jedno powiadomienie po imporcie podsumowuje wszystkie wybrane pliki, także te, których
   nie udało się zaimportować, i znika tym później, im jest dłuższe. Plik, którego nie da

@@ -1,8 +1,9 @@
 # simple-rest
 
-Minimalny klient REST w stylu Postmana: jeden plik binarny, bez instalacji, bez logowania,
-bez zależności. Interfejs działa w przeglądarce, ale zapytania HTTP wykonuje sam program,
-więc nie obowiązują ograniczenia CORS przeglądarki.
+Minimalny klient REST i TCP w stylu Postmana: jeden plik binarny, bez instalacji, bez
+logowania, bez zależności. Interfejs działa w przeglądarce, ale zapytania HTTP i połączenia
+TCP wykonuje sam program, więc nie obowiązują ograniczenia CORS przeglądarki, a konsola TCP
+może rozmawiać z urządzeniem po surowym gnieździe, czego przeglądarka nie umie.
 
 ![simple-rest: kolekcja po lewej, odpowiedź JSON na całe okno](site/simple-rest/img/promo.png)
 
@@ -25,9 +26,11 @@ nazwę z końcówką `.local`, `.lan`, `.home`, `.home.arpa`, `.internal` albo `
 lub nazwę komputera, którą zwraca system. Inną nazwę, np. `pc123.firma.pl` z firmowego DNS,
 trzeba dopisać flagą `-allow-host pc123.firma.pl` (patrz „Bezpieczeństwo”).
 
-Zapytania wysyła program, a harmonogramy działają w nim, więc wszystko dzieje się na maszynie
-z binarką, np. na Raspberry Pi. Serwer docelowy musi być osiągalny z tej maszyny, a nie
-z komputera, na którym jest przeglądarka. Wersje linuksowe są budowane bez CGO i nie
+Zapytania wysyła program, harmonogramy działają w nim i to on otwiera połączenia TCP, więc
+wszystko dzieje się na maszynie z binarką, np. na Raspberry Pi. Serwer docelowy i urządzenie
+TCP muszą być osiągalne z tej maszyny, a nie z komputera, na którym jest przeglądarka.
+Konsola TCP działa tak samo z innego komputera w sieci: połączenia są wspólne dla wszystkich
+kart i komputerów (patrz „Konsola TCP”). Wersje linuksowe są budowane bez CGO i nie
 rozwiązują nazw `.local` (mDNS): na Linuksie i Raspberry Pi podaj adres IP albo nazwę
 z DNS sieci. Na Windows nazwy `.local` działają tak jak w systemie.
 
@@ -61,15 +64,21 @@ Jeśli port 8787 jest zajęty, program wybiera losowy wolny port i wypisuje adre
   `{{nazwa}}` podstawianymi w URL, params, nagłówkach, body i auth.
 - Harmonogramy: program co zadany czas wysyła zapisane zapytanie, np. logowanie, i ustawia
   zmienną, np. `{{token}}`, wartością z odpowiedzi (patrz „Harmonogramy”).
-- Import/Export do JSON, razem z definicjami harmonogramów (bez ustawionych wartości).
+- Konsola TCP: program łączy się z urządzeniem albo systemem w sieci, wysyła komunikaty
+  z `{{zmiennymi}}` (tekst z escape'ami albo hex), dzieli odbiór na komunikaty według
+  ramkowania (None, LF, CR LF, MLLP, STX/ETX) i mierzy czas odpowiedzi (patrz „Konsola TCP”).
+- Import/Export do JSON, razem z definicjami harmonogramów (bez ustawionych wartości)
+  i połączeń TCP z zapisanymi komunikatami (bez logu).
   Import rozumie też Postman Collection v2.1 i Postman Environment.
   Zapytanie z Postmana bez własnego auth (albo z `inherit`) dostaje auth najbliższego
   folderu, a potem kolekcji; `noauth` znaczy brak auth. Zmienne kolekcji trafiają do
   nowego środowiska `<nazwa kolekcji> variables`. OAuth 2.0 i skrypty pre-request nie są
   importowane, a powiadomienie po imporcie podaje liczbę takich zapytań. Sekcje pliku
-  z nowszej wersji simple-rest (np. `tcp`) są pomijane i wymienione w powiadomieniu.
+  z nowszej wersji simple-rest, których ta wersja nie zna, są pomijane i wymienione
+  w powiadomieniu.
 - Kopiowanie zapytania jako polecenie `curl`.
-- Skróty: Enter w polu URL lub Ctrl+Enter wysyła, Ctrl+S zapisuje.
+- Skróty: Enter w polu URL lub Ctrl+Enter wysyła, Ctrl+S zapisuje. W konsoli TCP Ctrl+Enter
+  wysyła komunikat z edytora, a Ctrl+S zapisuje go pod nazwą przy połączeniu (Save as…).
 
 ## Harmonogramy
 
@@ -110,6 +119,76 @@ odpowiada.
   działa. Każdy start programu, także po aktualizacji, wyłącza wszystkie harmonogramy
   i czyści nakładkę, a wartości nigdy nie trafiają do pliku danych, eksportu ani historii.
 
+## Konsola TCP
+
+Konsola TCP (zakładka TCP na pasku bocznym) utrzymuje połączenie TCP z urządzeniem albo
+systemem w sieci, np. z analizatorem laboratoryjnym, wysyła komunikaty i pokazuje, co
+przychodzi. Program działa tylko jako klient: łączy się z podanym hostem i portem, nigdy
+nie nasłuchuje. Licznik na zakładce pokazuje otwarte połączenia.
+
+- **Połączenie** to definicja w pliku danych: nazwa, Host i Port (oba mogą zawierać
+  `{{zmienne}}`, np. `{{lab_host}}`), ramkowanie i ustawienia edytora. Host to nazwa, adres
+  IPv4 albo IPv6 (w nawiasach albo bez, także ze strefą, np. `fe80::1%eth0`). Wklejone
+  `tcp://10.0.0.5:2575` albo `10.0.0.5:2575` rozdziela się na host i port. Connect jest
+  zablokowany, dopóki zmienna hosta lub portu nie ma wartości albo port nie jest liczbą od 1
+  do 65535.
+- **Środowisko połączenia.** Connect bierze środowisko wybrane w tej karcie i połączenie
+  zostaje przy nim do rozłączenia: zmienne w komunikatach podstawia program z tego
+  środowiska (wiersze z pliku i nad nimi wartości z harmonogramów), niezależnie od tego,
+  kto wysyła i jakie środowisko ma jego karta. Karta z innym środowiskiem widzi podpowiedź,
+  a zmiana środowiska połączenia wymaga Disconnect i Connect. Przed Connect i przed Send
+  karta zapisuje swoje zmiany i prosi program o świeże wartości z harmonogramów, tak jak
+  przed Send HTTP.
+- **Ramkowanie** (Framing): None (domyślne, surowe bajty), LF, CR LF, MLLP (HL7, `0B` ...
+  `1C 0D`) i STX/ETX (`02` ... `03`). Wrap outgoing dokłada ramkę do wysyłanego komunikatu,
+  chyba że komunikat już ją ma. Odbiór jest dzielony na komunikaty według ramki, a bajty
+  spoza ramki (np. ACK albo NAK) trafiają do logu osobno, z dopiskiem `outside frame`.
+  Split on silence (przy None, MLLP i STX/ETX) zamyka taki wpis po zadanej ciszy
+  w milisekundach; 0 daje jeden wpis na każdy odczyt. Niedomknięta ramka czeka na swój
+  koniec bez względu na ciszę, a ramka ponad 1 MB jest ucinana. Zmiana ramkowania przy
+  otwartym połączeniu działa po Reconnect.
+- **Edytor komunikatu.** W trybie Text komunikat idzie jako UTF-8, Enter wstawia wybrany
+  koniec linii (LF, CR albo CR LF; HL7 używa CR), a przy włączonych Escapes `\r`, `\n`, `\t`,
+  `\\` i `\xHH` dają swoje bajty (`\xHH` dokładnie jeden bajt). Każdy inny ukośnik, np. `\&`
+  w nagłówku HL7, zostaje bez zmian. W trybie Hex komunikat to cyfry szesnastkowe, a odstępy
+  i nowe linie nie mają znaczenia. `{{zmienna}}` działa w obu trybach. Linia `Sends:`
+  pokazuje bajty, które pójdą na kabel, ze zmiennymi środowiska połączenia i z ramką;
+  zmienna bez wartości idzie dosłownie jako `{{nazwa}}`. Komunikat może mieć najwyżej 1 MB.
+- **Zapisane komunikaty.** Save as… (Ctrl+S) zapisuje komunikat z edytora przy połączeniu,
+  w pliku danych. Przycisk z nazwą wkłada go do edytora, a ▶ od razu wysyła. Bieżący tekst
+  edytora jest szkicem tej przeglądarki (localStorage) i nie trafia do pliku.
+- **Wait for reply** czeka na odpowiedź: jest nią pierwszy wpis, który zaczął przychodzić
+  po wysłaniu. Wynik to `Reply in 59 ms`, `No reply within 5 s` albo
+  `Connection closed while waiting`. W trakcie czekania nikt nie wyśle do tego połączenia
+  kolejnego komunikatu, a Cancel kończy czekanie. Czekanie nie trzyma połączenia HTTP
+  przeglądarki.
+- **Log** pokazuje wysłane (TX) i odebrane (RX) komunikaty z czasem, rozmiarem i numerem,
+  jako tekst z nazwami znaków sterujących (`<VT>`, `<CR>`, `<FS>`) albo jako hex. RX charset
+  wybiera kodowanie, w którym widać odbiór (UTF-8, Windows-1250, ISO-8859-2, Latin-1). Wpis
+  ma przyciski Copy, Copy escaped i To editor; ten ostatni wkłada do edytora szablon
+  wysłanego komunikatu albo jego bajty bez ramki. Czasy pochodzą z zegara maszyny
+  z binarką. Log trzyma najwyżej 1000 wpisów albo 2 MB na połączenie i tylko w pamięci
+  programu: nie trafia do pliku, historii ani eksportu, a Clear czyści go dla wszystkich.
+- **Wspólne połączenia.** Połączenia żyją w programie i są wspólne dla wszystkich kart
+  i komputerów: każdy widzi ten sam log, a wpis wysłany z innego komputera ma dopisek
+  `by <adres>`. Połączenie zostaje otwarte po zamknięciu kart, dopóki ktoś nie da
+  Disconnect, więc urządzenie przyjmujące jednego klienta jest do tego czasu zajęte. Connect
+  przy otwartym połączeniu kończy się komunikatem `Already connected (another tab or
+  computer?)`.
+- Martwe urządzenie bez ruchu wykrywa keepalive po około 30 sekundach, a na Linuksie także
+  przy danych w drodze (`TCP_USER_TIMEOUT`). Na Windows bardzo wolny odbiorca dużego
+  komunikatu (powyżej około 400 KB, wolniej niż około 6 KB/s) może przerwać wysyłkę błędem
+  `write timeout: no progress for 10 s`.
+- Po każdym starcie programu, także po aktualizacji, żadne połączenie nie jest otwarte i nic
+  nie łączy się samo. Wersje linuksowe nie rozwiązują nazw `.local` (mDNS): przy
+  `no such host` konsola podpowiada, żeby podać adres IP.
+
+Karta dostaje zmiany połączeń, logu, pliku danych i harmonogramów od razu, jednym
+strumieniem zdarzeń (`GET /api/events`); znacznik Live w konsoli mówi, że strumień działa.
+Karta w tle zamyka strumień, a po powrocie nadrabia zaległość. Bez strumienia, np. w czasie
+restartu programu, karta odpytuje program co kilka sekund, a edytor pokazuje
+`Live updates are off: values may be stale.`
+
 ## Aktualizacje z aplikacji
 
 Ustawienia (ikona koła zębatego), sekcja Updates:
@@ -135,9 +214,10 @@ Ustawienia (ikona koła zębatego), sekcja Updates:
   z `-allow-host pc123.firma.pl`. Nie uruchamiaj drugiej kopii obok działającej: port jest
   zajęty, więc wstałaby na losowym porcie, na tym samym pliku danych.
   Na Windows stary plik zostaje chwilowo jako `.exe.old` i jest usuwany przy starcie.
-  Restart wyłącza wszystkie harmonogramy i czyści ich wartości, więc przy włączonych
-  harmonogramach przycisk najpierw pyta o zgodę. Inne otwarte karty po restarcie pokazują
-  powiadomienie, że harmonogramy trzeba włączyć ponownie.
+  Restart wyłącza wszystkie harmonogramy, czyści ich wartości i zamyka połączenia TCP, więc
+  przy włączonych harmonogramach albo otwartych połączeniach przycisk najpierw pyta o zgodę.
+  Inne otwarte karty po restarcie pokazują powiadomienie, że harmonogramy trzeba włączyć
+  ponownie.
 - Kopia, która nie może się zaktualizować (katalog bez prawa zapisu, uruchomienie przez
   `go run`, brak pliku wydania dla tego systemu), mówi to wprost i linkuje do strony
   pobierania.
@@ -148,16 +228,17 @@ restart) uruchamia `sh scripts/e2e-update.sh`; to samo robi CI.
 
 ## Dane
 
-Wszystko (kolekcje, historia, środowiska, ustawienia, definicje harmonogramów) trafia do jednego pliku JSON obok
-binarki: `simple-rest-data.json`. Wystarczy przenieść katalog, żeby przenieść dane.
-Aktualizacja nie dotyka tego pliku.
+Wszystko (kolekcje, historia, środowiska, ustawienia, definicje harmonogramów i połączeń
+TCP) trafia do jednego pliku JSON obok binarki: `simple-rest-data.json`. Wystarczy przenieść
+katalog, żeby przenieść dane. Aktualizacja nie dotyka tego pliku.
 
 Z tym samym plikiem może pracować kilka kart naraz, także z innych komputerów przy
-`-listen 0.0.0.0:8787`. Karta sprawdza, czy plik się zmienił: co 10 sekund, gdy jest
-widoczna, po powrocie do niej i po zamknięciu okna dialogowego. Nowszą wersję wczytuje
-tylko wtedy, gdy sama nie ma niezapisanych zmian. Otwarte w edytorze zapytanie bez
+`-listen 0.0.0.0:8787`. Widoczna karta dostaje od programu znak, gdy plik się zmienił
+(strumień zdarzeń, patrz „Konsola TCP”), a bez strumienia sprawdza plik co 10 sekund;
+poza tym sprawdza go po powrocie do karty i po zamknięciu okna dialogowego. Nowszą wersję
+wczytuje tylko wtedy, gdy sama nie ma niezapisanych zmian. Otwarte w edytorze zapytanie bez
 niezapisanych zmian też się odświeża, a z niezapisanymi zmianami zostaje i pokazuje
-różnicę względem nowej wersji.
+różnicę względem nowej wersji. Konsola TCP też pokazuje definicję połączenia z pliku.
 
 Każdy zapis idzie z nagłówkiem `If-Match`. Jeśli plik zmieniła w międzyczasie inna karta
 albo inny komputer, program odrzuca zapis i plik zostaje bez zmian. Karta pokazuje wtedy
@@ -172,8 +253,12 @@ przeładowanie. Plik pamięta ostatni wybór jako środowisko startowe nowej kar
 
 Definicje harmonogramów leżą w pliku pod kluczem `schedules`. To, czy harmonogram jest
 włączony, kiedy ruszy, dlaczego stoi i jakie wartości ustawił, program trzyma tylko
-w pamięci i nigdy nie zapisuje pliku danych sam. Uwaga: po cofnięciu do wersji 1.1.0
-pierwszy zapis z karty usuwa z pliku klucz `schedules`.
+w pamięci i nigdy nie zapisuje pliku danych sam.
+
+Definicje połączeń TCP z zapisanymi komunikatami leżą w pliku pod kluczem `tcp`. Stan
+połączeń i ich log są tylko w pamięci programu, a tekst edytora komunikatu jest szkicem
+w przeglądarce (localStorage), osobno dla każdego połączenia. Uwaga: po cofnięciu do
+wersji 1.1.0 pierwszy zapis z karty usuwa z pliku klucze `schedules` i `tcp`.
 
 Pola, których ta wersja nie zna, na przykład dopisane przez nowszą wersję, przeżywają
 zapis bez zmian.
@@ -210,9 +295,9 @@ uruchamiaj lokalnie (komendy niżej) albo ręcznie z zakładki Actions (`workflo
 automatycznie sprawdzany jest dopiero PR `develop` → `master`.
 
 ```
-go test ./... -count=1                 # serwer, proxy, guard, updater (z fałszywym hubem), harmonogramy
+go test ./... -count=1                 # serwer, proxy, guard, updater (z fałszywym hubem), harmonogramy, TCP
 go test -race ./... -count=1           # to samo z wykrywaniem wyścigów (potrzebny gcc); CI tego nie robi
-node --test "tests/**/*.test.mjs"      # UI: params/URL, zmienne, auth, import Postman, cURL, zapis, harmonogramy
+node --test "tests/**/*.test.mjs"      # UI: params/URL, zmienne, auth, import Postman, cURL, zapis, harmonogramy, TCP
 sh scripts/e2e-update.sh               # ścieżka aktualizacji end to end na prawdziwej binarce
 node scripts/screenshots.mjs           # zrzuty do site/simple-rest/img/ (Edge albo Chrome)
 ```
@@ -224,6 +309,13 @@ wartości. Zapytanie harmonogramu buduje program w Go (`effective.go`), tak jak 
 zapytanie przycisku Send. Wspólne wektory w `testdata/effective.json` uruchamiają
 `effective_test.go` i `tests/effective.test.mjs`, więc obie strony budują to samo zapytanie
 z tych samych danych. Zmiana jednej z tych funkcji wymaga zmiany jej odpowiednika i wektora.
+
+`tests/tcp.test.mjs` sprawdza konsolę TCP: edytor komunikatu i bajty, które z niego
+wychodzą, to, co karta trzyma ze zdarzeń programu, strumień zdarzeń z powrotem do
+odpytywania oraz akcje konsoli. Ramkowanie i sprawdzanie hosta i portu mają odpowiedniki
+w Go (`tcpframe.go`, `tcp.go`), a wspólne wektory w `testdata/tcp-framing.json` uruchamiają
+`tcpframe_test.go` i `tests/tcp.test.mjs`. `tcp_linux_test.go` (`TCP_USER_TIMEOUT`) działa
+tylko na Linuksie, więc z Windows uruchamia go dopiero CI na PR wydania albo Raspberry Pi.
 
 `scripts/screenshots.mjs` buduje aplikację, uruchamia ją z przykładową kolekcją i drugą
 kopią zgłaszającą starszą wersję, po czym robi zrzuty przez protokół DevTools. Fałszywy hub
@@ -293,8 +385,11 @@ zapytania wysyła przeglądarka: serwer docelowy musi zezwalać na CORS, opcje T
 są ignorowane, dane trzymane są w localStorage tej przeglądarki, a sekcja aktualizacji
 jest ukryta. Harmonogramy działają tylko w programie: okno Schedules pokazuje definicje,
 np. zaimportowane z pliku, ale tylko do odczytu, a Send nie pyta o świeże wartości.
-Podobnie strona otwarta z innej wersji programu (np. karta sprzed aktualizacji) pokazuje
-harmonogramy z banerem i bez akcji, dopóki jej nie przeładujesz; Send działa dalej.
+Konsola TCP potrzebuje programu, bo przeglądarka nie otwiera surowych gniazd TCP: bez
+niego zakładka TCP pokazuje definicje połączeń tylko do odczytu, z banerem. Podobnie strona
+otwarta z innej wersji programu (np. karta sprzed aktualizacji) pokazuje harmonogramy
+i konsolę TCP z banerem i bez akcji (Connect, Send i Disconnect też), dopóki jej nie
+przeładujesz; Send HTTP działa dalej.
 
 ## Bezpieczeństwo
 
@@ -330,9 +425,14 @@ podawaj serwer tokenu i inne cele po adresie IP albo po nazwie z DNS sieci.
 Program nie ma hasła. `-listen 0.0.0.0:8787` wystawia proxy HTTP bez uwierzytelniania na
 całą sieć lokalną: każdy, kto dosięgnie programu, widzi i zmienia wszystko, co program
 trzyma, czyli kolekcje, historię i środowiska razem z wartościami zmiennych (także haseł
-i tokenów), wartości ustawione przez harmonogramy (`GET /api/schedules`), i wysyła
-zapytania z tej maszyny, także włącza i wyłącza harmonogramy. Używaj tego tylko w zaufanej
-sieci. Sam z siebie program łączy się tylko w dwóch przypadkach, i to dopiero po włączeniu:
-żeby sprawdzić wydania i żeby wysłać zapytanie harmonogramu. Harmonogram włączony z innego
-komputera działa dalej po zamknięciu tamtej karty; okno Schedules pokazuje, od kiedy jest
-włączony i z jakiego adresu.
+i tokenów), wartości ustawione przez harmonogramy (`GET /api/schedules`) i log konsoli
+TCP (np. dane pacjentów z analizatora), i wysyła zapytania z tej maszyny, także włącza
+i wyłącza harmonogramy. Konsola TCP wysyła dowolne bajty pod dowolny host i port osiągalny
+z maszyny z binarką, więc każdy w sieci może przez program rozmawiać z urządzeniami albo
+skanować sieć. Używaj tego tylko w zaufanej sieci. Trasy `/api/tcp*` i strumień zdarzeń
+`/api/events` przechodzą przez te same sprawdzenia Host i Origin co reszta. Sam z siebie
+program łączy się tylko w dwóch przypadkach, i to dopiero po włączeniu: żeby sprawdzić
+wydania i żeby wysłać zapytanie harmonogramu. Połączenie TCP otwiera wyłącznie Connect
+z UI. Harmonogram włączony z innego komputera działa dalej po zamknięciu tamtej karty;
+okno Schedules pokazuje, od kiedy jest włączony i z jakiego adresu. Tak samo połączenie
+TCP zostaje otwarte po zamknięciu karty, a konsola pokazuje, z jakiego adresu je otwarto.
