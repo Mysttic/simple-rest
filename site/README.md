@@ -19,8 +19,8 @@ Podpięcie (w repozytorium Mysttic/Mysttic):
       <p>
         A REST client that is one file. Collections, environments, history and
         a response viewer in your browser, requests sent by the program, so
-        CORS never gets in the way, and schedules that keep a token fresh.
-        No installer, no account.
+        CORS never gets in the way, schedules that keep a token fresh, and
+        a TCP console for devices on your network. No installer, no account.
       </p>
       <div class="platforms">
         <span>Windows</span>

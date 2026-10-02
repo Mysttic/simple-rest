@@ -126,6 +126,8 @@ systemem w sieci, np. z analizatorem laboratoryjnym, wysyła komunikaty i pokazu
 przychodzi. Program działa tylko jako klient: łączy się z podanym hostem i portem, nigdy
 nie nasłuchuje. Licznik na zakładce pokazuje otwarte połączenia.
 
+![Konsola TCP: zamówienie HL7 wysłane po MLLP do analizatora i ACK, które przyszło w odpowiedzi](site/simple-rest/img/tcp.png)
+
 - **Połączenie** to definicja w pliku danych: nazwa, Host i Port (oba mogą zawierać
   `{{zmienne}}`, np. `{{lab_host}}`), ramkowanie i ustawienia edytora. Host to nazwa, adres
   IPv4 albo IPv6 (w nawiasach albo bez, także ze strefą, np. `fe80::1%eth0`). Wklejone
