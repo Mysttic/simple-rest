@@ -149,6 +149,12 @@ img.preview { max-width: 100%; padding: 12px; }
 .envlist .item { padding-left: 8px; }
 .toast { position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%); background: var(--bg4); border: 1px solid var(--line); padding: 8px 14px; border-radius: 6px; opacity: 0; transition: opacity .2s; pointer-events: none; z-index: 20; }
 .toast.show { opacity: 1; }
+.banner {
+  position: fixed; top: 52px; left: 50%; transform: translateX(-50%); z-index: 15; width: max-content; max-width: 94vw;
+  display: flex; align-items: center; gap: 12px; padding: 8px 12px; border-radius: 6px;
+  background: #4a3a10; border: 1px solid var(--warn); box-shadow: 0 4px 20px rgba(0,0,0,.5);
+}
+.banner[hidden] { display: none; }
 .spin { display: inline-block; width: 12px; height: 12px; border: 2px solid #fff; border-right-color: transparent; border-radius: 50%; animation: spin .7s linear infinite; vertical-align: -2px; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
@@ -158,6 +164,81 @@ progress { width: 100%; height: 8px; accent-color: var(--acc); margin: 6px 0; }
 #updateBadge { cursor: pointer; border: 0; }
 #updSection h3 { margin: 16px 0 8px; font-size: 13px; }
 
+/* schedules */
+#schedBtn .count { color: var(--acc); font-size: 11px; margin-left: 4px; }
+#schedBtn.err { border-color: var(--err); }
+#schedBtn.err .count { color: var(--err); }
+.item .smark { color: var(--acc); flex: none; }
+.item .sglyph { width: 12px; flex: none; text-align: center; }
+.item .sstat { font-size: 11px; flex: none; white-space: nowrap; }
+.st-ok { color: var(--ok); } .st-warn { color: var(--warn); } .st-err { color: var(--err); } .st-off { color: var(--fg2); }
+.warn-hint { color: var(--warn); font-size: 12px; margin: 6px 0; }
+.warn-hint.bad { color: var(--err); }
+.warn-hint button, .runinfo button, #envOverlay button { padding: 1px 8px; font-size: 12px; }
+.modal-note { margin: 10px 14px 0; padding: 8px 12px; border-radius: 6px; background: #4a3a10; border: 1px solid var(--warn); }
+.modal footer .spacer { flex: 1; }
+.modal h4 { margin: 12px 0 6px; font-size: 12px; font-weight: 600; color: var(--fg2); }
+table.kv.rules select { background: transparent; border-color: transparent; padding: 3px 4px; font-size: 12px; }
+table.kv.rules td.opt { width: 34px; text-align: center; }
+.runinfo { display: grid; grid-template-columns: 90px 1fr; gap: 4px 12px; margin-top: 10px; font-size: 12px; }
+.runinfo .k { color: var(--fg2); }
+.mono { font-family: var(--mono); word-break: break-all; }
+#envOverlay table { width: 100%; border-collapse: collapse; font-size: 12px; }
+#envOverlay td { padding: 3px 6px; border-bottom: 1px solid var(--line); }
+#envOverlay td:last-child { white-space: nowrap; text-align: right; }
+
+/* TCP console: the work area shows either the HTTP editor or #tcpView */
+#tcpView { display: none; flex: 1; flex-direction: column; min-height: 0; min-width: 0; overflow-x: hidden; overflow-y: auto; }
+.work.view-tcp > .request, .work.view-tcp > .splitter, .work.view-tcp > .response { display: none; }
+.work.view-tcp > #tcpView { display: flex; }
+/* In a short window the log keeps some lines and the view scrolls. */
+#tcpMain { display: flex; flex-direction: column; flex: 1; min-height: 560px; }
+#tcpMain[hidden] { display: none; }
+#tcpView .bar { flex-wrap: wrap; padding: 5px 12px; }
+#tcpView .modal-note { margin: 8px 12px 0; }
+#tcpName { flex: 1; background: transparent; border-color: transparent; font-weight: 600; font-size: 14px; }
+#tcpName:hover, #tcpName:focus { border-color: var(--line); background: var(--bg2); }
+#tcpHost { flex: 1; min-width: 140px; font-family: var(--mono); }
+#tcpPort { width: 80px; font-family: var(--mono); }
+#tcpIdle { width: 70px; }
+#tcpWaitSec { width: 56px; }
+.tcpstat { font-family: var(--mono); font-size: 12px; }
+.tcpmeta { padding: 0 12px 4px; font: 12px var(--mono); color: var(--fg2); word-break: break-all; }
+#tcpHints { padding: 0 12px; }
+#tcpHints .warn-hint { margin: 2px 0; }
+.tcploghead { border-top: 1px solid var(--line); }
+.seg { display: inline-flex; }
+.seg button { border-radius: 0; padding: 2px 8px; font-size: 12px; }
+.seg button:first-child { border-radius: 5px 0 0 5px; }
+.seg button:last-child { border-radius: 0 5px 5px 0; border-left: 0; }
+.seg button.active { background: var(--bg4); color: var(--fg); }
+.tcplog { flex: 1; min-height: 90px; overflow: auto; background: var(--bg); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); font: 12px/1.45 var(--mono); padding: 4px 0; }
+.tle { display: grid; grid-template-columns: 92px 30px 64px minmax(0, 1fr); gap: 0 8px; padding: 2px 12px; }
+.tle:hover { background: var(--bg2); }
+.tle .t, .tle .n { color: var(--fg2); white-space: nowrap; }
+.tle .n { text-align: right; }
+.tle .d { font-weight: 700; color: var(--fg2); }
+.tle.tx .d { color: var(--warn); } .tle.rx .d { color: var(--ok); } .tle.error .d, .tle.error .x { color: var(--err); }
+.tle .x { white-space: pre; display: block; overflow-x: auto; }
+.tcplog.wrap .tle .x { white-space: pre-wrap; word-break: break-all; }
+.tle .m { color: var(--fg2); font-family: var(--sans); font-size: 11px; display: flex; flex-wrap: wrap; gap: 2px 10px; align-items: center; }
+.tle .m .lb { color: var(--purple); }
+.tle .m .wn { color: var(--warn); }
+.tle .acts { visibility: hidden; display: inline-flex; gap: 4px; }
+.tle:hover .acts { visibility: visible; }
+.tle .acts button { padding: 0 6px; font-size: 11px; }
+.tcppending { padding: 2px 12px; color: var(--warn); }
+.tchips { display: inline-flex; flex-wrap: wrap; gap: 6px; }
+.tchip { display: inline-flex; }
+.tchip button { border-radius: 0; padding: 1px 7px; font-size: 12px; }
+.tchip button:first-child { border-radius: 5px 0 0 5px; }
+.tchip button + button { border-left: 0; }
+.tchip button:last-child { border-radius: 0 5px 5px 0; color: var(--fg2); }
+#tcpData { flex: none; height: 100px; min-height: 60px; margin: 0 12px; font-size: 12px; }
+.tcpsends { padding: 4px 12px 0; font: 12px var(--mono); color: var(--fg2); white-space: pre-wrap; word-break: break-all; max-height: 3em; overflow: hidden; }
+#tcpNote .warn-hint { display: inline; margin: 0 8px 0 0; }
+#tcpEmpty { flex: 1; }
+
 @media (max-width: 800px) {
   body { grid-template-columns: 1fr; }
   .sidebar { position: fixed; top: 44px; bottom: 0; left: 0; width: min(320px, 85vw); z-index: 5; transform: translateX(-100%); transition: transform .15s; }
@@ -166,20 +247,23 @@ progress { width: 100%; height: 8px; accent-color: var(--acc); margin: 6px 0; }
   .topbar .hide-sm { display: none; }
   .envlayout { grid-template-columns: 1fr; }
   .envlist { border: 0; padding: 0; }
+  .tle { grid-template-columns: 76px 28px minmax(0, 1fr); }
+  .tle .n { display: none; }
 }
 </style>
 </head>
 <body>
 <header class="topbar">
-  <button id="menuBtn" class="icon" title="Collections">&#9776;</button>
+  <button id="menuBtn" class="icon" title="Menu">&#9776;</button>
   <div class="brand">simple<span>-rest</span></div>
   <span id="modeBadge" class="badge">...</span>
   <button id="updateBadge" class="badge warn" title="A newer release is available, open Settings" hidden></button>
   <div class="spacer"></div>
   <select id="envSelect" title="Active environment"><option value="">No environment</option></select>
   <button id="envBtn" title="Manage environments">Environments</button>
-  <button id="importBtn" class="hide-sm" title="Import collections / environments (own JSON or Postman v2.1)">Import</button>
-  <button id="exportBtn" class="hide-sm" title="Export collections and environments to JSON">Export</button>
+  <button id="schedBtn" title="Schedules">&#10227;<span class="hide-sm"> Schedules</span><span class="count" id="schedCount"></span></button>
+  <button id="importBtn" class="hide-sm" title="Import collections, environments, schedules and TCP connections (own JSON or Postman v2.1)">Import</button>
+  <button id="exportBtn" class="hide-sm" title="Export collections, environments, schedules and TCP connections to JSON">Export</button>
   <button id="settingsBtn" class="icon" title="Settings">&#9881;</button>
   <input type="file" id="importFile" accept=".json,application/json" multiple hidden>
 </header>
@@ -188,14 +272,17 @@ progress { width: 100%; height: 8px; accent-color: var(--acc); margin: 6px 0; }
   <div class="tabs">
     <button data-side="coll" class="active">Collections</button>
     <button data-side="hist">History</button>
+    <button data-side="tcp" title="TCP console: the number of open connections">TCP<span class="count" id="tcpTabCount"></span></button>
   </div>
   <div class="search">
     <input type="text" id="sideSearch" placeholder="Filter...">
     <button id="addCollBtn" title="New collection">+</button>
     <button id="clearHistBtn" class="danger" title="Clear history" hidden>Clear</button>
+    <button id="addTcpBtn" title="New TCP connection" hidden>+</button>
   </div>
   <div class="list" id="collList"></div>
   <div class="list hist" id="histList" hidden></div>
+  <div class="list" id="tcpList" hidden></div>
 </aside>
 
 <main class="work">
@@ -295,6 +382,69 @@ progress { width: 100%; height: 8px; accent-color: var(--acc); margin: 6px 0; }
       <div id="respPreview" hidden style="height:100%"></div>
     </div>
   </section>
+
+  <section id="tcpView">
+    <div class="modal-note" id="tcpBanner" role="alert" hidden></div>
+    <div class="empty" id="tcpEmpty">No TCP connection open. Pick one in the TCP tab of the sidebar, or press + there.</div>
+    <div id="tcpMain" hidden>
+      <div class="bar name">
+        <input type="text" id="tcpName" placeholder="Connection name" data-commit="change">
+        <button id="tcpDupBtn" title="Duplicate this connection">Duplicate</button>
+        <button id="tcpDelBtn" class="danger" title="Delete this connection">Delete</button>
+      </div>
+      <div class="bar">
+        <label for="tcpHost">Host</label>
+        <input type="text" id="tcpHost" placeholder="10.0.0.5, lab-pc or {{lab_host}}" spellcheck="false" autocomplete="off" data-commit="change">
+        <label for="tcpPort">Port</label>
+        <input type="text" id="tcpPort" placeholder="2575" spellcheck="false" autocomplete="off" data-commit="change">
+        <button id="tcpConnBtn" class="primary">Connect</button>
+        <span class="tcpstat" id="tcpStatus"></span>
+        <span class="spacer" style="flex:1"></span>
+        <span class="badge" id="tcpLive" title="Changes come in as they happen" hidden>Live</span>
+      </div>
+      <div class="tcpmeta" id="tcpMeta"></div>
+      <div class="bar">
+        <label for="tcpFraming">Framing</label>
+        <select id="tcpFraming"></select>
+        <span class="hint mono" id="tcpFramingBytes"></span>
+        <label><input type="checkbox" id="tcpWrapOut"> Wrap outgoing</label>
+        <label id="tcpIdleBox" title="Bytes outside a frame make one entry until this much silence; 0 makes one entry of each read">Split on silence <input type="number" id="tcpIdle" min="0" max="5000" step="10" data-commit="change"> ms</label>
+      </div>
+      <div id="tcpHints"></div>
+      <div class="bar tcploghead">
+        <b>Log</b><span class="hint" id="tcpCount"></span>
+        <span class="spacer" style="flex:1"></span>
+        <label for="tcpCharset">RX charset</label>
+        <select id="tcpCharset"><option value="utf-8">UTF-8</option><option value="windows-1250">Windows-1250</option><option value="iso-8859-2">ISO-8859-2</option><option value="latin1">Latin-1</option></select>
+        <span class="seg"><button data-logview="text" class="active">Text</button><button data-logview="hex">Hex</button></span>
+        <button id="tcpLogWrapBtn" title="Toggle line wrap">Wrap</button>
+        <button id="tcpClearBtn" title="Clear the log of this connection, for every tab">Clear</button>
+      </div>
+      <div class="tcplog" id="tcpLog"></div>
+      <div class="tcppending" id="tcpPending" hidden></div>
+      <div class="bar"><span class="hint">Saved:</span><span class="tchips" id="tcpChips"></span><span class="spacer" style="flex:1"></span>
+        <button id="tcpSaveAsBtn" title="Save the message in the editor with this connection (Ctrl+S)">Save as…</button></div>
+      <div class="bar">
+        <label><input type="radio" name="tcpMode" value="text"> Text</label>
+        <label><input type="radio" name="tcpMode" value="hex"> Hex</label>
+        <label class="tcp-text">Enter inserts <select id="tcpNewline"><option value="lf">LF</option><option value="cr">CR</option><option value="crlf">CR LF</option></select></label>
+        <label class="tcp-text"><input type="checkbox" id="tcpEscapes"> Escapes (\r \n \t \\ \xHH)</label>
+      </div>
+      <textarea id="tcpData" spellcheck="false" placeholder="The message. {{variables}} come from the environment the connection was opened with."></textarea>
+      <div class="tcpsends" id="tcpSends"></div>
+      <div class="bar">
+        <span class="hint" id="tcpBytes"></span>
+        <span id="tcpNote"></span>
+        <span class="spacer" style="flex:1"></span>
+        <label><input type="checkbox" id="tcpWait"> Wait for reply</label>
+        <label><input type="number" id="tcpWaitSec" min="0.1" max="60" step="1" data-commit="change"> s</label>
+        <span class="hint" id="tcpReply"></span>
+        <button id="tcpCancelWait" hidden>Cancel</button>
+        <button id="tcpSendBtn" class="primary" title="Send (Ctrl+Enter)">Send</button>
+        <span class="hint">Ctrl+Enter</span>
+      </div>
+    </div>
+  </section>
 </main>
 
 <div class="modal-bg" id="envModal">
@@ -311,10 +461,53 @@ progress { width: 100%; height: 8px; accent-color: var(--acc); margin: 6px 0; }
           <button id="delEnvBtn" class="danger">Delete</button>
         </div>
         <table class="kv" id="envVarsTable"></table>
+        <div id="envOverlay"></div>
         <p class="hint">Use as {{name}} in URL, params, headers, body and auth.</p>
       </div>
     </div>
     <footer><button class="primary" data-close>Close</button></footer>
+  </div>
+</div>
+
+<div class="modal-bg" id="schedModal">
+  <div class="modal" style="width:min(860px,96vw)">
+    <header>Schedules <span class="hint" style="font-weight:400">Runs in the simple-rest program</span><div class="spacer"></div><button class="icon" data-close>&#10005;</button></header>
+    <div class="modal-note" id="schedBanner" role="alert" hidden></div>
+    <div class="body envlayout">
+      <div class="envlist">
+        <div id="schedList"></div>
+        <button id="addSchedBtn" style="margin-top:8px" title="Schedule the request open in the editor">+ Schedule</button>
+        <div class="warn-hint" id="schedAddHint"></div>
+      </div>
+      <div id="schedEditor">
+        <div class="bar" style="padding:0 0 8px">
+          <input type="text" id="schedName" placeholder="Schedule name" style="flex:1" data-commit="change">
+          <button id="delSchedBtn" class="danger">Delete</button>
+        </div>
+        <div class="bar" style="padding:0 0 8px">
+          <label><input type="checkbox" id="schedEnabled"> Enabled</label>
+          <span class="hint" id="schedSince" style="flex:1"></span>
+          <button id="schedRunBtn" title="Send the request once now and set the values">Run now</button>
+        </div>
+        <div class="grid">
+          <label for="schedReq">Request</label><select id="schedReq"></select>
+          <label for="schedEnv">Env</label><select id="schedEnv"></select>
+          <label for="schedEvery">Every</label>
+          <div><input type="number" id="schedEvery" min="1" step="1" style="width:80px" data-commit="change">
+            <select id="schedUnit"><option value="1">seconds</option><option value="60">minutes</option><option value="3600">hours</option></select></div>
+          <label for="schedExp">Expiry</label>
+          <div><input type="text" id="schedExp" placeholder="expires_in" spellcheck="false" style="width:140px" data-commit="change"> from the response,
+            <input type="number" id="schedLead" min="0" max="3600" step="1" style="width:70px" data-commit="change"> s before it
+            <div class="hint">(leave empty to use Every only)</div></div>
+        </div>
+        <h4>Set from the response</h4>
+        <table class="kv rules" id="schedRules"></table>
+        <div id="schedHints"></div>
+        <div class="runinfo" id="schedRun"></div>
+      </div>
+    </div>
+    <p class="hint" style="margin:0;padding:0 14px 10px">Runs inside the simple-rest program, also with no browser open. Sends the saved request. Every start of the program turns all schedules off. Values are kept in memory only, never in the data file.</p>
+    <footer><button id="schedOffAllBtn" title="Turn every schedule off">Turn all off</button><div class="spacer"></div><button class="primary" data-close>Close</button></footer>
   </div>
 </div>
 
@@ -347,6 +540,8 @@ progress { width: 100%; height: 8px; accent-color: var(--acc); margin: 6px 0; }
 </div>
 
 <div class="toast" id="toast"></div>
+<div class="banner" id="staleBanner" role="alert" hidden><span>This page comes from another simple-rest version than the running program. Reload the page.</span><button class="primary" data-reload>Reload</button></div>
+<div class="banner" id="conflictBanner" role="alert" hidden><span>Your last change was not saved: the data was changed in another tab or on another computer.</span><button class="primary" data-reload>Reload</button></div>
 <script>
 (() => {
 'use strict';
@@ -357,9 +552,13 @@ const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;'
 const clone = o => JSON.parse(JSON.stringify(o));
 const RAW_TYPES = { json: 'application/json', text: 'text/plain', xml: 'application/xml', html: 'text/html', js: 'application/javascript' };
 const DEFAULT_SETTINGS = { timeoutMs: 30000, followRedirects: true, verifyTls: true, cookies: true, history: true };
+const STATE_KEYS = ['version', 'collections', 'history', 'envs', 'activeEnv', 'settings', 'schedules', 'tcp'];
 
 // ---------------------------------------------------------------- state
-let state = { version: 1, collections: [], history: [], envs: [], activeEnv: '', settings: { ...DEFAULT_SETTINGS } };
+// state is refilled in place (applyState) and never replaced, so references to
+// it, such as __sr.state, stay valid.
+const state = { version: 1, collections: [], history: [], envs: [], activeEnv: '', settings: { ...DEFAULT_SETTINGS }, schedules: [], tcp: [] };
+let extraKeys = {};        // top-level keys of the data file this version does not know, saved back as they came
 let MODE = 'standalone'; // 'server' when served by the Go binary
 let info = {};
 let cur = null;            // request being edited (working copy)
@@ -369,9 +568,32 @@ let lastResponse = null;
 let sideTab = 'coll';
 let respView = 'pretty';
 
+// ---------------------------------------------------------------- normalization
+// The data file and imports may hold any JSON type in any field; these turn
+// values into what the editor expects. Fields they do not know stay as they are.
+const str = v => typeof v === 'string' ? v : v == null ? '' : typeof v === 'object' ? JSON.stringify(v) : String(v);
+const obj = v => v && typeof v === 'object' && !Array.isArray(v) ? v : {};
+const arr = v => Array.isArray(v) ? v : [];
+const toMs = v => Math.max(0, Math.trunc(+v) || 0);
+const SWITCHES = ['followRedirects', 'verifyTls', 'cookies'];
+const AUTH_KEYS = ['type', 'username', 'password', 'token', 'keyName', 'keyValue', 'keyIn'];
+// setOwn and assignOwn work like an assignment and Object.assign, but define
+// the key: JSON.parse makes "__proto__" a plain key, and an assignment would
+// replace the prototype of t with its value instead of keeping the key.
+const setOwn = (t, k, v) => Object.defineProperty(t, k, { value: v, enumerable: true, writable: true, configurable: true });
+function assignOwn(t, src) {
+  for (const k of Object.keys(src)) setOwn(t, k, src[k]);
+  return t;
+}
+
 const newRow = () => ({ enabled: true, name: '', value: '' });
-function newRequest() {
-  const s = state.settings;
+function normalizeRow(x) {
+  const r = assignOwn(newRow(), obj(x));
+  r.enabled = r.enabled === undefined || !!r.enabled;
+  r.name = str(r.name); r.value = str(r.value);
+  return r;
+}
+function newRequest(s = state.settings) {
   return {
     id: uid(), name: '', method: 'GET', url: '', params: [], headers: [],
     body: { mode: 'none', raw: '', rawType: 'json', form: [] },
@@ -379,49 +601,357 @@ function newRequest() {
     options: { timeoutMs: s.timeoutMs, followRedirects: s.followRedirects, verifyTls: s.verifyTls, cookies: s.cookies },
   };
 }
-function normalizeRequest(r) {
-  const d = newRequest();
-  const options = Object.assign({}, d.options, (r && r.options) || {});
-  r = Object.assign(d, r || {});
-  r.body = Object.assign({ mode: 'none', raw: '', rawType: 'json', form: [] }, r.body || {});
-  r.auth = Object.assign({ type: 'none', username: '', password: '', token: '', keyName: '', keyValue: '', keyIn: 'header' }, r.auth || {});
-  r.options = options;
-  r.params = (r.params || []).map(x => Object.assign(newRow(), x));
-  r.headers = (r.headers || []).map(x => Object.assign(newRow(), x));
-  r.body.form = (r.body.form || []).map(x => Object.assign(newRow(), x));
-  r.method = String(r.method || 'GET').toUpperCase();
-  return r;
+// normalizeRequest fills in what old or foreign requests lack; s gives the
+// default options. It has a twin in effective.go (see buildEffective).
+function normalizeRequest(r, s = state.settings) {
+  const d = newRequest(s);
+  r = obj(r);
+  const known = {
+    id: str(r.id) || d.id, name: str(r.name), method: String(r.method || 'GET').toUpperCase(), url: str(r.url),
+    params: arr(r.params).map(normalizeRow), headers: arr(r.headers).map(normalizeRow),
+    body: assignOwn(d.body, obj(r.body)), auth: assignOwn(d.auth, obj(r.auth)), options: assignOwn(d.options, obj(r.options)),
+  };
+  const out = Object.assign(assignOwn(d, r), known);
+  const b = out.body;
+  b.raw = str(b.raw); b.form = arr(b.form).map(normalizeRow);
+  if (!Object.hasOwn(RAW_TYPES, b.rawType)) b.rawType = 'text';
+  for (const k of AUTH_KEYS) out.auth[k] = str(out.auth[k]);
+  out.options.timeoutMs = toMs(out.options.timeoutMs);
+  for (const k of SWITCHES) out.options[k] = !!out.options[k];
+  return out;
+}
+// A schedule of the data file is a definition only: whether it is on, when it
+// runs and what it set live in the program (schedule.go), which reads the
+// fields below and nothing else, so a hand-written "enabled": true turns
+// nothing on. normalizeSchedule reads them as decodeSchedule there does: a
+// missing or null field gets the default, a field of another JSON type counts
+// as missing (the program lists it among the problems of the schedule), a
+// number of seconds is cut to a whole one and kept within its range, and only
+// the first 20 rules count. Unknown fields stay as they are.
+const SCHED_ID = /^[A-Za-z0-9_-]{1,64}$/;
+const MAX_RULES = 20;
+const txt = (v, def = '') => (typeof v === 'string' ? v : v === null ? '' : def);
+const flag = (v, def) => (typeof v === 'boolean' ? v : v === null ? false : def);
+const secs = (v, def, lo, hi) => (typeof v === 'number' && !Number.isNaN(v) ? Math.min(Math.max(Math.trunc(v), lo), hi) : def);
+function normalizeRule(x) {
+  const r = assignOwn({}, obj(x));
+  const from = txt(r.from, 'json');
+  return Object.assign(r, {
+    enabled: flag(r.enabled, true), optional: flag(r.optional, false), var: txt(r.var),
+    from: from === 'header' || from === 'regex' ? from : 'json', path: txt(r.path),
+  });
+}
+// normalizeSchedule gives a schedule a new id when its own is not one the
+// program takes, or when seen already holds it: the program skips such a
+// schedule, and no route could name it.
+function normalizeSchedule(x, seen = new Set()) {
+  const s = assignOwn({}, obj(x));
+  let id = txt(s.id);
+  if (!SCHED_ID.test(id) || seen.has(id)) id = uid();
+  seen.add(id);
+  return Object.assign(s, {
+    id, name: txt(s.name), requestId: txt(s.requestId), envId: txt(s.envId),
+    everySec: secs(s.everySec, 240, 10, 86400), expiresPath: txt(s.expiresPath), leadSec: secs(s.leadSec, 60, 0, 3600),
+    extract: arr(s.extract).slice(0, MAX_RULES).map(normalizeRule),
+  });
+}
+// The framing presets of the TCP console: the bytes a frame starts and ends
+// with. They have twins in tcpframe.go (framingPresets); change them only
+// together and with a vector in testdata/tcp-framing.json, which
+// tests/tcp.test.mjs and tcpframe_test.go both run.
+const TCP_PRESETS = {
+  none: { label: 'None (raw bytes)', start: [], end: [] },
+  lf: { label: 'LF', start: [], end: [0x0A] },
+  crlf: { label: 'CR LF', start: [], end: [0x0D, 0x0A] },
+  mllp: { label: 'MLLP (HL7)', start: [0x0B], end: [0x1C, 0x0D] },
+  stxetx: { label: 'STX/ETX', start: [0x02], end: [0x03] },
+};
+const presetOf = name => TCP_PRESETS[Object.hasOwn(TCP_PRESETS, name) ? name : 'none'];
+const TCP_MODES = ['text', 'hex'], TCP_NEWLINES = ['lf', 'cr', 'crlf'], RX_CHARSETS = ['utf-8', 'windows-1250', 'iso-8859-2', 'latin1'];
+const oneOf = (v, list, def) => (list.includes(v) ? v : def);
+function normalizeTcpMessage(x) {
+  const m = assignOwn({}, obj(x));
+  return Object.assign(m, { id: str(m.id) || uid(), name: str(m.name), mode: oneOf(m.mode, TCP_MODES, 'text'), data: str(m.data) });
+}
+// normalizeTcp reads a TCP connection of the data file: times are cut to a
+// whole number of milliseconds within their range, a field of another type
+// gets its default and so does an unknown framing preset (none). The host
+// and the port are templates, so a number there becomes its text. Like a
+// schedule, a connection gets a new id when its own is not one the routes of
+// the program take or seen holds it. Unknown fields stay as they are.
+function normalizeTcp(x, seen = new Set()) {
+  const d = assignOwn({}, obj(x));
+  let id = txt(d.id);
+  if (!SCHED_ID.test(id) || seen.has(id)) id = uid();
+  seen.add(id);
+  const framing = assignOwn({}, obj(d.framing));
+  if (!Object.hasOwn(TCP_PRESETS, framing.preset)) framing.preset = 'none';
+  return Object.assign(d, {
+    id, name: str(d.name), host: str(d.host), port: str(d.port),
+    connectTimeoutMs: secs(d.connectTimeoutMs, 10000, 100, 60000), framing, idleMs: secs(d.idleMs, 50, 0, 5000),
+    wrap: flag(d.wrap, true), waitReply: flag(d.waitReply, false), replyTimeoutMs: secs(d.replyTimeoutMs, 5000, 100, 60000),
+    mode: oneOf(d.mode, TCP_MODES, 'text'), newline: oneOf(d.newline, TCP_NEWLINES, 'lf'), escapes: flag(d.escapes, true),
+    rxCharset: oneOf(d.rxCharset, RX_CHARSETS, 'utf-8'), messages: arr(d.messages).map(normalizeTcpMessage),
+  });
+}
+// normalizeDoc turns a parsed data file (or null) into a complete document.
+// Top-level keys this version does not know go to extra, so a save writes
+// them back; unknown fields of collections, environments, requests,
+// schedules, TCP connections and rows stay on their objects.
+function normalizeDoc(data) {
+  const d = obj(data);
+  const settings = assignOwn({ ...DEFAULT_SETTINGS }, obj(d.settings));
+  settings.timeoutMs = toMs(settings.timeoutMs);
+  for (const k of SWITCHES) settings[k] = !!settings[k];
+  const collections = arr(d.collections).map(x => {
+    const c = assignOwn({ id: '', name: '', open: true, requests: [] }, obj(x));
+    return Object.assign(c, { id: str(c.id) || uid(), name: str(c.name) || 'Collection', open: c.open !== false, requests: arr(c.requests).map(r => normalizeRequest(r, settings)) });
+  });
+  const envs = arr(d.envs).map(x => {
+    const e = assignOwn({ id: '', name: '', vars: [] }, obj(x));
+    return Object.assign(e, { id: str(e.id) || uid(), name: str(e.name) || 'env', vars: arr(e.vars).map(normalizeRow) });
+  });
+  const activeEnv = str(d.activeEnv);
+  const seen = new Set();
+  const schedules = arr(d.schedules).map(x => normalizeSchedule(x, seen));
+  const seenTcp = new Set();
+  const tcp = arr(d.tcp).map(x => normalizeTcp(x, seenTcp));
+  const extra = {};
+  for (const k of Object.keys(d)) if (!STATE_KEYS.includes(k)) setOwn(extra, k, d[k]);
+  return {
+    version: 1, collections, history: arr(d.history).slice(0, 200), envs,
+    activeEnv: envs.some(e => e.id === activeEnv) ? activeEnv : '', settings, schedules, tcp, extra,
+  };
+}
+// applyState refills state from a normalized document. keepEnv keeps the
+// environment of this tab (a sync); otherwise the tab takes the one it had
+// before a reload, or else the one in the file. '' (No environment) is a
+// choice like any other; an environment that is gone is not.
+function applyState(doc, { keepEnv = false } = {}) {
+  const want = keepEnv ? [state.activeEnv] : [loadTabEnv(), doc.activeEnv];
+  for (const k of STATE_KEYS) state[k] = doc[k];
+  extraKeys = doc.extra || {};
+  state.activeEnv = want.find(id => id === '' || (id && findEnv(id))) ?? '';
+}
+const serializeState = () => JSON.stringify(Object.assign(assignOwn({}, extraKeys), state));
+
+// The active environment belongs to the tab: sessionStorage outlives a reload
+// but not the tab, and the file keeps the last choice only as the start value
+// of a new tab.
+function loadTabEnv() {
+  try { return sessionStorage.getItem('simple-rest-env'); } catch (e) { return null; }
+}
+function setActiveEnv(id) {
+  state.activeEnv = id;
+  try { sessionStorage.setItem('simple-rest-env', id); } catch (e) { /* no storage: the choice lasts until a reload */ }
+  persist();
 }
 
 // ---------------------------------------------------------------- persistence
-let saveTimer = null;
-function persist() { clearTimeout(saveTimer); saveTimer = setTimeout(persistNow, 400); }
-async function persistNow() {
-  const data = JSON.stringify(state);
-  if (MODE === 'server') {
+// The data file has an ETag (lastTag). A save sends it as If-Match, so a save
+// over a file that another tab or computer changed meanwhile gets 412 and
+// leaves the file alone. saveState is ok, unsaved (the last save failed; a
+// network failure is retried), stale (409: the page comes from another version
+// of the program) or conflict (412). Stale and conflict stop saving until the
+// page is reloaded.
+let saveTimer = null, retryTimer = null;
+let saving = null;      // promise of the PUT loop in flight
+let again = false;      // state changed while a PUT was in flight
+let saveState = 'ok';
+let lastTag = '';       // ETag of the data file as this tab last saw it
+let lastSynced = '';    // the text of the data file at lastTag
+const savingOff = () => saveState === 'stale' || saveState === 'conflict';
+const savePending = () => !!(saveTimer || saving);
+function setSaveState(s) {
+  saveState = s;
+  if (savingOff()) { clearTimeout(saveTimer); clearTimeout(retryTimer); saveTimer = retryTimer = null; }
+  $('#staleBanner').hidden = s !== 'stale';
+  $('#conflictBanner').hidden = s !== 'conflict';
+  if (s === 'stale' && isOpen('#schedModal')) renderSchedMode();
+  if (s === 'stale' && view === 'tcp') renderTcpView();
+}
+function persist() {
+  if (savingOff()) return;
+  clearTimeout(saveTimer); saveTimer = setTimeout(persistNow, 400);
+}
+// persistNow saves at once and resolves to whether everything is saved. Only
+// one PUT is in flight; a change meanwhile is saved right after it.
+function persistNow() {
+  clearTimeout(saveTimer); clearTimeout(retryTimer); saveTimer = retryTimer = null;
+  if (savingOff()) return Promise.resolve(false);
+  if (saving) { again = true; return saving; }
+  saving = (async () => {
+    let ok;
     try {
-      const r = await fetch('/api/state', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: data });
-      if (!r.ok) throw new Error(await r.text());
-    } catch (e) { toast('Save failed: ' + e.message); }
-  } else {
-    try { localStorage.setItem('simple-rest', data); } catch (e) { toast('Save failed: ' + e.message); }
+      do { again = false; ok = await putState(); } while (ok && again);
+    } finally { saving = null; }
+    if (ok && syncAgain && !saveTimer) { syncAgain = false; syncIfBehind(); }
+    return ok;
+  })();
+  return saving;
+}
+async function putState() {
+  const data = serializeState();
+  if (data === lastSynced) { setSaveState('ok'); return true; }
+  if (MODE !== 'server') {
+    // localStorage has no If-Match: a save over what another tab saved since
+    // this tab last looked is a conflict, as a 412 is.
+    try {
+      if ((localStorage.getItem('simple-rest') || '') !== lastSynced) { setSaveState('conflict'); return false; }
+      localStorage.setItem('simple-rest', data);
+    } catch (e) { toast('Save failed: ' + e.message); setSaveState('unsaved'); return false; }
+    lastSynced = data;
+    setSaveState('ok');
+    return true;
   }
+  const headers = { 'Content-Type': 'application/json', 'X-Simple-Rest-Version': info.version };
+  if (lastTag) headers['If-Match'] = lastTag;
+  let r;
+  try {
+    r = await fetch('/api/state', { method: 'PUT', headers, body: data });
+  } catch (e) {
+    if (saveState !== 'unsaved') toast('Save failed: ' + e.message);
+    setSaveState('unsaved');
+    retryTimer = setTimeout(persistNow, 5000);
+    return false;
+  }
+  if (r.ok) { lastTag = r.headers.get('ETag') || lastTag; lastSynced = data; setSaveState('ok'); return true; }
+  if (r.status === 409) setSaveState('stale');
+  else if (r.status === 412) setSaveState('conflict');
+  else { toast('Save failed: ' + (await r.text()).trim()); setSaveState('unsaved'); }
+  return false;
+}
+// flushPersist saves what waits for the timer, or waits for the save in
+// flight, and resolves to whether everything is saved.
+function flushPersist() {
+  if (saveTimer || retryTimer) return persistNow();
+  return saving || Promise.resolve(saveState === 'ok');
 }
 async function loadState() {
-  let data = null;
+  let text = null;
   try {
-    if (MODE === 'server') data = await (await fetch('/api/state')).json();
-    else data = JSON.parse(localStorage.getItem('simple-rest') || 'null');
+    if (MODE === 'server') {
+      const r = await fetch('/api/state', { cache: 'no-store' });
+      if (!r.ok) throw new Error((await r.text()).trim() || 'HTTP ' + r.status);
+      text = await r.text();
+      lastTag = r.headers.get('ETag') || '';
+    } else text = localStorage.getItem('simple-rest');
   } catch (e) { toast('Could not load saved data: ' + e.message); }
-  if (!data || typeof data !== 'object') return;
-  state.settings = Object.assign({ ...DEFAULT_SETTINGS }, data.settings || {});
-  state.collections = (data.collections || []).map(c => ({
-    id: c.id || uid(), name: c.name || 'Collection', open: c.open !== false,
-    requests: (c.requests || []).map(normalizeRequest),
-  }));
-  state.envs = (data.envs || []).map(e => ({ id: e.id || uid(), name: e.name || 'env', vars: (e.vars || []).map(v => Object.assign(newRow(), v)) }));
-  state.activeEnv = state.envs.some(e => e.id === data.activeEnv) ? data.activeEnv : '';
-  state.history = (data.history || []).slice(0, 200);
+  lastSynced = text || '';
+  let data = null;
+  try { data = JSON.parse(text || 'null'); } catch (e) { toast('Could not load saved data: ' + e.message); }
+  applyState(normalizeDoc(data));
+}
+
+// ---------------------------------------------------------------- sync
+// syncIfBehind shows what another tab or computer saved. It never runs over
+// changes of this tab: with a save pending it waits for the save, whose
+// If-Match catches a conflict, and it stops for good with saving.
+let syncing = null;     // the sync in flight
+let syncAgain = false;  // a sync waits for the pending save
+let focusWait = false;  // a sync waits for a held field to lose focus
+function syncIfBehind(hintTag) {
+  if (!syncing) syncing = syncNow(hintTag).finally(() => { syncing = null; });
+  return syncing;
+}
+async function syncNow(hintTag) {
+  if (saveState !== 'ok') return 'off';
+  if (hintTag && hintTag === lastTag) return 'same';
+  if (savePending()) { syncAgain = true; return 'deferred'; }
+  const held = heldField();
+  if (held) {
+    if (!focusWait) {
+      focusWait = true;
+      held.addEventListener('focusout', () => { focusWait = false; syncIfBehind(); }, { once: true });
+    }
+    return 'deferred';
+  }
+  const tag = lastTag;
+  let text, newTag = '';
+  try {
+    if (MODE === 'server') {
+      const r = await fetch('/api/state', { cache: 'no-store', headers: tag ? { 'If-None-Match': tag } : {} });
+      if (r.status === 304) return 'same';
+      if (!r.ok) return 'error';
+      text = await r.text();
+      newTag = r.headers.get('ETag') || '';
+    } else {
+      text = localStorage.getItem('simple-rest') || '';
+      if (text === lastSynced) return 'same';
+    }
+  } catch (e) { return 'error'; }
+  // The tab may have changed or saved something while the answer was coming.
+  if (savePending() || saveState !== 'ok' || lastTag !== tag) { syncAgain = true; return 'deferred'; }
+  let data;
+  try { data = JSON.parse(text || 'null'); } catch (e) { return 'error'; }
+  lastSynced = text; lastTag = newTag;
+  applyState(normalizeDoc(data), { keepEnv: true });
+  redrawAfterSync();
+  return 'applied';
+}
+// heldField is the focused field of an open modal or of the TCP console when
+// it holds typed text the model does not have yet: fields that write to the
+// model on change carry data-commit="change" and get data-held while typed
+// into (see wire).
+function heldField() {
+  const el = document.activeElement;
+  return el && el.dataset && el.dataset.held && (el.closest('.modal-bg.open') || el.closest('#tcpView')) ? el : null;
+}
+function redrawAfterSync() {
+  const focus = saveFocus();
+  syncEditor();
+  renderCollections(); renderHistory(); renderEnvSelect(); renderSchedBtn(); renderTcpList();
+  if ($('#envModal').classList.contains('open')) {
+    if (!findEnv(envEditId)) envEditId = state.envs[0] ? state.envs[0].id : null;
+    renderEnvModal();
+  }
+  if (isOpen('#schedModal')) renderSchedModal();
+  if (view === 'tcp') renderTcpView();
+  restoreFocus(focus);
+}
+// syncEditor follows a change of the open request made elsewhere. A clean
+// editor loads the new version; one with unsaved edits keeps them, and #dirty
+// compares them with the new version.
+function syncEditor() {
+  if (!cur || !curCollId) return;
+  const c = state.collections.find(x => x.id === curCollId);
+  const r = c && c.requests.find(x => x.id === cur.id);
+  if (!r) { curCollId = null; return; }
+  const theirs = JSON.stringify(normalizeRequest(clone(r)));
+  if (theirs === savedSnapshot) return;
+  if (JSON.stringify(cur) === savedSnapshot) loadRequest(r, c.id);
+  else { savedSnapshot = theirs; markDirty(); }
+}
+// saveFocus and restoreFocus keep the cursor in place over a redraw that
+// rebuilds the field it was in: by id, or by table, row and column.
+function saveFocus() {
+  const el = document.activeElement;
+  if (!el || !el.closest || !/^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName)) return null;
+  const td = el.closest('td'), table = el.closest('table');
+  let start = null, end = null;
+  try { start = el.selectionStart; end = el.selectionEnd; } catch (e) { /* this input type has no selection */ }
+  return { el, id: el.id, table: table ? table.id : '', row: td ? td.parentNode.rowIndex : -1, col: td ? td.cellIndex : -1, start, end };
+}
+function restoreFocus(f) {
+  if (!f) return;
+  let el = f.el;
+  if (!el.isConnected && f.id) el = document.getElementById(f.id);
+  else if (!el.isConnected && f.table) {
+    const t = document.getElementById(f.table), row = t && t.rows[f.row], cell = row && row.cells[f.col];
+    el = cell && cell.querySelector('input');
+  }
+  if (!el || !el.isConnected) return;
+  if (document.activeElement !== el) el.focus();
+  if (f.start != null) try { el.setSelectionRange(f.start, f.end); } catch (e) { /* this input type has no selection */ }
+}
+// A tab that comes back to the front asks for the version of the program, so
+// a page left open over an update learns it is stale before it tries to save.
+async function checkPageVersion() {
+  if (MODE !== 'server') return;
+  try {
+    const r = await fetch('/api/info', { cache: 'no-store' });
+    if (r.ok && (await r.json()).version !== info.version) setSaveState('stale');
+  } catch (e) { /* the program is away, maybe restarting */ }
 }
 async function detectMode() {
   if (location.protocol.startsWith('http')) {
@@ -442,19 +972,58 @@ async function detectMode() {
 }
 
 let toastTimer;
-function toast(msg) {
+function toast(msg, ms = 2500) {
   const t = $('#toast'); t.textContent = msg; t.classList.add('show');
-  clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('show'), 2500);
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('show'), ms);
 }
 
 // ---------------------------------------------------------------- variables
-function activeVars() {
-  const env = state.envs.find(e => e.id === state.activeEnv);
-  const m = {};
+const findEnv = id => state.envs.find(e => e.id === id);
+// varsOf maps the names of the enabled rows of env to their values. Names are
+// taken as typed and a later row wins over an earlier one with the same name.
+// The map has no prototype, so {{constructor}} is a variable only when a row
+// sets it. varsOf and subst have twins in effective.go (see buildEffective).
+function varsOf(env) {
+  const m = Object.create(null);
   if (env) for (const v of env.vars) if (v.enabled && v.name) m[v.name] = v.value;
   return m;
 }
-const subst = (s, vars) => String(s ?? '').replace(/\{\{\s*([\w.\-]+)\s*\}\}/g, (m, k) => (k in vars ? vars[k] : m));
+// ovl is the copy of the overlay the last snapshot of the program brought:
+// the values schedules set, by environment id and name. They live in the
+// program only, never in the data file.
+let ovl = { boot: '', vars: {} };
+const ovlOf = envId => (envId && Object.hasOwn(ovl.vars, envId) ? obj(ovl.vars[envId]) : {});
+// effectiveVars are the variables a request sent in envId sees: the rows of
+// the environment with the overlay over them. An overlay value wins also over
+// a disabled row and for a name the table lacks, as in schedule.go.
+function effectiveVars(envId) {
+  const m = varsOf(findEnv(envId)), o = ovlOf(envId);
+  for (const k of Object.keys(o)) m[k] = str(obj(o[k]).value);
+  return m;
+}
+const activeVars = () => effectiveVars(state.activeEnv);
+const VAR_REF = /\{\{\s*([\w.\-]+)\s*\}\}/g;
+const subst = (s, vars) => String(s ?? '').replace(VAR_REF, (m, k) => (Object.hasOwn(vars, k) ? vars[k] : m));
+// requestTexts are the texts of r that buildEffective puts variables into:
+// disabled headers and the auth fields of another type do not count.
+// referencedVars lists the names {{...}} in texts stands for, each once. Both
+// have twins in schedule.go.
+function requestTexts(r) {
+  const t = [r.url];
+  for (const h of r.headers) if (h.enabled && h.name.trim()) t.push(h.name, h.value);
+  const a = r.auth;
+  if (a.type === 'basic') t.push(a.username, a.password);
+  else if (a.type === 'bearer') t.push(a.token);
+  else if (a.type === 'apikey' && a.keyName.trim()) t.push(a.keyName, a.keyValue);
+  if (r.body.mode === 'raw') t.push(r.body.raw);
+  else if (r.body.mode === 'form') for (const f of r.body.form) if (f.enabled && f.name) t.push(f.name, f.value);
+  return t;
+}
+function referencedVars(texts) {
+  const names = [];
+  for (const s of texts) for (const m of String(s ?? '').matchAll(VAR_REF)) if (!names.includes(m[1])) names.push(m[1]);
+  return names;
+}
 
 // ---------------------------------------------------------------- key/value editor
 function kvTable(table, rows, opts = {}) {
@@ -489,6 +1058,7 @@ function kvTable(table, rows, opts = {}) {
 // ---------------------------------------------------------------- URL <-> params sync
 const splitUrl = u => { const i = u.indexOf('?'); return i < 0 ? [u, ''] : [u.slice(0, i), u.slice(i + 1)]; };
 const dec = s => { try { return decodeURIComponent(s); } catch (e) { return s; } };
+// encName and encValue have twins in effective.go (see buildEffective).
 const encName = s => s.replace(/[ #&=%]/g, c => '%' + c.charCodeAt(0).toString(16).toUpperCase());
 const encValue = s => s.replace(/[ #&]/g, c => '%' + c.charCodeAt(0).toString(16).toUpperCase());
 function parseQuery(q) {
@@ -566,9 +1136,14 @@ function loadRequest(req, collId) {
 }
 
 // ---------------------------------------------------------------- building the effective request
+// A schedule sends a request that the program builds in Go (effective.go) the
+// way buildEffective builds one here. The twins there are decodeRequest and
+// decodeSettings (normalizeRequest and the settings of normalizeDoc), varsOf,
+// subst, encName, encValue and buildEffective. Change one only together with
+// its twin and with a vector in testdata/effective.json, which
+// tests/effective.test.mjs and effective_test.go both run.
 const b64 = s => btoa(unescape(encodeURIComponent(s)));
-function buildEffective(r) {
-  const vars = activeVars();
+function buildEffective(r, vars = activeVars()) {
   const s = x => subst(x, vars);
   let url = s(r.url.trim());
   let headers = r.headers.filter(h => h.enabled && h.name.trim()).map(h => ({ name: s(h.name.trim()), value: s(h.value) }));
@@ -593,37 +1168,130 @@ function buildEffective(r) {
   const o = r.options;
   return {
     method: r.method, url, headers, body, bodyBase64: false,
-    timeoutMs: Math.max(0, +o.timeoutMs || 0) || 30000,
+    timeoutMs: toMs(o.timeoutMs) || 30000,
     followRedirects: !!o.followRedirects, verifyTls: !!o.verifyTls, cookies: !!o.cookies,
   };
 }
 
 // ---------------------------------------------------------------- sending
 let sending = false;
+// sendRequest keeps its own copy of the request: a sync may load another
+// version of it into the editor while the answer is on its way.
 async function sendRequest() {
   if (sending) return;
-  const eff = buildEffective(cur);
-  if (!eff.url) { toast('URL is empty'); $('#url').focus(); return; }
+  const sent = clone(cur);
+  if (!buildEffective(sent).url) { toast('URL is empty'); $('#url').focus(); return; }
   sending = true;
   const btn = $('#sendBtn'); btn.innerHTML = '<span class="spin"></span>'; btn.disabled = true;
   setStatus('Sending…', '', '');
+  const { eff, res, notes, names, envId } = await sendFlow(sent);
+  sending = false; btn.textContent = 'Send'; btn.disabled = false;
+  lastResponse = res;
+  renderResponse(res, eff.url);
+  addHistory(sent);
+  noteToast(notes, names, envId);
+}
+// sendFlow sends r in the environment of the tab. Values that schedules set
+// for the variables of r are refreshed first (freshVars), so the request goes
+// out with the token the program holds now.
+async function sendFlow(r) {
+  const envId = state.activeEnv, names = referencedVars(requestTexts(r));
+  const { vars, notes } = await freshVars(names, envId, () => setStatus('Refreshing token…', '', ''));
+  const eff = buildEffective(r, vars);
+  setStatus('Sending…', '', '');
+  const res = await transport(eff);
+  return { eff, res, notes, names, envId };
+}
+// freshVars gives the variables of envId for a request that uses names. When
+// a schedule of envId sets one of names, the tab saves what it changed and
+// asks the program to refresh those values first (ensureVars); onSlow runs
+// when that takes over 300 ms. It never fails: without an answer the values
+// the tab has go out. notes say why a value may be old or missing.
+async function freshVars(names, envId, onSlow) {
+  let notes = [];
+  if (featureState() === 'ok' && schedulesSetting(envId, names).length) {
+    await flushPersist();
+    const slow = onSlow ? setTimeout(onSlow, 300) : null;
+    try { notes = await ensureVars(names, envId); } catch (e) { /* send with the values the tab has */ }
+    clearTimeout(slow);
+  }
+  return { vars: effectiveVars(envId), notes };
+}
+// ensureVars asks the program to refresh the overlay values of names in envId
+// (POST /api/vars/ensure, up to 20 s there and 25 s here), takes them into
+// ovl and returns the notes of the answer.
+async function ensureVars(names, envId) {
+  const want = names.filter(n => VAR_NAME.test(n)).slice(0, 256);
+  const res = await postJSON('/api/vars/ensure', { envId, names: want }, 25000);
+  if (res.status !== 200) throw new Error(actionError(res));
+  const a = res.body, got = obj(a.vars);
+  // Another boot: the program restarted, and the next snapshot says so.
+  if (ovl.boot && a.boot !== ovl.boot) tick(true);
+  if (!Object.hasOwn(ovl.vars, envId)) setOwn(ovl.vars, envId, {});
+  const m = ovlOf(envId);
+  for (const n of want) { if (Object.hasOwn(got, n)) setOwn(m, n, got[n]); else delete m[n]; }
+  return arr(a.notes);
+}
+const VAR_NAME = /^[A-Za-z0-9_.-]{1,128}$/;
+// transport sends a built request: through the program, or straight from the
+// browser without it.
+async function transport(eff) {
   const t0 = performance.now();
-  let res;
   try {
     if (MODE === 'server') {
       const r = await fetch('/api/send', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(eff) });
       if (!r.ok) throw new Error('proxy error ' + r.status + ': ' + (await r.text()));
-      res = await r.json();
-    } else {
-      res = await sendDirect(eff, t0);
+      return mdnsHint(await r.json(), eff.url);
     }
+    return await sendDirect(eff, t0);
   } catch (e) {
-    res = { error: e.name === 'TimeoutError' ? 'timeout after ' + eff.timeoutMs + ' ms' : e.message, timeMs: performance.now() - t0, headers: [] };
+    return { error: e.name === 'TimeoutError' ? 'timeout after ' + eff.timeoutMs + ' ms' : e.message, timeMs: performance.now() - t0, headers: [] };
   }
-  sending = false; btn.textContent = 'Send'; btn.disabled = false;
-  lastResponse = res;
-  renderResponse(res);
-  addHistory();
+}
+// mdnsHint adds to a failed lookup of a .local name the hint a schedule gets
+// (extract.go): the Linux builds have no cgo and never ask mDNS.
+function mdnsHint(res, url) {
+  if (info.os !== 'linux' || !res || res.status || !/no such host/.test(str(res.error))) return res;
+  let host = '';
+  try { host = new URL(url).hostname.toLowerCase().replace(/\.$/, ''); } catch (e) { return res; }
+  if (host.endsWith('.local')) res.error += '. This build cannot resolve .local names (mDNS). Use the IP address.';
+  return res;
+}
+// noteToast shows one note of an ensure answer, the one that matters most.
+const NOTE_ORDER = ['stopped', 'failed', 'config', 'missing', 'running', 'expired', 'off'];
+const topNote = notes => arr(notes).map(obj).filter(x => NOTE_ORDER.includes(x.state))
+  .sort((a, b) => NOTE_ORDER.indexOf(a.state) - NOTE_ORDER.indexOf(b.state))[0];
+function noteToast(notes, names, envId) {
+  const n = topNote(notes);
+  const text = n ? noteText(n, names, envId) : '';
+  if (text) toast(text, Math.max(4000, text.length * 60));
+}
+// sentence is the first sentence of s, fullStop the whole of it, each ending
+// with a full stop.
+const fullStop = s => { const t = str(s).trim(); return !t || /[.!?]$/.test(t) ? t : t + '.'; };
+const sentence = s => { const t = str(s), i = t.search(/\.\s/); return fullStop(i < 0 ? t : t.slice(0, i + 1)); };
+function noteText(n, names, envId) {
+  const s = findSched(n.id), name = `"${(s && s.name) || str(n.name) || str(n.id)}"`;
+  const rules = s ? s.extract.filter(r => r.enabled && names.includes(r.var)) : [];
+  const vals = ovlOf(envId), now = serverNow();
+  const pick = test => rules.find(test) || rules[0];
+  const varName = r => (r ? `{{${r.var}}}` : 'The value');
+  switch (n.state) {
+    case 'stopped': return `Schedule ${name} is stopped: ${sentence(n.error)} Sent with the old value.`;
+    case 'failed': return `Schedule ${name} failed: ${fullStop(n.error)} Sent with the old value.`;
+    case 'config': return `Schedule ${name} could not run: ${fullStop(n.error)}`;
+    case 'missing': return `${varName(pick(r => !r.optional && !Object.hasOwn(vals, r.var)))} is not set yet by schedule ${name}.` + (n.nextAt ? ` Next run at ${fmtHM(n.nextAt)}.` : '');
+    case 'running': return `Schedule ${name} is still running. Sent with the old value.`;
+    case 'expired': {
+      const every = s ? s.everySec : 0;
+      const r = pick(x => Object.hasOwn(vals, x.var) && isExpired(obj(vals[x.var]), now, every));
+      const v = r && Object.hasOwn(vals, r.var) ? obj(vals[r.var]) : null;
+      const at = v ? expiryOf(v, every) : 0;
+      return `${varName(r)} from schedule ${name} expired${at ? ' at ' + fmtHM(at) : ''} and the schedule is off. Turn it on in Schedules.`;
+    }
+    case 'off': return `${varName(pick(r => !Object.hasOwn(vals, r.var)))} comes from schedule ${name}, which is off. Turn it on in Schedules.`;
+  }
+  return '';
 }
 async function sendDirect(eff, t0) {
   const h = new Headers();
@@ -643,9 +1311,9 @@ async function sendDirect(eff, t0) {
   }
   return { status: r.status, statusText: r.statusText, proto: '', headers, body, bodyBase64, size: bytes.length, timeMs: performance.now() - t0, finalUrl: r.url };
 }
-function addHistory() {
+function addHistory(req) {
   if (!state.settings.history) return;
-  const snap = clone(cur); snap.id = uid();
+  const snap = clone(req); snap.id = uid();
   state.history.unshift({ id: uid(), at: Date.now(), req: snap });
   if (state.history.length > 200) state.history.length = 200;
   renderHistory(); persist();
@@ -673,7 +1341,9 @@ function highlightJSON(text) {
   }
   return out + esc(text.slice(last));
 }
-function renderResponse(res) {
+// renderResponse shows res; url is where the request went, so a different
+// final URL is a redirect.
+function renderResponse(res, url) {
   const out = $('#respOut');
   $('#respHeaders').innerHTML = '';
   $('#cntRespHeaders').textContent = '';
@@ -686,7 +1356,7 @@ function renderResponse(res) {
   }
   const cls = 'c' + String(res.status)[0];
   setStatus(res.status + ' ' + (res.statusText || ''), cls, fmtMs(res.timeMs) + ' · ' + fmtSize(res.size) + (res.proto ? ' · ' + res.proto : ''));
-  const sentUrl = buildEffective(cur).url.replace(/ /g, '%20');
+  const sentUrl = url.replace(/ /g, '%20');
   if (res.finalUrl && res.finalUrl !== sentUrl) $('#respUrl').textContent = '→ ' + res.finalUrl;
   if (res.error) toast(res.error);
   $('#respHeaders').innerHTML = '<table class="hdrs">' + res.headers.map(h => `<tr><td>${esc(h.name)}</td><td>${esc(h.value)}</td></tr>`).join('') + '</table>';
@@ -705,6 +1375,8 @@ function renderBody() {
   const res = lastResponse, out = $('#respOut'), prev = $('#respPreview');
   out.hidden = respView === 'preview'; prev.hidden = respView !== 'preview';
   if (!res) { out.hidden = false; prev.hidden = true; return; }
+  // A failed send has no body: every view keeps the error renderResponse showed.
+  if (res.error && !res.status) { out.hidden = false; prev.hidden = true; out.innerHTML = `<span class="x">${esc(res.error)}</span>`; return; }
   const ct = contentType(res);
   if (respView === 'preview') {
     prev.innerHTML = '';
@@ -738,6 +1410,8 @@ function downloadResponse() {
 // ---------------------------------------------------------------- sidebar
 function renderCollections() {
   const list = $('#collList'), filter = $('#sideSearch').value.trim().toLowerCase();
+  const marked = scheduledRequests();
+  lastMarks = [...marked].sort().join('\n');
   list.innerHTML = '';
   if (!state.collections.length) { list.innerHTML = '<div class="empty">No collections yet.<br>Save a request or press +.</div>'; return; }
   for (const c of state.collections) {
@@ -752,7 +1426,7 @@ function renderCollections() {
       if (act === 'rename') { const n = prompt('Collection name', c.name); if (n && n.trim()) { c.name = n.trim(); persist(); renderCollections(); } }
       else if (act === 'add') saveAs(c.id);
       else if (act === 'delete') {
-        if (!confirm(`Delete collection "${c.name}" with ${c.requests.length} request(s)?`)) return;
+        if (!confirm(`Delete collection "${c.name}" with ${c.requests.length} request(s)?` + usedBy(schedulesUsing({ requestIds: c.requests.map(r => r.id) })))) return;
         state.collections = state.collections.filter(x => x !== c);
         if (curCollId === c.id) curCollId = null;
         persist(); renderCollections();
@@ -761,13 +1435,15 @@ function renderCollections() {
     const items = div.querySelector('.items');
     for (const r of reqs) {
       const it = document.createElement('div'); it.className = 'item' + (curCollId === c.id && cur.id === r.id ? ' active' : '');
-      it.innerHTML = `<span class="method m-${esc(r.method)}">${esc(r.method)}</span><span class="name" title="${esc(r.url)}">${esc(r.name || r.url || 'Untitled')}</span>
-        <span class="actions"><button class="icon" data-act="dup" title="Duplicate">&#10697;</button><button class="icon" data-act="delete" title="Delete">&#10005;</button></span>`;
+      it.innerHTML = `<span class="method m-${esc(r.method)}">${esc(r.method)}</span><span class="name" title="${esc(r.url)}">${esc(r.name || r.url || 'Untitled')}</span>`
+        + (marked.has(r.id) ? '<span class="smark" title="A schedule that is on sends this request">&#10227;</span>' : '')
+        + `<span class="actions"><button class="icon" data-act="sched" title="Schedule this request">&#10227;</button><button class="icon" data-act="dup" title="Duplicate">&#10697;</button><button class="icon" data-act="delete" title="Delete">&#10005;</button></span>`;
       it.addEventListener('click', e => {
         const act = e.target.dataset.act;
         if (act === 'dup') { const d = clone(r); d.id = uid(); d.name = (r.name || 'Untitled') + ' copy'; c.requests.splice(c.requests.indexOf(r) + 1, 0, d); persist(); renderCollections(); }
+        else if (act === 'sched') scheduleRequest(r);
         else if (act === 'delete') {
-          if (!confirm(`Delete request "${r.name || r.url}"?`)) return;
+          if (!confirm(`Delete request "${r.name || r.url}"?` + usedBy(schedulesUsing({ requestIds: [r.id] })))) return;
           c.requests = c.requests.filter(x => x !== r);
           if (curCollId === c.id && cur.id === r.id) curCollId = null;
           persist(); renderCollections();
@@ -795,13 +1471,20 @@ const isDirty = () => $('#dirty').classList.contains('on');
 function openRequest(r, collId) {
   if (isDirty() && !confirm('Discard unsaved changes in the current request?')) return;
   loadRequest(r, collId);
+  setView('http');
   $('#sidebar').classList.remove('open');
 }
+// The tabs of the sidebar: the list each shows and the button next to the
+// filter that goes with it.
+const SIDE_TABS = {
+  coll: { list: '#collList', button: '#addCollBtn' },
+  hist: { list: '#histList', button: '#clearHistBtn' },
+  tcp: { list: '#tcpList', button: '#addTcpBtn' },
+};
 function setSideTab(t) {
-  sideTab = t;
-  $$('[data-side]').forEach(b => b.classList.toggle('active', b.dataset.side === t));
-  $('#collList').hidden = t !== 'coll'; $('#histList').hidden = t !== 'hist';
-  $('#addCollBtn').hidden = t !== 'coll'; $('#clearHistBtn').hidden = t !== 'hist';
+  sideTab = Object.hasOwn(SIDE_TABS, t) ? t : 'coll';
+  $$('[data-side]').forEach(b => b.classList.toggle('active', b.dataset.side === sideTab));
+  for (const [k, v] of Object.entries(SIDE_TABS)) { $(v.list).hidden = k !== sideTab; $(v.button).hidden = k !== sideTab; }
 }
 
 // ---------------------------------------------------------------- save / new
@@ -841,6 +1524,7 @@ function saveAs(collId) {
 function startNew() {
   if (isDirty() && !confirm('Discard unsaved changes?')) return;
   loadRequest(newRequest(), null);
+  setView('http');
   $('#url').focus();
 }
 
@@ -854,6 +1538,7 @@ function renderEnvSelect() {
 function openEnvModal() {
   envEditId = state.activeEnv || (state.envs[0] ? state.envs[0].id : null);
   renderEnvModal(); $('#envModal').classList.add('open');
+  tick(true);
 }
 function renderEnvModal() {
   const list = $('#envList'); list.innerHTML = '';
@@ -868,6 +1553,1622 @@ function renderEnvModal() {
   if (!e) return;
   $('#envName').value = e.name;
   kvTable($('#envVarsTable'), e.vars, { placeholders: ['Variable', 'Value'], onChange: persist });
+  renderEnvOverlay();
+}
+// renderEnvOverlay lists, under the table of the environment, the values
+// schedules set in it.
+function renderEnvOverlay() {
+  const env = findEnv(envEditId), vals = env ? ovlOf(env.id) : {}, names = Object.keys(vals);
+  let html = '';
+  if (env && names.length) {
+    const now = serverNow(), ro = featureState() !== 'ok';
+    html = '<h4>Set by schedules (kept in memory until the program stops, they override the table)</h4><table>' + names.map(n => {
+      const v = obj(vals[n]), s = findSched(v.by), j = s && jobOf(s.id);
+      const every = s && !(j && j.enabled) ? s.everySec : 0;
+      const at = expiryOf(v, every);
+      const by = (s ? `"${esc(s.name || 'Untitled')}"` : '(schedule deleted)') + ' ' + fmtHM(v.at);
+      const until = !at ? '' : isExpired(v, now, every) ? `, <span class="st-warn">expired ${fmtHM(at)}</span>` : v.expiresAt ? `, expires ${fmtHM(at)}` : '';
+      const over = env.vars.some(r => r.name === n) ? ' <span class="hint">overrides the table</span>' : '';
+      return `<tr><td class="mono">${esc(n)}</td><td class="mono">${esc(maskValue(v.value))}</td><td>${by}${until}${over}</td>`
+        + `<td><button data-copy="${esc(env.id)}" data-name="${esc(n)}">Copy</button> <button data-clear="${esc(n)}"${ro ? ' disabled' : ''}>Clear</button></td></tr>`;
+    }).join('') + '</table>';
+  }
+  setHTML($('#envOverlay'), html);
+}
+
+// ---------------------------------------------------------------- schedules: definitions
+const findSched = id => state.schedules.find(s => s.id === id);
+// findRequest finds a request by id as the program does: the first one of
+// that id across all collections.
+function findRequest(id) {
+  if (id) for (const c of state.collections) { const r = c.requests.find(x => x.id === id); if (r) return r; }
+  return null;
+}
+// schedulesSetting lists the schedules of envId with an enabled rule for one
+// of names: those that set values a request with these variables uses.
+const schedulesSetting = (envId, names) => state.schedules.filter(s => envId && s.envId === envId && s.extract.some(r => r.enabled && names.includes(r.var)));
+// schedulesUsing lists the schedules that send one of requestIds or work in
+// envId, for the confirm of a delete.
+const schedulesUsing = ({ requestIds = [], envId = '' }) => state.schedules.filter(s => (envId && s.envId === envId) || requestIds.includes(s.requestId));
+function usedBy(list) {
+  if (!list.length) return '';
+  const names = list.map(s => `"${s.name || 'Untitled'}"`).join(', ');
+  return list.length === 1
+    ? `\n\nUsed by schedule ${names}. It will stop sending until you pick another one.`
+    : `\n\nUsed by schedules ${names}. They will stop sending until you pick another one.`;
+}
+// varConflicts lists the variables s sets that another schedule of the same
+// environment sets too: the later value wins.
+function varConflicts(s) {
+  const out = [];
+  for (const r of s.extract) {
+    if (!r.enabled || !r.var || out.some(c => c.name === r.var)) continue;
+    for (const o of state.schedules) {
+      if (o !== s && o.envId === s.envId && o.extract.some(x => x.enabled && x.var === r.var)) out.push({ name: r.var, by: o });
+    }
+  }
+  return out;
+}
+// missingVars are the variables the request of s uses that its environment,
+// with the overlay, lacks: the program sends nothing then.
+function missingVars(s) {
+  const r = findRequest(s.requestId);
+  if (!r || !findEnv(s.envId)) return [];
+  const vars = effectiveVars(s.envId);
+  return referencedVars(requestTexts(r)).filter(n => !Object.hasOwn(vars, n));
+}
+// maskValue shows a value without giving it away: up to min(6, len/4) of its
+// first characters and its length, or the length alone up to 12 characters.
+function maskValue(v) {
+  const cs = [...str(v)], n = cs.length, len = `(${n} char${n === 1 ? '' : 's'})`;
+  return n <= 12 ? len : cs.slice(0, Math.min(6, Math.floor(n / 4))).join('') + '... ' + len;
+}
+// expiryOf is when an overlay value expires: at its own expiresAt, or else
+// everySec after it was set (0 leaves that out, for a schedule that is on and
+// renews it); 0 for never. isExpired compares that with now, in program time.
+const expiryOf = (v, everySec = 0) => (v.expiresAt > 0 ? v.expiresAt : everySec > 0 ? v.at + everySec * 1000 : 0);
+const isExpired = (v, now, everySec = 0) => { const at = expiryOf(v, everySec); return at > 0 && at <= now; };
+
+// ---------------------------------------------------------------- schedules: the program
+// The program runs the schedules and holds what they set. The tab polls
+// GET /api/schedules (tick): every 2 s while the Schedules or Environments
+// window is open, every 10 s while the tab is visible, never in the
+// background, and at once after an action or a return to the tab. The answer
+// is 204 while nothing changed since the snapshot the tab has. The snapshot
+// also carries the ETag of the data file, so the poll is the sync of the tab
+// too: syncIfBehind asks for the file only when that tag is new.
+let schedSnap = null;   // the last snapshot: {boot, gen, now, version, stateTag, jobs, vars}
+let skew = 0;           // the clock of the program minus the clock of this computer, ms
+let seenTag = '';       // stateTag of the last snapshot
+let schedDown = false;  // the last poll got no answer
+let lastPoll = 0, polling = null, pollAgain = false;
+let lastMarks = '';     // the requests the sidebar marks as scheduled
+const serverNow = () => Date.now() + skew;
+const isOpen = sel => $(sel).classList.contains('open');
+const jobOf = id => (schedSnap && Object.hasOwn(schedSnap.jobs, id) ? obj(schedSnap.jobs[id]) : null);
+const jobsOn = () => (schedSnap ? Object.values(schedSnap.jobs).filter(j => obj(j).enabled).length : 0);
+// featureState tells whether the schedules can act: ok, nobin (the page was
+// opened without the program) or stale (it comes from another version of the
+// program). Only ok allows actions; the others show the definitions read only.
+const featureState = () => (MODE !== 'server' ? 'nobin' : saveState === 'stale' ? 'stale' : 'ok');
+
+// With the event stream live (see openEvents) the timer polls nothing: the
+// stream brings every change. A forced tick (an action, a window that opens,
+// sched.changed) still asks for the schedules.
+function tick(force = false) {
+  if (MODE !== 'server' || (!force && document.visibilityState !== 'visible')) return Promise.resolve();
+  const fast = isOpen('#schedModal') || isOpen('#envModal') || view === 'tcp';
+  if (fast) updateLive();
+  if (streamLive && !force) return Promise.resolve();
+  if (polling) { if (force) pollAgain = true; return polling; }
+  if (!force && Date.now() - lastPoll < (fast ? 1500 : 9500)) return Promise.resolve();
+  polling = (async () => {
+    do {
+      pollAgain = false; lastPoll = Date.now();
+      // A poll gives up before the next one is due: a connection to a
+      // computer that went away may hang for minutes, and the button shows ?
+      // meanwhile.
+      const signal = AbortSignal.timeout(8000);
+      await poll(signal);
+      if (!streamLive) await pollTcp(signal);
+    } while (pollAgain);
+  })().finally(() => { polling = null; });
+  return polling;
+}
+async function poll(signal) {
+  let r = null;
+  try {
+    r = await fetch('/api/schedules' + (schedSnap ? '?since=' + encodeURIComponent(schedSnap.boot + '.' + schedSnap.gen) : ''), { cache: 'no-store', signal });
+  } catch (e) { /* the program is away, maybe restarting */ }
+  if (r && r.status === 200) {
+    let snap = null;
+    try { snap = await r.json(); } catch (e) { /* cut short: as no answer */ }
+    if (snap) { applySnapshot(snap); return; }
+  }
+  const up = !!r && r.status === 204;
+  if (schedDown === up) { schedDown = !up; renderSchedBtn(); }
+  // Without a snapshot the tab asks for the file itself, as it did every 10 s
+  // before there were schedules.
+  syncIfBehind(up && seenTag ? seenTag : undefined);
+}
+// applySnapshot takes a snapshot of the program. Another boot means the
+// program restarted, which turned every schedule off and emptied the overlay;
+// the tab says so when that undid something. Another version means this page
+// is stale. A new stateTag means the data file changed.
+function applySnapshot(snap) {
+  const s = obj(snap), before = schedSnap;
+  const next = {
+    boot: str(s.boot), gen: Number(s.gen) || 0, now: Number(s.now) || Date.now(), version: str(s.version),
+    stateTag: str(s.stateTag), jobs: obj(s.jobs), vars: obj(s.vars),
+  };
+  const undone = before && (Object.values(before.jobs).some(j => obj(j).enabled) || Object.values(before.vars).some(m => Object.keys(obj(m)).length));
+  if (before && next.boot !== before.boot && undone) toast('simple-rest was restarted: all schedules are off. Turn them on in Schedules.', 6000);
+  if (next.version && info.version && next.version !== info.version) setSaveState('stale');
+  schedSnap = next;
+  skew = next.now - Date.now();
+  ovl = { boot: next.boot, vars: next.vars };
+  seenTag = next.stateTag;
+  schedDown = false;
+  renderSchedRuntime();
+  if (seenTag) syncIfBehind(seenTag);
+}
+// renderSchedRuntime shows what the program says: the button, the open
+// windows and the marks in the sidebar. It leaves the fields of the
+// definitions alone, so it may run while the user types.
+function renderSchedRuntime() {
+  renderSchedBtn();
+  if (isOpen('#schedModal')) { renderSchedList(); syncEnabledBox(); renderSchedHints(); renderSchedRun(); }
+  if (isOpen('#envModal')) renderEnvOverlay();
+  if ([...scheduledRequests()].sort().join('\n') !== lastMarks) renderCollections();
+}
+// scheduledRequests are the ids of the requests a schedule that is on sends.
+function scheduledRequests() {
+  const ids = new Set();
+  for (const s of state.schedules) { const j = jobOf(s.id); if (j && j.enabled) ids.add(s.requestId); }
+  return ids;
+}
+// The button counts the schedules that are on and not stopped; it turns red
+// when one is stopped or cannot run, and shows ? when the program does not
+// answer.
+function renderSchedBtn() {
+  let count = '', title = 'Schedules', err = false;
+  if (MODE !== 'server') title = 'Schedules (they run inside the simple-rest program)';
+  else if (schedDown) { count = '?'; title = 'Schedules: simple-rest does not answer'; }
+  else if (schedSnap) {
+    const jobs = Object.values(schedSnap.jobs).map(obj);
+    const on = jobs.filter(j => j.enabled && j.state !== 'stopped').length;
+    const stopped = jobs.filter(j => j.state === 'stopped').length, config = jobs.filter(j => j.state === 'config').length;
+    err = stopped + config > 0;
+    count = on ? String(on) : '';
+    title = 'Schedules: ' + [`${on} on`, stopped && `${stopped} stopped`, config && `${config} cannot run`].filter(Boolean).join(', ');
+  }
+  const b = $('#schedBtn');
+  $('#schedCount').textContent = count; b.title = title; b.classList.toggle('err', err);
+}
+// postJSON sends body to a route of the program and resolves to {status,
+// body}. No answer, or none within ms, gives status 0 and an error.
+async function postJSON(path, body, ms) {
+  try {
+    const r = await fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), signal: AbortSignal.timeout(ms) });
+    let data = {};
+    try { data = obj(await r.json()); } catch (e) { /* no JSON in the answer */ }
+    return { status: r.status, body: data };
+  } catch (e) {
+    return { status: 0, body: { error: e.name === 'TimeoutError' ? 'simple-rest did not answer in time.' : 'simple-rest does not answer: ' + e.message } };
+  }
+}
+const actionError = res => (res.status === 503 ? 'simple-rest is shutting down.' : str(res.body.error) || 'HTTP ' + res.status);
+
+// ---------------------------------------------------------------- schedules: actions
+// schedBusy holds, per schedule, what this tab asked the program and has no
+// answer for yet: the clicks on Enabled, with the state the last one asked
+// for, and Run now. Until the answers come the box shows that click and Run
+// now spins, whatever is redrawn meanwhile, and for that schedule only.
+const schedBusy = new Map();
+function markBusy(id, action, by) {
+  const b = schedBusy.get(id) || { toggles: 0, want: null, runs: 0 };
+  if (action === 'run') b.runs += by;
+  else {
+    b.toggles += by;
+    if (by > 0) b.want = action === 'enable';
+    else if (!b.toggles) b.want = null;
+  }
+  if (b.toggles || b.runs) schedBusy.set(id, b); else schedBusy.delete(id);
+}
+// schedAction asks the program to turn schedule id on or off or to run it
+// now. None of these writes the data file, but the program reads the
+// definition from it, so what this tab changed is saved first. When that
+// fails, the program would use another definition than the one shown: only
+// turning off, which needs none, goes then. The answer is null when nothing
+// was asked.
+async function schedAction(id, action) {
+  if (featureState() !== 'ok') return null;
+  markBusy(id, action, 1);
+  setSchedMsg(id, '');
+  renderRunBtn();
+  let res = null;
+  try {
+    if ((await flushPersist()) || action === 'disable') {
+      res = await postJSON(`/api/schedules/${encodeURIComponent(id)}/${action}`, {}, action === 'run' ? 65000 : 15000);
+    }
+  } finally { markBusy(id, action, -1); }
+  const job = res ? res.body : {};
+  if (!res) {
+    setSchedMsg(id, 'Your changes are not saved, so simple-rest would use the old definition.' + (savingOff() ? ' Reload the page.' : ''), true);
+  } else if (res.status === 200 || res.status === 202) {
+    if (schedSnap) setOwn(schedSnap.jobs, id, job);
+    if (action === 'run' && res.status === 200 && !job.enabled && job.lastOkAt && job.lastOkAt === job.lastRunAt) setSchedMsg(id, 'Value set once. Tick Enabled to keep it fresh.');
+  } else {
+    // 422 lists the problems the hints already show.
+    const known = arr((jobOf(id) || {}).problems);
+    const listed = res.status === 422 && arr(job.problems).length && arr(job.problems).every(p => known.includes(p));
+    setSchedMsg(id, listed ? 'This schedule cannot run: fix the problems below.' : actionError(res), true);
+  }
+  renderSchedRuntime();
+  renderRunBtn();
+  if (res) tick(true);
+  return res;
+}
+// turnAllOff saves first as every action does, but goes on when that fails:
+// turning off needs no definition.
+async function turnAllOff() {
+  if (featureState() !== 'ok') return;
+  const on = jobsOn();
+  if (on > 1 && !confirm(`Turn all ${on} schedules off?`)) return;
+  await flushPersist();
+  const res = await postJSON('/api/schedules/disable-all', {}, 15000);
+  toast(res.status === 200 ? `${Number(res.body.off) || 0} schedule(s) turned off` : actionError(res));
+  tick(true);
+}
+// deleteSched turns s off in the program first when it is on, then deletes
+// its definition. The program would turn it off anyway once it reads the
+// file without it.
+async function deleteSched(s) {
+  if (featureState() !== 'ok' || !confirm(`Delete schedule "${s.name || 'Untitled'}"?`)) return;
+  const j = jobOf(s.id);
+  if (j && j.enabled) await schedAction(s.id, 'disable');
+  state.schedules = state.schedules.filter(x => x.id !== s.id);
+  persist();
+  if (isOpen('#schedModal')) renderSchedModal();
+}
+// addSchedule adds a schedule, off, for the saved request r, or for the
+// request in the editor when r is null. With no environment at all it makes
+// one, Default, and picks it in this tab.
+function addSchedule(r) {
+  if (featureState() !== 'ok') return null;
+  $('#schedAddHint').textContent = '';
+  if (!r && view === 'tcp') { $('#schedAddHint').textContent = 'Open an HTTP request to schedule it.'; return null; }
+  if (!r) {
+    const c = curCollId && state.collections.find(x => x.id === curCollId);
+    r = c && c.requests.find(x => x.id === cur.id);
+    if (!r) { $('#schedAddHint').textContent = 'Save the request to a collection first'; return null; }
+  }
+  let envId = findEnv(state.activeEnv) ? state.activeEnv : state.envs[0] ? state.envs[0].id : '';
+  if (!envId) {
+    const e = { id: uid(), name: 'Default', vars: [] };
+    state.envs.push(e); setActiveEnv(e.id); renderEnvSelect();
+    envId = e.id;
+  }
+  const s = normalizeSchedule({
+    id: uid(), name: r.name || r.url || 'Schedule', requestId: r.id, envId, everySec: 240, expiresPath: 'expires_in', leadSec: 60,
+    extract: [{ enabled: true, optional: false, var: 'token', from: 'json', path: 'access_token' }],
+  });
+  state.schedules.push(s);
+  schedEditId = s.id;
+  persist();
+  setSchedMsg(s.id, 'Check the rules with Run now, then tick Enabled.');
+  if (isOpen('#schedModal')) renderSchedModal();
+  return s;
+}
+// scheduleRequest is the Schedule button of a request in the sidebar: it
+// shows the schedule of the request, or adds one.
+function scheduleRequest(r) {
+  const s = state.schedules.find(x => x.requestId === r.id);
+  openSchedModal(s ? s.id : null);
+  if (!s) addSchedule(r);
+}
+async function clearVar(envId, name) {
+  if (featureState() !== 'ok') return;
+  try {
+    const r = await fetch(`/api/vars/${encodeURIComponent(envId)}/${encodeURIComponent(name)}`, { method: 'DELETE' });
+    if (r.status === 204 || r.status === 404) { delete ovlOf(envId)[name]; renderEnvOverlay(); }
+    else toast('Could not clear the value: ' + (r.status === 503 ? 'simple-rest is shutting down.' : 'HTTP ' + r.status));
+  } catch (e) { toast('Could not clear the value: ' + e.message); }
+  tick(true);
+}
+const copyValue = (envId, name) => copyText(str(obj(ovlOf(envId)[name]).value));
+
+// ---------------------------------------------------------------- schedules: the window
+let schedEditId = null;
+let schedMsg = { id: null, text: '', bad: false };   // what the last action or button said, under the editor
+const shown = new WeakMap();
+// setHTML replaces what el holds only when it changes, so a redraw every few
+// seconds does not swallow a click on a button inside.
+function setHTML(el, html) {
+  if (shown.get(el) === html) return false;
+  shown.set(el, html); el.innerHTML = html;
+  return true;
+}
+// Times of the program are shown on the clock of this computer.
+const fmtClock = ms => new Date(ms - skew).toTimeString().slice(0, 8);
+const fmtHM = ms => fmtClock(ms).slice(0, 5);
+function fmtLeft(ms) {
+  const s = Math.max(0, Math.ceil(ms / 1000)), h = Math.floor(s / 3600), m = Math.floor(s / 60) % 60, ss = String(s % 60).padStart(2, '0');
+  return h ? `${h}:${String(m).padStart(2, '0')}:${ss}` : `${m}:${ss}`;
+}
+function fmtAgo(ms) {
+  const s = Math.max(0, Math.floor(ms / 1000));
+  return s < 60 ? s + 's' : s < 3600 ? Math.floor(s / 60) + 'm' : Math.floor(s / 3600) + 'h';
+}
+// live marks a time that moves with the clock: the time left until at, or
+// the time since. updateLive brings them all up to date.
+const live = (kind, at, pre = '') => `<span data-live="${kind}" data-at="${Number(at) || 0}" data-pre="${esc(pre)}"></span>`;
+function updateLive() {
+  const now = serverNow();
+  for (const el of $$('[data-live]')) {
+    const at = +el.dataset.at;
+    el.textContent = el.dataset.pre + (el.dataset.live === 'in' ? fmtLeft(at - now) : fmtAgo(now - at));
+  }
+}
+function setSchedMsg(id, text, bad = false) {
+  schedMsg = { id, text, bad };
+  if (isOpen('#schedModal')) renderSchedHints();
+}
+function openSchedModal(id) {
+  schedEditId = id && findSched(id) ? id : findSched(schedEditId) ? schedEditId : state.schedules[0] ? state.schedules[0].id : null;
+  $('#schedAddHint').textContent = '';
+  $('#schedModal').classList.add('open');
+  renderSchedModal();
+  tick(true);
+}
+function renderSchedModal() {
+  if (!findSched(schedEditId)) schedEditId = state.schedules[0] ? state.schedules[0].id : null;
+  renderSchedList();
+  renderSchedEditor();
+  renderSchedMode();
+}
+// renderSchedMode shows the banner of featureState. Without the program, or
+// from another version of it, the definitions are there to read; nothing can
+// act or change, and neither state ends before a reload.
+function renderSchedMode() {
+  const fs = featureState(), banner = $('#schedBanner');
+  banner.hidden = fs === 'ok';
+  banner.textContent = fs === 'nobin' ? 'Schedules run inside the simple-rest program. Open this page from the program to use them.'
+    : 'This page comes from another simple-rest version than the running program. Reload the page.';
+  if (fs === 'ok') return;
+  for (const el of $$('#schedEditor input, #schedEditor select, #schedEditor button, #addSchedBtn, #schedOffAllBtn')) {
+    if (!el.dataset.copy) el.disabled = true;
+  }
+}
+// schedStatus is the short status of s in the list: first what keeps it from
+// running as the data file is in this tab, then what the program says.
+function schedStatus(s) {
+  const j = jobOf(s.id), on = !!(j && j.enabled), glyph = on ? '&#9679;' : '&#9675;';
+  const warn = text => ({ text, cls: 'st-warn', glyph: on ? '!' : '&#9675;' });
+  if (!findRequest(s.requestId)) return warn('no request');
+  if (!findEnv(s.envId)) return warn('no env');
+  const miss = missingVars(s);
+  if (miss.length) return warn(`missing {{${miss[0]}}}`);
+  switch (j && j.state) {
+    case 'running': return { text: 'running…', cls: 'st-ok', glyph };
+    case 'ok': return { text: 'ok ', ago: j.lastOkAt, cls: 'st-ok', glyph };
+    case 'retry': return { text: 'retry ', left: j.nextAt, cls: 'st-warn', glyph };
+    case 'waiting': return { text: 'waiting', cls: 'st-ok', glyph };
+    case 'stopped': return { text: 'stopped', cls: 'st-err', glyph: '!' };
+    case 'config': return { text: 'cannot run', cls: 'st-err', glyph: '!' };
+  }
+  return { text: 'off', cls: 'st-off', glyph };
+}
+function renderSchedList() {
+  const items = state.schedules.map(s => {
+    const st = schedStatus(s);
+    const text = st.ago != null ? live('ago', st.ago, st.text) : st.left != null ? live('in', st.left, st.text) : esc(st.text);
+    return `<div class="item${s.id === schedEditId ? ' active' : ''}" data-id="${esc(s.id)}"><span class="sglyph ${st.cls}">${st.glyph}</span>`
+      + `<span class="name">${esc(s.name || 'Untitled')}</span><span class="sstat ${st.cls}">${text}</span></div>`;
+  });
+  setHTML($('#schedList'), items.join('') || '<div class="empty">No schedules yet.</div>');
+  updateLive();
+}
+// renderSchedEditor fills the fields of the schedule being edited. It
+// rebuilds them, so only a change of the definition calls for it.
+function renderSchedEditor() {
+  const s = findSched(schedEditId);
+  $('#schedEditor').style.visibility = s ? '' : 'hidden';
+  if (!s) return;
+  $('#schedName').value = s.name;
+  const missing = (id, what) => `<option value="${esc(id)}">${id ? `(${what} not found)` : `Pick ${what === 'request' ? 'a request' : 'an environment'}`}</option>`;
+  let reqs = findRequest(s.requestId) ? '' : missing(s.requestId, 'request');
+  for (const c of state.collections) {
+    if (!c.requests.length) continue;
+    reqs += `<optgroup label="${esc(c.name)}">` + c.requests.map(r => `<option value="${esc(r.id)}">${esc(r.method + ' ' + (r.name || r.url || 'Untitled'))}</option>`).join('') + '</optgroup>';
+  }
+  $('#schedReq').innerHTML = reqs; $('#schedReq').value = s.requestId;
+  $('#schedEnv').innerHTML = (findEnv(s.envId) ? '' : missing(s.envId, 'environment')) + state.envs.map(e => `<option value="${esc(e.id)}">${esc(e.name)}</option>`).join('');
+  $('#schedEnv').value = s.envId;
+  showEvery(s);
+  $('#schedExp').value = s.expiresPath;
+  $('#schedLead').value = s.leadSec;
+  rulesTable(s);
+  syncEnabledBox();
+  renderRunBtn();
+  renderSchedHints();
+  renderSchedRun();
+}
+function showEvery(s) {
+  const unit = s.everySec % 3600 === 0 ? 3600 : s.everySec % 60 === 0 ? 60 : 1;
+  $('#schedEvery').value = s.everySec / unit; $('#schedUnit').value = String(unit);
+}
+// syncEnabledBox shows whether the schedule shown is on: as the click on the
+// box asked while its answer is on its way (schedBusy), else as the program
+// says.
+function syncEnabledBox() {
+  const s = findSched(schedEditId);
+  if (!s) return;
+  const j = jobOf(s.id), b = schedBusy.get(s.id), enabled = !!(j && j.enabled);
+  const on = b && b.want !== null ? b.want : enabled;
+  $('#schedEnabled').checked = on;
+  $('#schedSince').textContent = on && enabled ? `since ${fmtHM(j.enabledAt)}, from ${str(j.enabledBy)}` : '';
+}
+// renderRunBtn shows Run now of the schedule shown, spinning while its run is
+// on its way.
+function renderRunBtn() {
+  const s = findSched(schedEditId), b = s && schedBusy.get(s.id), btn = $('#schedRunBtn');
+  const running = !!(b && b.runs);
+  if (running) btn.innerHTML = '<span class="spin"></span>'; else btn.textContent = 'Run now';
+  btn.disabled = running || featureState() !== 'ok';
+}
+// rulesTable is the table "Set from the response": a row per rule and an
+// empty one that becomes a rule once something is put into it, up to 20.
+function rulesTable(s) {
+  const table = $('#schedRules');
+  table.innerHTML = '<tr><th></th><th>Variable</th><th>From</th><th>Path / header / regex</th><th title="Optional: when it finds nothing, the other rules still count">Opt</th><th></th></tr>';
+  const changed = () => { persist(); renderSchedList(); renderSchedHints(); };
+  function addRow(rule) {
+    const tr = table.insertRow(), ghost = !rule;
+    tr.innerHTML = `<td><input type="checkbox"${ghost ? ' disabled' : ''}></td>
+      <td><input type="text" placeholder="token" spellcheck="false" autocomplete="off" data-commit="change"></td>
+      <td><select><option value="json">JSON</option><option value="header">Header</option><option value="regex">Regex</option></select></td>
+      <td><input type="text" placeholder="access_token" spellcheck="false" autocomplete="off" data-commit="change"></td>
+      <td class="opt"><input type="checkbox"${ghost ? ' disabled' : ''}></td>
+      <td><button class="icon" title="Remove"${ghost ? ' hidden' : ''}>&#10005;</button></td>`;
+    const [on, name, path, opt] = tr.querySelectorAll('input');
+    const from = tr.querySelector('select'), del = tr.querySelector('button');
+    if (rule) {
+      on.checked = rule.enabled; name.value = rule.var; from.value = rule.from; path.value = rule.path; opt.checked = rule.optional;
+      if (!rule.enabled) tr.className = 'off';
+    }
+    const ensure = () => {
+      if (rule) return;
+      rule = { enabled: true, optional: false, var: '', from: 'json', path: '' };
+      s.extract.push(rule);
+      on.disabled = opt.disabled = false; on.checked = true; del.hidden = false;
+      if (s.extract.length < MAX_RULES) addRow(null);
+    };
+    name.addEventListener('change', () => { ensure(); rule.var = name.value.trim(); name.value = rule.var; changed(); });
+    path.addEventListener('change', () => { ensure(); rule.path = path.value; changed(); });
+    from.addEventListener('change', () => { ensure(); rule.from = from.value; changed(); });
+    on.addEventListener('change', () => { if (!rule) return; rule.enabled = on.checked; tr.className = rule.enabled ? '' : 'off'; changed(); });
+    opt.addEventListener('change', () => { if (!rule) return; rule.optional = opt.checked; changed(); });
+    del.addEventListener('click', () => {
+      const i = s.extract.indexOf(rule);
+      if (i >= 0) s.extract.splice(i, 1);
+      rulesTable(s); changed();
+    });
+  }
+  s.extract.forEach(r => addRow(r));
+  if (s.extract.length < MAX_RULES) addRow(null);
+}
+const warnLine = (text, extra = '', bad = false) => `<div class="warn-hint${bad ? ' bad' : ''}">${esc(text)}${extra}</div>`;
+// renderSchedHints says what may keep the schedule from doing what the user
+// expects.
+function renderSchedHints() {
+  const s = findSched(schedEditId), out = [];
+  if (s) {
+    const j = jobOf(s.id), env = findEnv(s.envId);
+    if (schedMsg.id === s.id && schedMsg.text) out.push(warnLine(schedMsg.text, '', schedMsg.bad));
+    for (const p of j ? arr(j.problems) : []) out.push(warnLine(str(p)));
+    const sets = [...new Set(s.extract.filter(r => r.enabled && r.var).map(r => `{{${r.var}}}`))];
+    if (env && sets.length && state.activeEnv !== s.envId) {
+      out.push(warnLine(`Requests see ${sets.join(', ')} only when "${env.name}" is selected in the top bar.`, ' <button data-act="selectEnv">Select it</button>'));
+    }
+    for (const c of varConflicts(s)) out.push(warnLine(`${c.name} is also set by schedule "${c.by.name || 'Untitled'}"`));
+    if (env) for (const n of missingVars(s)) out.push(warnLine(`Variable {{${n}}} is not set in "${env.name}". Nothing will be sent.`));
+    if (s.extract.some(r => r.enabled && r.from === 'regex')) out.push(warnLine('Regex uses Go syntax (RE2): no lookbehind or backreferences. Use ([^\\r\\n]+) to stop at the end of a line.'));
+    if (cur && curCollId && cur.id === s.requestId && isDirty()) out.push(warnLine('The schedule sends the saved version. Save (Ctrl+S) to use your edits.'));
+  }
+  setHTML($('#schedHints'), out.join(''));
+}
+// JSON_STRING is a string of JSON text, or the start of one cut off at its end.
+const JSON_STRING = /"(?:[^"\\]|\\[\s\S]?)*(?:"|$)/g;
+// shownAnswer is the start of the answer of the last run (snippet, which the
+// program keeps after a failure) as the window shows it. An error answer
+// shows as it came. A 2xx answer is a login that worked but lacked a value
+// the rules ask for, so it may hold tokens: of JSON the keys, numbers and
+// the shape show and every string value is masked, and other text is left
+// out. Without a status the answer counts as 2xx.
+function shownAnswer(snippet, status) {
+  if (status && (status < 200 || status > 299)) return snippet;
+  if (!/^\s*[[{]/.test(snippet)) return '';
+  return snippet.replace(JSON_STRING, (m, at, all) => {
+    if (m.length > 1 && m.endsWith('"') && /^\s*:/.test(all.slice(at + m.length))) return m; // a key
+    let v;
+    try { v = JSON.parse(m); } catch (e) { v = m.slice(1); } // cut off
+    return '"' + maskValue(v) + '"';
+  });
+}
+// renderSchedRun shows what the program knows of the schedule: its runs,
+// the values it set and why it stopped.
+function renderSchedRun() {
+  const s = findSched(schedEditId), j = s && jobOf(s.id), rows = [];
+  const row = (k, v) => rows.push(`<div class="k">${esc(k)}</div><div>${v}</div>`);
+  const entry = (e, note) => [fmtClock(e.at), e.status ? String(e.status) : 'no answer', fmtMs(Number(e.timeMs) || 0)].concat(note ? [str(e.note)] : []).map(esc).join('&nbsp;&nbsp;');
+  if (s && j) {
+    const log = arr(j.log).map(obj);
+    row('Last run', log.length ? entry(log[log.length - 1]) : 'never');
+    if (j.enabled && !j.blocked && j.nextAt) {
+      const nf = str(j.nextFrom);
+      const from = nf === 'every' ? 'from Every' : nf === 'retry' ? 'retry' : nf === 'changed' ? 'the definition changed' : nf ? 'from ' + nf : '';
+      row('Next run', `${esc(fmtClock(j.nextAt))} (${live('in', j.nextAt, 'in ')}${from ? ', ' + esc(from) : ''})`);
+    }
+    const vals = ovlOf(s.envId), now = serverNow();
+    for (const n of [...new Set(s.extract.filter(r => r.enabled && r.var).map(r => r.var))]) {
+      if (!Object.hasOwn(vals, n)) continue;
+      const v = obj(vals[n]), other = v.by !== s.id ? findSched(v.by) : null;
+      row(n, `<span class="mono">${esc(maskValue(v.value))}</span> <button data-copy="${esc(s.envId)}" data-name="${esc(n)}">Copy</button>`
+        + (isExpired(v, now, j.enabled ? 0 : s.everySec) ? ' <span class="st-warn">expired</span>' : '')
+        + (v.by !== s.id ? ` <span class="hint">set by ${other ? `schedule "${esc(other.name || 'Untitled')}"` : 'a deleted schedule'}</span>` : ''));
+    }
+    if (arr(j.fields).length) row('Fields', esc(arr(j.fields).join(', ')));
+    if (j.blocked) row('Stopped', esc(j.blocked));
+    else if (j.lastError) row('Last error', esc(j.lastError));
+    const answer = j.snippet && (j.blocked || j.lastError) ? shownAnswer(str(j.snippet), log.length ? Number(log[log.length - 1].status) : 0) : '';
+    if (answer) row('Response', `<span class="mono">${esc(answer)}</span>`);
+    if (j.blocked && j.changedSinceStop) rows.push('<div></div><div class="st-warn">Request changed since the stop. Press Run now.</div>');
+    if (log.length) row('Recent', log.slice(-5).reverse().map(e => `<div>${entry(e, true)}</div>`).join(''));
+  }
+  setHTML($('#schedRun'), rows.join(''));
+  updateLive();
+}
+
+// ---------------------------------------------------------------- TCP: bytes and framing
+// The console works on bytes (Uint8Array), and text goes on the wire as
+// UTF-8. The program fills the variables in and frames what it sends
+// (tcp.go); the page shows the same bytes before (Sends:) and checks the
+// target before Connect, so tcpWrap and tcpTarget have twins there (see
+// TCP_PRESETS).
+const MAX_TCP_MESSAGE = 1 << 20, MAX_TCP_SRC = 64 << 10, MAX_TCP_LOG = 1000, TCP_SHOWN = 4096;
+const utf8 = s => new TextEncoder().encode(s);
+function concatBytes(list) {
+  let n = 0;
+  for (const b of list) n += b.length;
+  const out = new Uint8Array(n);
+  let at = 0;
+  for (const b of list) { out.set(b, at); at += b.length; }
+  return out;
+}
+// latin1Text, bytesToB64 and b64ToBytes go in pieces, so a message of 1 MB
+// does not overflow the stack of String.fromCharCode.
+function latin1Text(b) {
+  let s = '';
+  for (let i = 0; i < b.length; i += 0x8000) s += String.fromCharCode.apply(null, b.subarray(i, i + 0x8000));
+  return s;
+}
+const bytesToB64 = b => btoa(latin1Text(b));
+function b64ToBytes(s) {
+  let bin = '';
+  try { bin = atob(str(s)); } catch (e) { /* not base64: no bytes */ }
+  const out = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+  return out;
+}
+const hex2 = x => x.toString(16).toUpperCase().padStart(2, '0');
+const sameAt = (data, marker, at) => marker.every((x, i) => data[at + i] === x);
+// tcpWrap frames data for sending as wrap in tcpframe.go does and says
+// whether it added anything: a message that already starts with the start
+// marker and ends with the end one goes as it is, and LF and CR LF, which
+// have no start marker, only get an end that is missing.
+function tcpWrap(data, preset) {
+  const { start, end } = presetOf(preset);
+  if (!end.length) return { bytes: data, wrapped: false };
+  if (data.length >= start.length + end.length && sameAt(data, start, 0) && sameAt(data, end, data.length - end.length)) return { bytes: data, wrapped: false };
+  return { bytes: concatBytes([Uint8Array.from(start), data, Uint8Array.from(end)]), wrapped: true };
+}
+// tcpUnwrap takes the framing of preset off data, when data has it.
+function tcpUnwrap(data, preset) {
+  const { start, end } = presetOf(preset);
+  if (!end.length || data.length < start.length + end.length || !sameAt(data, start, 0) || !sameAt(data, end, data.length - end.length)) return data;
+  return data.subarray(start.length, data.length - end.length);
+}
+const framingBytes = preset => { const p = presetOf(preset); return p.end.length ? [p.start.map(hex2).join(' '), '...', p.end.map(hex2).join(' ')].join(' ').trim() : ''; };
+// Split on silence works on the bytes outside a frame, which LF and CR LF do
+// not have.
+const idleApplies = preset => preset === 'none' || presetOf(preset).start.length > 0;
+
+// parseIP tells whether s is an IP address as ParseAddr of Go's net/netip
+// reads one (the twin of tcpTarget uses it), and gives its zone.
+function parseIP(s) {
+  for (const c of s) {
+    if (c === '.') return ipv4Text(s) ? { zone: '' } : null;
+    if (c === ':') return parseIPv6(s);
+    if (c === '%') return null;
+  }
+  return null;
+}
+const ipv4Text = s => { const f = s.split('.'); return f.length === 4 && f.every(x => /^(0|[1-9][0-9]{0,2})$/.test(x) && +x <= 255); };
+function parseIPv6(input) {
+  let s = input, zone = '';
+  const z = s.indexOf('%');
+  if (z >= 0) { zone = s.slice(z + 1); s = s.slice(0, z); if (!zone) return null; }
+  const halves = s.split('::');
+  if (halves.length > 2) return null;
+  const groups = halves.flatMap(h => (h === '' ? [] : h.split(':')));
+  let n = 0;
+  for (let i = 0; i < groups.length; i++) {
+    const g = groups[i];
+    if (/^[0-9A-Fa-f]{1,4}$/.test(g)) n += 1;
+    else if (i === groups.length - 1 && ipv4Text(g)) n += 2; // an IPv4 address takes the last two groups
+    else return null;
+  }
+  // :: stands for at least one group of zeros.
+  return (halves.length === 2 ? n < 8 : n === 8) ? { zone } : null;
+}
+// tcpTarget checks the host and the port of a connection once the variables
+// are in, as its twin in tcp.go does: a name, an IPv4 address or an IPv6 one,
+// in brackets or not and with a zone or not, and a port from 1 to 65535. It
+// gives {host, port, addr}, addr as Connect dials it, or {error: 'host' or
+// 'port', msg}.
+const HOST_NAME = /^[A-Za-z0-9_][A-Za-z0-9_.-]*$/, IP_ZONE = /^[A-Za-z0-9_.-]{1,64}$/;
+function tcpTarget(host, port) {
+  let h = str(host).trim();
+  if (h.startsWith('[') && h.endsWith(']')) h = h.slice(1, -1);
+  const ip = parseIP(h), bad = { error: 'host', msg: `Host ${JSON.stringify(str(host))} is not a host name or an IP address.` };
+  if (ip) { if (ip.zone && !IP_ZONE.test(ip.zone)) return bad; }
+  else if (h === '') return { error: 'host', msg: 'The host is empty.' };
+  else if (h.replace(/\.$/, '').length > 253 || !HOST_NAME.test(h)) return bad;
+  const p = str(port).trim();
+  if (p === '') return { error: 'port', msg: 'The port is empty.' };
+  const n = /^[0-9]+$/.test(p) ? Number(p) : NaN;
+  if (!(n >= 1 && n <= 65535)) return { error: 'port', msg: `Port ${JSON.stringify(str(port))} is not a number from 1 to 65535.` };
+  return { host: h, port: n, addr: (h.includes(':') ? `[${h}]` : h) + ':' + n };
+}
+// splitTarget takes a pasted tcp://host:port or host:port apart; a host
+// alone loses only tcp://. It gives null for anything else.
+function splitTarget(text) {
+  const t = str(text).trim(), bare = t.replace(/^tcp:\/\//i, '');
+  const m = bare.match(/^\[([^\]]+)\]:([0-9]+)$/) || bare.match(/^([^:\s]+):([0-9]+)$/);
+  if (m) return { host: m[1], port: m[2] };
+  return bare !== t ? { host: bare, port: '' } : null;
+}
+
+// tcpEncode turns the text of the message editor into the parts a send
+// carries: {b64} for bytes as they are and {v} for a variable, which the
+// program fills in from the environment of the connection (tcp.go). In Text
+// mode the text goes as UTF-8, Enter gives the bytes newline names, and with
+// escapes on \r \n \t \\ and \xHH give their bytes (\xHH one byte) while any
+// other backslash stays as it is. In Hex mode the text is hex digits, with
+// white space between them as it comes. {{name}} is a variable in both. src
+// is the text itself, the template the log keeps, unless it is over 64 KB.
+const ESCAPE_TOKEN = /\\(?:[rnt\\]|x[0-9A-Fa-f]{2})|\r\n|\r|\n/g, NEWLINE_TOKEN = /\r\n|\r|\n/g;
+const ESCAPED = { r: 0x0D, n: 0x0A, t: 0x09, '\\': 0x5C };
+const NEWLINES = { lf: [0x0A], cr: [0x0D], crlf: [0x0D, 0x0A] };
+function tcpEncode(text, opts) {
+  const { chunks, error } = encodeChunks(text, opts), s = str(text);
+  return {
+    parts: chunks.map(c => (c instanceof Uint8Array ? { b64: bytesToB64(c) } : { v: c.v })),
+    src: s.length <= MAX_TCP_SRC && utf8(s).length <= MAX_TCP_SRC ? s : '', error,
+  };
+}
+// encodeChunks is tcpEncode before base64: byte arrays, the ones next to
+// each other joined, and {v} for the variables.
+function encodeChunks(text, { mode = 'text', newline = 'lf', escapes = true } = {}) {
+  const s = str(text), raw = [];
+  let error = '', last = 0;
+  const piece = p => {
+    if (!p) return;
+    if (mode !== 'hex') { textBytes(p, NEWLINES[newline] || NEWLINES.lf, escapes, raw); return; }
+    const h = parseHex(p);
+    if (h.error && !error) error = h.error;
+    raw.push(h.bytes);
+  };
+  for (const m of s.matchAll(VAR_REF)) {
+    if (!VAR_NAME.test(m[1])) continue; // not a name the program takes: text
+    piece(s.slice(last, m.index));
+    raw.push({ v: m[1] });
+    last = m.index + m[0].length;
+  }
+  piece(s.slice(last));
+  const chunks = [];
+  let run = [];
+  for (const c of raw) {
+    if (c instanceof Uint8Array) { if (c.length) run.push(c); continue; }
+    if (run.length) { chunks.push(concatBytes(run)); run = []; }
+    chunks.push(c);
+  }
+  if (run.length) chunks.push(concatBytes(run));
+  return { chunks, error };
+}
+function textBytes(s, newline, escapes, out) {
+  let last = 0;
+  for (const m of s.matchAll(escapes ? ESCAPE_TOKEN : NEWLINE_TOKEN)) {
+    if (m.index > last) out.push(utf8(s.slice(last, m.index)));
+    const t = m[0];
+    out.push(Uint8Array.from(t[0] !== '\\' ? newline : t[1] === 'x' ? [parseInt(t.slice(2), 16)] : [ESCAPED[t[1]]]));
+    last = m.index + t.length;
+  }
+  if (last < s.length) out.push(utf8(s.slice(last)));
+}
+// parseHex reads hex digits, with any white space between them.
+function parseHex(text) {
+  const t = str(text).replace(/\s+/g, ''), bad = t.match(/[^0-9A-Fa-f]/);
+  if (bad) return { bytes: new Uint8Array(0), error: `Hex: "${bad[0]}" is not a hex digit.` };
+  if (t.length % 2) return { bytes: new Uint8Array(0), error: 'Hex: an odd number of digits, so the last byte is not whole.' };
+  const out = new Uint8Array(t.length / 2);
+  for (let i = 0; i < out.length; i++) out[i] = parseInt(t.substr(2 * i, 2), 16);
+  return { bytes: out, error: '' };
+}
+// hexText writes bytes for the editor in Hex mode, 16 to a line.
+function hexText(b) {
+  const lines = [];
+  for (let o = 0; o < b.length; o += 16) lines.push(Array.from(b.subarray(o, o + 16), hex2).join(' '));
+  return lines.join('\n');
+}
+// utf8At reads the UTF-8 character at i of b: [code point, length], or null
+// when no valid one starts there.
+function utf8At(b, i) {
+  const c = b[i];
+  const [n, min, bits] = c >= 0xC2 && c <= 0xDF ? [2, 0x80, c & 0x1F] : c >= 0xE0 && c <= 0xEF ? [3, 0x800, c & 0x0F] : c >= 0xF0 && c <= 0xF4 ? [4, 0x10000, c & 0x07] : [0];
+  if (!n || i + n > b.length) return null;
+  let cp = bits;
+  for (let k = 1; k < n; k++) {
+    if ((b[i + k] & 0xC0) !== 0x80) return null;
+    cp = (cp << 6) | (b[i + k] & 0x3F);
+  }
+  return cp < min || cp > 0x10FFFF || (cp >= 0xD800 && cp <= 0xDFFF) ? null : [cp, n];
+}
+// escapeBytes writes bytes as text that tcpEncode turns back into the same
+// bytes with escapes on: printable characters of valid UTF-8 stay, \ CR LF
+// and TAB get their escapes, any other byte becomes \xHH, and so does a {
+// before another one, so no {{name}} appears.
+function escapeBytes(b) {
+  let out = '';
+  for (let i = 0; i < b.length;) {
+    const c = b[i];
+    if (c < 0x80) {
+      out += c === 0x5C ? '\\\\' : c === 0x0D ? '\\r' : c === 0x0A ? '\\n' : c === 0x09 ? '\\t'
+        : c === 0x7B && b[i + 1] === 0x7B ? '\\x7B' : c >= 0x20 && c < 0x7F ? String.fromCharCode(c) : '\\x' + hex2(c);
+      i++;
+      continue;
+    }
+    const u = utf8At(b, i);
+    if (u && u[0] >= 0xA0 && u[0] !== 0xFEFF && u[0] !== 0x2028 && u[0] !== 0x2029) { out += String.fromCodePoint(u[0]); i += u[1]; }
+    else { out += '\\x' + hex2(c); i++; }
+  }
+  return out;
+}
+// decodeBytes is the text of bytes in charset; a BOM stays a character.
+function decodeBytes(b, charset = 'utf-8') {
+  if (charset === 'latin1') return latin1Text(b);
+  try { return new TextDecoder(charset, { ignoreBOM: true }).decode(b); } catch (e) { return new TextDecoder('utf-8', { ignoreBOM: true }).decode(b); }
+}
+const CTRL_NAMES = 'NUL SOH STX ETX EOT ENQ ACK BEL BS HT LF VT FF CR SO SI DLE DC1 DC2 DC3 DC4 NAK SYN ETB CAN EM SUB ESC FS GS RS US'.split(' ');
+const CTRL_CHAR = /[\x00-\x1F\x7F]/;
+// tcpVisible shows bytes as text of charset: a control character by its
+// name (<CR>), a BOM as <BOM>, and with breaks a line ends after a <CR> or
+// <LF> that text follows. The result is text, which the page shows only
+// through textContent or esc.
+function tcpVisible(b, charset = 'utf-8', { breaks = true } = {}) {
+  const s = decodeBytes(b, charset);
+  return s.replace(/[\x00-\x1F\x7F-\x9F\uFEFF]/g, (c, i) => {
+    const n = c.charCodeAt(0), next = s[i + 1];
+    const name = n < 0x20 ? CTRL_NAMES[n] : n === 0x7F ? 'DEL' : n === 0xFEFF ? 'BOM' : hex2(n);
+    const brk = breaks && (n === 0x0A || (n === 0x0D && next !== '\n')) && next !== undefined && !CTRL_CHAR.test(next);
+    return `<${name}>` + (brk ? '\n' : '');
+  });
+}
+// hexDump shows bytes 16 to a line: the offset, the bytes and the printable ones.
+function hexDump(b) {
+  const lines = [];
+  for (let o = 0; o < b.length; o += 16) {
+    const row = b.subarray(o, o + 16), hex = Array.from(row, hex2);
+    const bytes = hex.slice(0, 8).join(' ') + (hex.length > 8 ? '  ' + hex.slice(8).join(' ') : '');
+    lines.push(o.toString(16).toUpperCase().padStart(4, '0') + '  ' + bytes.padEnd(48) + '  '
+      + Array.from(row, x => (x >= 0x20 && x < 0x7F ? String.fromCharCode(x) : '.')).join(''));
+  }
+  return lines.join('\n');
+}
+// previewBytes are the bytes a send of text in definition d puts on the
+// wire: the variables as the program fills them in, from the environment of
+// the connection when it is open (si) and else of this tab, with the
+// overlay (ovl) over its rows, and the framing of the connection. missing
+// names the variables without a value, which go as {{name}}.
+function previewBytes(text, d, si = null) {
+  const open = isOpenInfo(si);
+  const envId = open ? str(si.envId) : state.activeEnv, preset = open ? str(obj(si.framing).preset) : d.framing.preset;
+  const { chunks, error } = encodeChunks(text, d), vars = effectiveVars(envId), missing = [];
+  const raw = concatBytes(chunks.map(c => {
+    if (c instanceof Uint8Array) return c;
+    if (Object.hasOwn(vars, c.v)) return utf8(vars[c.v]);
+    if (!missing.includes(c.v)) missing.push(c.v);
+    return utf8('{{' + c.v + '}}');
+  }));
+  const w = d.wrap ? tcpWrap(raw, preset) : { bytes: raw, wrapped: false };
+  return { bytes: w.bytes, wrapped: w.wrapped, already: d.wrap && !w.wrapped && presetOf(preset).end.length > 0, preset, envId, missing, error };
+}
+
+// ---------------------------------------------------------------- TCP: what the program says
+// tcpRT is what the program said of its TCP connections, which every tab and
+// computer shares: its boot, the address this tab comes from (client), the
+// state of each connection by id (sessions) and when that came, on the
+// monotonic clock of this computer (seen), the log of the connection the
+// console shows (logs; no other is kept) and the last reply of each.
+const newTcpRT = () => ({ boot: '', client: '', sessions: new Map(), seen: new Map(), logs: new Map(), replies: new Map() });
+const tcpRT = newTcpRT();
+const newTcpLog = () => ({ entries: [], last: 0, clearedAt: 0, loaded: false });
+function trackLog(rt, id) {
+  if (!rt.logs.has(id)) rt.logs.set(id, newTcpLog());
+  return rt.logs.get(id);
+}
+const nowMono = () => performance.now();
+const isOpenInfo = si => !!si && (si.state === 'connected' || si.state === 'connecting');
+// setInfo keeps si as the state of its connection, unless the one kept is newer.
+function setInfo(rt, si) {
+  const id = str(si.id), old = rt.sessions.get(id);
+  if (!id || (old && Number(old.rev) > Number(si.rev))) return false;
+  rt.sessions.set(id, si);
+  rt.seen.set(id, nowMono());
+  return true;
+}
+// noteReply keeps the newest entry that ends a wait for a reply: the reply,
+// or the note that none came.
+function noteReply(rt, id, e) {
+  const old = rt.replies.get(id);
+  if (e.replyTo && (!old || old.seq < Number(e.seq))) {
+    rt.replies.set(id, { seq: Number(e.seq), tx: Number(e.replyTo), dir: str(e.dir), rttMs: Number(e.rttMs) || 0, text: str(e.text), timedOut: !!e.timedOut, closed: !!e.closed });
+  }
+}
+// tcpReduce takes an event of the stream into rt, or the answer of
+// GET /api/tcp as tcp.snapshot; eventId is the id of the event,
+// <boot>.<seq>. A snapshot of another boot (the program restarted) starts
+// over, and any other event of another boot is left out. A state counts
+// unless the one kept has a newer rev, an entry only once and only when no
+// clear came after it. It returns the id of the connection that changed,
+// '*' for a snapshot, or null when nothing did.
+function tcpReduce(rt, name, data, eventId = '') {
+  const d = obj(data), id = str(d.id), boot = str(eventId).split('.')[0];
+  if (name === 'tcp.snapshot') {
+    if (str(d.boot) !== rt.boot) {
+      rt.boot = str(d.boot);
+      rt.sessions.clear(); rt.seen.clear(); rt.replies.clear();
+      for (const k of rt.logs.keys()) rt.logs.set(k, newTcpLog());
+    }
+    if (d.client) rt.client = str(d.client);
+    const ids = new Set();
+    for (const x of arr(d.sessions)) { const si = obj(x); ids.add(str(si.id)); setInfo(rt, si); }
+    for (const k of [...rt.sessions.keys()]) if (!ids.has(k)) { rt.sessions.delete(k); rt.seen.delete(k); rt.replies.delete(k); }
+    // A connection the program no longer has took its log along.
+    for (const k of [...rt.logs.keys()]) if (!ids.has(k)) rt.logs.set(k, newTcpLog());
+    return '*';
+  }
+  if ((boot && boot !== rt.boot) || !id) return null;
+  switch (name) {
+    case 'tcp.state': return setInfo(rt, d) ? id : null;
+    case 'tcp.entry': {
+      const e = obj(d.entry), si = rt.sessions.get(id), log = rt.logs.get(id), seq = Number(e.seq) || 0;
+      // The counters only grow within a connection: an entry a snapshot has
+      // counted already does not take them back.
+      if (si && Number(e.conn) === Number(si.conn)) {
+        si.bytesIn = Math.max(Number(si.bytesIn) || 0, Number(d.bytesIn) || 0);
+        si.bytesOut = Math.max(Number(si.bytesOut) || 0, Number(d.bytesOut) || 0);
+      }
+      noteReply(rt, id, e);
+      if (log && seq > log.last && seq > log.clearedAt) {
+        log.entries.push(e);
+        log.last = seq;
+        if (log.entries.length > MAX_TCP_LOG) log.entries.splice(0, log.entries.length - MAX_TCP_LOG);
+      }
+      return id;
+    }
+    case 'tcp.cleared': {
+      const log = rt.logs.get(id);
+      if (log) {
+        log.clearedAt = Math.max(log.clearedAt, Number(d.seq) || 0);
+        log.entries = log.entries.filter(e => Number(e.seq) > log.clearedAt);
+      }
+      return id;
+    }
+    case 'tcp.removed':
+      rt.sessions.delete(id); rt.seen.delete(id); rt.replies.delete(id);
+      if (rt.logs.has(id)) rt.logs.set(id, newTcpLog());
+      return id;
+  }
+  return null;
+}
+// tcpMergeLog takes the answer of GET /api/tcp/{id}/log into the log of
+// connection id. What came meanwhile as events stays, every entry once and in
+// order; replace (a poll, without the stream) takes the answer as the whole
+// log. It returns false for the log of another boot.
+function tcpMergeLog(rt, id, data, replace = false) {
+  const d = obj(data);
+  if (rt.boot && str(d.boot) && str(d.boot) !== rt.boot) return false;
+  const log = trackLog(rt, id), got = arr(d.entries).map(obj);
+  let list = got;
+  if (!replace) {
+    const bySeq = new Map(log.entries.map(e => [Number(e.seq), e]));
+    for (const e of got) bySeq.set(Number(e.seq), e);
+    list = [...bySeq.values()].sort((a, b) => Number(a.seq) - Number(b.seq));
+  }
+  log.entries = list.filter(e => Number(e.seq) > log.clearedAt).slice(-MAX_TCP_LOG);
+  for (const e of log.entries) { log.last = Math.max(log.last, Number(e.seq) || 0); noteReply(rt, id, e); }
+  log.loaded = true;
+  return true;
+}
+
+// ---------------------------------------------------------------- live updates
+// In the program a visible tab keeps one event stream, GET /api/events
+// (events.go): the TCP console, state.changed when the data file has a new
+// tag and sched.changed when the schedules changed. While it is live (ready
+// came) the tab polls nothing; without it the tab polls as before (tick). A
+// hidden tab closes the stream and opens it again with the id of the last
+// event it saw, so it gets what it missed, or a snapshot. A stream the
+// program does not give (503 while it restarts) is tried again every 2 s for
+// 30 s, then every 30 s, and at once on focus, online and a return to the tab.
+let events = null;         // the EventSource
+let streamLive = false;    // the stream is up to date
+let lastEventId = '';      // <boot>.<seq> of the last event seen
+let reopenTimer = null, downSince = 0;
+const STREAM_EVENTS = ['tcp.snapshot', 'tcp.state', 'tcp.entry', 'tcp.cleared', 'tcp.removed', 'state.changed', 'sched.changed', 'ready'];
+function openEvents() {
+  if (MODE !== 'server' || events || typeof EventSource !== 'function' || document.visibilityState !== 'visible') return false;
+  clearTimeout(reopenTimer); reopenTimer = null;
+  const es = new EventSource('/api/events' + (lastEventId ? '?after=' + encodeURIComponent(lastEventId) : ''));
+  events = es;
+  for (const name of STREAM_EVENTS) es.addEventListener(name, e => { if (events === es) onStreamEvent(name, e); });
+  es.addEventListener('error', () => {
+    if (events !== es) return;
+    setStreamLive(false);
+    // CLOSED: the program answered with something other than a stream.
+    // Otherwise the browser tries again by itself, with Last-Event-ID.
+    if (es.readyState === 2) { es.close(); events = null; reopenLater(); }
+  });
+  return true;
+}
+function closeEvents() {
+  clearTimeout(reopenTimer); reopenTimer = null;
+  if (events) { events.close(); events = null; }
+  setStreamLive(false);
+}
+function reopenLater() {
+  if (!downSince) downSince = Date.now();
+  clearTimeout(reopenTimer);
+  reopenTimer = setTimeout(() => { reopenTimer = null; openEvents(); }, Date.now() - downSince < 30000 ? 2000 : 30000);
+}
+// retryEvents opens a stream that is down at once.
+function retryEvents() { if (!events) openEvents(); }
+function setStreamLive(on) {
+  if (streamLive === on) return;
+  streamLive = on;
+  if (view === 'tcp') { renderTcpSession(); renderTcpEditor(); }
+}
+function onStreamEvent(name, e) {
+  const id = str(e.lastEventId);
+  if (id) lastEventId = id;
+  let data;
+  try { data = obj(JSON.parse(e.data)); } catch (err) { return; }
+  switch (name) {
+    case 'ready':
+      downSince = 0;
+      setStreamLive(true);
+      // Another boot: the program restarted, which the schedules tell.
+      if (schedSnap && data.boot && data.boot !== schedSnap.boot) tick(true);
+      return;
+    case 'state.changed': syncIfBehind(str(data.tag) || undefined); return;
+    case 'sched.changed':
+      if (!schedSnap || schedSnap.boot !== id.split('.')[0] || schedSnap.gen !== Number(data.gen)) tick(true);
+      return;
+  }
+  applyTcpEvent(name, data, id);
+}
+// applyTcpEvent takes a TCP event into tcpRT and shows what changed. After a
+// snapshot the console asks for the log of its connection, which may have
+// missed entries.
+function applyTcpEvent(name, data, eventId = '') {
+  const before = tcpRT.boot, id = tcpReduce(tcpRT, name, data, eventId);
+  if (id === null) return;
+  if (name !== 'tcp.entry') renderTcpList();
+  if (id === '*') {
+    if (before && tcpRT.boot !== before) tick(true);
+    if (view === 'tcp') { renderTcpView(); if (tcpId) loadTcpLog(tcpId); }
+    return;
+  }
+  if (view !== 'tcp' || id !== tcpId) return;
+  if (name === 'tcp.entry') appendTcpEntry(obj(data).entry); else renderTcpLog();
+  renderTcpSession(); renderTcpEditor();
+}
+// pollTcp is the TCP part of a poll while the stream is not live: the
+// connections, and the log of the one the console shows when it changed.
+async function pollTcp(signal) {
+  let list = null;
+  try {
+    const r = await fetch('/api/tcp', { cache: 'no-store', signal });
+    if (r.status === 200) list = await r.json();
+  } catch (e) { /* the program is away, maybe restarting */ }
+  if (!list || streamLive) return;
+  const mark = () => { const si = tcpRT.sessions.get(tcpId); return si ? [si.rev, si.conn, si.state, si.bytesIn, si.bytesOut, si.waiting, si.pending].join() : ''; };
+  const before = mark(), boot = tcpRT.boot;
+  tcpReduce(tcpRT, 'tcp.snapshot', list);
+  renderTcpList();
+  if (view !== 'tcp' || !tcpId) return;
+  renderTcpSession(); renderTcpEditor();
+  const log = tcpRT.logs.get(tcpId);
+  if (mark() !== before || boot !== tcpRT.boot || !log || !log.loaded) await loadTcpLog(tcpId, { replace: true, signal });
+}
+// loadTcpLog asks the program for the log of connection id, the one the
+// console shows. A connection the program does not have (404, or none in
+// the last snapshot) has no log.
+async function loadTcpLog(id, { replace = false, signal } = {}) {
+  if (MODE !== 'server') return;
+  let data = tcpRT.boot && !tcpRT.sessions.has(id) ? { entries: [] } : null;
+  if (!data) {
+    try {
+      const r = await fetch(`/api/tcp/${encodeURIComponent(id)}/log?limit=${MAX_TCP_LOG}`, { cache: 'no-store', signal });
+      if (r.status === 200) data = await r.json();
+      else if (r.status === 404) data = { entries: [] };
+    } catch (e) { /* the program is away; the next poll or snapshot asks again */ }
+  }
+  if (!data || id !== tcpId || !tcpMergeLog(tcpRT, id, data, replace)) return;
+  if (view === 'tcp') { renderTcpLog(); renderTcpEditor(); }
+}
+
+// ---------------------------------------------------------------- TCP: the console
+// The work area shows the HTTP editor or the TCP console (view); the console
+// shows one connection (tcpId): its definition from the data file, what the
+// program says of it, its log and the message editor. The editor text is a
+// draft of this browser (localStorage), not part of the data file.
+let view = 'http';
+let tcpId = null;
+let tcpLogHex = false;     // the log shows hex dumps
+let tcpBusy = false;       // a Connect or Disconnect of this tab is on its way
+let tcpSending = null;     // {id, out}: a send of this tab on its way, and bytesOut when it left
+let tcpMsg = { id: null, text: '', bad: false };   // what the last action said
+let tcpNote = { id: null, text: '' };              // the note of the last ensure
+let tcpLogKey = '';        // what the log on the page shows
+const findTcp = id => state.tcp.find(d => d.id === id);
+const tcpOpenCount = () => [...tcpRT.sessions.values()].filter(isOpenInfo).length;
+const draftKey = id => 'simple-rest-tcp-draft:' + id;
+function loadDraft(id) {
+  try { return (id && localStorage.getItem(draftKey(id))) || ''; } catch (e) { return ''; }
+}
+function saveDraft(id, text) {
+  try { if (text) localStorage.setItem(draftKey(id), text); else localStorage.removeItem(draftKey(id)); } catch (e) { /* no room or no storage: the draft lasts until a reload */ }
+}
+function loadTabView() {
+  try { return obj(JSON.parse(sessionStorage.getItem('simple-rest-view') || 'null')); } catch (e) { return {}; }
+}
+// setView shows the HTTP editor or the console of connection id. The tab
+// keeps the choice over a reload, as after an update.
+function setView(v, id = tcpId) {
+  view = v === 'tcp' ? 'tcp' : 'http';
+  if (view === 'tcp' && id !== tcpId) {
+    tcpId = id;
+    tcpMsg = { id: null, text: '', bad: false }; tcpNote = { id: null, text: '' };
+    for (const k of [...tcpRT.logs.keys()]) if (k !== id) tcpRT.logs.delete(k);
+    $('#tcpData').value = loadDraft(id);
+  }
+  $('.work').classList.toggle('view-tcp', view === 'tcp');
+  try { sessionStorage.setItem('simple-rest-view', JSON.stringify({ view, tcpId })); } catch (e) { /* no storage: the view lasts until a reload */ }
+  renderTcpList();
+  if (view !== 'tcp') return;
+  if (tcpId) trackLog(tcpRT, tcpId);
+  tcpLogKey = '';
+  renderTcpView();
+  if (tcpId) loadTcpLog(tcpId);
+}
+const targetText = (h, p) => (str(h) || str(p) ? `${str(h)}:${str(p)}` : '');
+function tcpGlyph(si) {
+  if (!si) return { glyph: '○', cls: 'st-off', title: 'Not connected' };
+  if (si.state === 'connected') return { glyph: '●', cls: 'st-ok', title: 'Connected' };
+  if (si.state === 'connecting') return { glyph: '◌', cls: 'st-warn', title: 'Connecting' };
+  return si.error ? { glyph: '○', cls: 'st-err', title: 'Closed: ' + si.error } : { glyph: '○', cls: 'st-off', title: 'Closed' };
+}
+// renderTcpList fills the TCP tab of the sidebar: the definitions, then the
+// connections of the program whose definition is gone, and counts the open ones.
+function renderTcpList() {
+  const filter = $('#sideSearch').value.trim().toLowerCase(), ids = state.tcp.map(d => d.id);
+  for (const id of tcpRT.sessions.keys()) if (!findTcp(id)) ids.push(id);
+  let connected = 0;
+  const items = [];
+  for (const id of ids) {
+    const d = findTcp(id), si = tcpRT.sessions.get(id) || null, g = tcpGlyph(si);
+    if (si && si.state === 'connected') connected++;
+    const name = d ? d.name || 'Untitled' : '(not saved)', target = d ? targetText(d.host, d.port) : targetText(si.hostTpl, si.portTpl);
+    if (filter && !(name + ' ' + target).toLowerCase().includes(filter)) continue;
+    items.push(`<div class="item${view === 'tcp' && id === tcpId ? ' active' : ''}" data-tcp="${esc(id)}" title="${esc(g.title)}"><span class="sglyph ${g.cls}">${g.glyph}</span>`
+      + `<span class="name">${esc(name)}</span><span class="url">${esc(target)}</span></div>`);
+  }
+  setHTML($('#tcpList'), items.join('') || (ids.length ? '' : '<div class="empty">No TCP connections yet.<br>Press + to add one.</div>'));
+  $('#tcpTabCount').textContent = connected ? String(connected) : '';
+}
+const fmtDuration = ms => { const s = Math.max(0, Math.floor(ms / 1000)); return [Math.floor(s / 3600), Math.floor(s / 60) % 60, s % 60].map(x => String(x).padStart(2, '0')).join(':'); };
+function tcpStatusText(si) {
+  if (!si) return 'Not connected';
+  if (si.state === 'connecting') return 'Connecting…';
+  if (si.state === 'connected') return 'Connected ' + fmtDuration((Number(si.connectedForMs) || 0) + nowMono() - (tcpRT.seen.get(str(si.id)) ?? nowMono()));
+  return si.error ? 'Closed: ' + si.error : 'Closed';
+}
+// tcpClock moves the time of an open connection on.
+function tcpClock() {
+  const si = view === 'tcp' && document.visibilityState === 'visible' && tcpRT.sessions.get(tcpId);
+  if (si && si.state === 'connected') $('#tcpStatus').textContent = '● ' + tcpStatusText(si);
+}
+const addrOf = si => (str(si.host).includes(':') ? `[${si.host}]` : str(si.host)) + ':' + si.port;
+function tcpMetaText(si) {
+  if (!si) return '';
+  const parts = [si.remote ? `${si.local} -> ${si.remote}` : addrOf(si), si.envId ? `env ${si.envName}` : 'no environment',
+    `TX ${fmtSize(Number(si.bytesOut) || 0)}`, `RX ${fmtSize(Number(si.bytesIn) || 0)}`];
+  if (si.openedBy) parts.push('opened by ' + (si.openedBy === tcpRT.client ? 'you' : si.openedBy));
+  return parts.join(' · ');
+}
+// connectCheck says what keeps definition d from connecting in envId, the
+// environment of this tab: a variable of the host or the port without a
+// value, or a host or port that is not one (as the program says it).
+function connectCheck(d, envId = state.activeEnv) {
+  const vars = effectiveVars(envId), env = findEnv(envId);
+  for (const n of referencedVars([d.host, d.port])) {
+    if (!Object.hasOwn(vars, n)) return { error: env ? `Variable {{${n}}} is not set in "${env.name}".` : `Variable {{${n}}} is not set: no environment is picked.` };
+  }
+  const t = tcpTarget(subst(d.host, vars), subst(d.port, vars));
+  return t.error ? { error: t.msg } : { target: t };
+}
+// tcpChanges tells whether the open connection si differs from definition d:
+// framing, the preset; other, the host or port (as templates, or their value
+// in the environment of the connection) or the silence that splits.
+function tcpChanges(d, si) {
+  if (!d || !isOpenInfo(si)) return { framing: false, other: false };
+  const vars = effectiveVars(str(si.envId)), t = tcpTarget(subst(d.host, vars), subst(d.port, vars));
+  return {
+    framing: d.framing.preset !== str(obj(si.framing).preset),
+    other: d.host !== str(si.hostTpl) || d.port !== str(si.portTpl) || !!t.error || t.host !== str(si.host) || t.port !== Number(si.port) || d.idleMs !== Number(si.idleMs),
+  };
+}
+// mdnsTcpHint is what a failed lookup of a .local name gets, as Send does.
+function mdnsTcpHint(si) {
+  if (info.os !== 'linux' || !/no such host/.test(str(si.error)) || !str(si.host).toLowerCase().replace(/\.$/, '').endsWith('.local')) return '';
+  return 'This build cannot resolve .local names (mDNS). Use the IP address.';
+}
+const envLabel = id => { const e = id && findEnv(id); return e ? `"${e.name}"` : 'no environment'; };
+// The fields of a definition, which only the program of this version may change.
+const TCP_FIELDS = ['tcpName', 'tcpHost', 'tcpPort', 'tcpFraming', 'tcpWrapOut', 'tcpIdle', 'tcpWait', 'tcpWaitSec', 'tcpNewline', 'tcpEscapes', 'tcpCharset'];
+const setVal = (sel, v) => { const el = $(sel); if (!(el.dataset && el.dataset.held) && el.value !== v) el.value = v; };
+// renderTcpView fills the console with the connection shown: the fields of
+// its definition, what the program says of it, the log and the editor.
+// Without the program, or from another version of it, the definition is
+// there to read and nothing acts (featureState).
+function renderTcpView() {
+  const d = findTcp(tcpId), si = tcpRT.sessions.get(tcpId) || null, fs = featureState(), banner = $('#tcpBanner');
+  banner.hidden = fs === 'ok';
+  banner.textContent = fs === 'nobin' ? 'TCP needs the simple-rest program: browsers cannot open raw TCP sockets.'
+    : 'This page comes from another simple-rest version than the running program. Reload the page.';
+  $('#tcpEmpty').hidden = !!(d || si);
+  $('#tcpMain').hidden = !(d || si);
+  if (!d && !si) return;
+  const ro = fs !== 'ok' || !d;
+  const def = d || normalizeTcp({ id: tcpId, host: si.hostTpl, port: si.portTpl, framing: si.framing, idleMs: si.idleMs });
+  setVal('#tcpName', d ? d.name : '(not saved)');
+  setVal('#tcpHost', def.host); setVal('#tcpPort', def.port);
+  $('#tcpFraming').value = def.framing.preset;
+  $('#tcpFramingBytes').textContent = framingBytes(def.framing.preset);
+  $('#tcpWrapOut').checked = def.wrap;
+  setVal('#tcpIdle', String(def.idleMs));
+  $('#tcpIdleBox').hidden = !idleApplies(def.framing.preset);
+  $('#tcpWait').checked = def.waitReply;
+  setVal('#tcpWaitSec', String(def.replyTimeoutMs / 1000));
+  $$('input[name=tcpMode]').forEach(r => { r.checked = r.value === def.mode; });
+  $('#tcpNewline').value = def.newline;
+  $('#tcpEscapes').checked = def.escapes;
+  $$('#tcpView .tcp-text').forEach(el => { el.hidden = def.mode !== 'text'; });
+  $('#tcpCharset').value = def.rxCharset;
+  for (const f of TCP_FIELDS) $('#' + f).disabled = ro;
+  $$('input[name=tcpMode]').forEach(r => { r.disabled = ro; });
+  $('#tcpDupBtn').disabled = ro;
+  $('#tcpDelBtn').disabled = fs !== 'ok';
+  $('#tcpSaveAsBtn').disabled = ro;
+  renderTcpSaved(d, ro);
+  renderTcpSession();
+  renderTcpLog();
+  renderTcpEditor();
+}
+// renderTcpSession shows what the program says of the connection shown: its
+// state, addresses and counters, the button that fits it and the hints.
+function renderTcpSession() {
+  if (view !== 'tcp') return;
+  const d = findTcp(tcpId), si = tcpRT.sessions.get(tcpId) || null, fs = featureState(), g = tcpGlyph(si);
+  const st = $('#tcpStatus'), btn = $('#tcpConnBtn'), now = si ? si.state : 'closed';
+  st.textContent = g.glyph + ' ' + tcpStatusText(si);
+  st.className = 'tcpstat ' + g.cls;
+  btn.textContent = now === 'connected' ? 'Disconnect' : now === 'connecting' ? 'Cancel' : 'Connect';
+  btn.className = now === 'closed' ? 'primary' : '';
+  const check = d && now === 'closed' ? connectCheck(d) : null;
+  btn.disabled = fs !== 'ok' || tcpBusy || (now === 'closed' && (!check || !!check.error));
+  $('#tcpMeta').textContent = tcpMetaText(si);
+  $('#tcpLive').hidden = !streamLive;
+  const pending = si && si.state === 'connected' ? Number(si.pending) || 0 : 0;
+  $('#tcpPending').hidden = !pending;
+  $('#tcpPending').textContent = pending ? `Waiting for the end of a frame: ${fmtSize(pending)}` : '';
+  $('#tcpClearBtn').disabled = fs !== 'ok' || !si;
+  const out = [];
+  if (tcpMsg.id === tcpId && tcpMsg.text) out.push(warnLine(tcpMsg.text, '', tcpMsg.bad));
+  if (!d) out.push(warnLine('This connection is not in the data file any more: it was deleted in another tab or on another computer.'));
+  if (check && check.error) out.push(warnLine(check.error));
+  if (isOpenInfo(si)) {
+    if (str(si.envId) !== state.activeEnv) out.push(warnLine(`This tab uses ${envLabel(state.activeEnv)}. This connection was opened with ${si.envId ? `"${si.envName}"` : 'no environment'} and sends with its values.`));
+    const ch = tcpChanges(d, si), again = ' <button data-act="reconnect">Reconnect</button>';
+    if (ch.other) out.push(warnLine(`${si.state === 'connected' ? 'Connected to' : 'Connecting to'} ${addrOf(si)}. Reconnect to apply changes.`, again));
+    else if (ch.framing) out.push(warnLine('Framing changes apply after Reconnect.', again));
+  } else if (si && mdnsTcpHint(si)) out.push(warnLine(mdnsTcpHint(si), '', true));
+  setHTML($('#tcpHints'), out.join(''));
+}
+function renderTcpSaved(d, ro) {
+  const chips = d ? d.messages.map(m => `<span class="tchip" data-msg="${esc(m.id)}"><button data-act="load" title="Put it into the editor">${esc(m.name || 'Untitled')}</button>`
+    + `<button data-act="send" title="Send it">&#9654;</button><button data-act="del" title="Delete this saved message"${ro ? ' disabled' : ''}>&#10005;</button></span>`) : [];
+  setHTML($('#tcpChips'), chips.join('') || '<span class="hint">none</span>');
+}
+const fmtTime = at => { const t = new Date(Number(at) || 0); return t.toTimeString().slice(0, 8) + '.' + String(t.getMilliseconds()).padStart(3, '0'); };
+const tcpLogCtx = () => { const d = findTcp(tcpId); return { hex: tcpLogHex, charset: d ? d.rxCharset : 'utf-8', client: tcpRT.client }; };
+// tcpEntryHTML is one entry of the log. Times are those of the computer that
+// runs the program. What came from the device is shown as text only, through esc.
+function tcpEntryHTML(e, ctx) {
+  const dir = str(e.dir), seq = Number(e.seq) || 0, data = dir === 'tx' || dir === 'rx', meta = [];
+  let body = str(e.text), size = '';
+  const label = (cls, text) => meta.push(`<span${cls ? ` class="${cls}"` : ''}>${esc(text)}</span>`);
+  if (data) {
+    const b = b64ToBytes(e.data), shown = b.subarray(0, TCP_SHOWN);
+    body = ctx.hex ? hexDump(shown) : tcpVisible(shown, dir === 'rx' ? ctx.charset : 'utf-8');
+    size = fmtSize(b.length);
+    label('', '#' + seq);
+    if (b.length > shown.length) label('wn', `the log shows ${fmtSize(shown.length)} of ${fmtSize(b.length)}: use Copy`);
+    if (e.outside) label('lb', 'outside frame');
+    if (e.incomplete) label('lb', `incomplete (${str(e.incomplete)})`);
+    if (e.cut) label('lb', 'cut at 1 MB');
+    if (dir === 'rx' && e.replyTo) label('lb', `reply to #${e.replyTo} in ${fmtMs(Number(e.rttMs) || 0)}`);
+    if (arr(e.missing).length) label('wn', 'sent as typed, not set: ' + arr(e.missing).map(n => `{{${str(n)}}}`).join(', '));
+  }
+  if (e.by && e.by !== ctx.client) label('', 'by ' + str(e.by));
+  if (data) meta.push('<span class="acts"><button data-act="copy">Copy</button><button data-act="copyesc">Copy escaped</button><button data-act="edit">To editor</button></span>');
+  const tag = { tx: 'TX', rx: 'RX', info: '··', error: 'ERR' }[dir] || dir;
+  return `<div class="tle ${esc(dir)}" data-seq="${seq}"><span class="t">${esc(fmtTime(e.at))}</span><span class="d">${esc(tag)}</span><span class="n">${esc(size)}</span>`
+    + `<div class="b"><span class="x">${esc(body)}</span>${meta.length ? `<div class="m">${meta.join('')}</div>` : ''}</div></div>`;
+}
+const logKey = (entries, ctx) => [tcpId, ctx.hex, ctx.charset, ctx.client, entries.length, entries.length && entries[0].seq, entries.length && entries[entries.length - 1].seq].join();
+// renderTcpLog draws the log of the connection shown, the last 1000
+// entries, unless the page shows them already.
+function renderTcpLog() {
+  if (view !== 'tcp') return;
+  const log = tcpRT.logs.get(tcpId), entries = log ? log.entries : [], ctx = tcpLogCtx(), el = $('#tcpLog'), key = logKey(entries, ctx);
+  $('#tcpCount').textContent = ` ${entries.length} entr${entries.length === 1 ? 'y' : 'ies'}`;
+  if (key === tcpLogKey) return;
+  tcpLogKey = key;
+  el.innerHTML = entries.map(e => tcpEntryHTML(e, ctx)).join('') || '<div class="empty">Nothing sent or received yet.</div>';
+  el.scrollTop = el.scrollHeight;
+}
+// appendTcpEntry adds the entry that just came to the log on the page, or
+// draws the log again when the page does not show the entries before it.
+function appendTcpEntry(e) {
+  const log = tcpRT.logs.get(tcpId), el = $('#tcpLog');
+  if (!log || log.entries[log.entries.length - 1] !== e) return;
+  const n = log.entries.length, rows = el.children.length, atEnd = el.scrollHeight - el.scrollTop - el.clientHeight < 40;
+  if (tcpLogKey && (rows === n - 1 || (rows === MAX_TCP_LOG && n === MAX_TCP_LOG))) {
+    if (rows === MAX_TCP_LOG) el.children[0].remove();
+    const ctx = tcpLogCtx(), box = document.createElement('div');
+    box.innerHTML = tcpEntryHTML(e, ctx);
+    el.appendChild(box.firstElementChild || box);
+    tcpLogKey = logKey(log.entries, ctx);
+    $('#tcpCount').textContent = ` ${n} entr${n === 1 ? 'y' : 'ies'}`;
+  } else { tcpLogKey = ''; renderTcpLog(); }
+  if (atEnd) el.scrollTop = el.scrollHeight;
+}
+// replyText says how the wait for a reply to the last message ended.
+function replyText(si) {
+  const r = si && tcpRT.replies.get(tcpId), log = tcpRT.logs.get(tcpId), tx = log && log.entries.findLast(e => e.dir === 'tx');
+  if (!r || !tx || Number(tx.seq) !== r.tx) return '';
+  if (r.dir === 'rx') return `Reply in ${fmtMs(r.rttMs)}`;
+  if (r.closed) return 'Connection closed while waiting';
+  return r.text ? r.text[0].toUpperCase() + r.text.slice(1) : '';
+}
+// renderTcpEditor shows what Send would do with the text in the editor: the
+// bytes after the variables and the framing (Sends:), their count, what is
+// wrong with them, and the state of Send and of the wait for a reply.
+function renderTcpEditor() {
+  if (view !== 'tcp') return;
+  const d = findTcp(tcpId), si = tcpRT.sessions.get(tcpId) || null, fs = featureState(), text = $('#tcpData').value, notes = [];
+  let sends = '', count = '', sendable = false;
+  if (d) {
+    const p = previewBytes(text, d, si), n = p.bytes.length;
+    if (p.error) notes.push(warnLine(p.error, '', true));
+    else {
+      if (n) sends = 'Sends: ' + tcpVisible(p.bytes.subarray(0, 600), 'utf-8', { breaks: false }) + (n > 600 ? '…' : '')
+        + (p.wrapped ? `   (wrapped: ${presetOf(p.preset).label})` : p.already ? '   (already framed, sent as is)' : '');
+      count = `${n} byte${n === 1 ? '' : 's'}`;
+      if (p.missing.length) notes.push(warnLine('unknown variable: ' + p.missing.map(x => `{{${x}}}`).join(', ')));
+      if (n > MAX_TCP_MESSAGE) notes.push(warnLine('The message is over 1 MB.', '', true));
+      sendable = n > 0 && n <= MAX_TCP_MESSAGE;
+    }
+    if (d.mode === 'text' && d.escapes && /^\s*[[{]/.test(text) && text.includes('\\')) notes.push(warnLine('Escapes are on: a \\ in this JSON starts an escape. Turn Escapes off to send it as typed.'));
+  }
+  if (MODE === 'server' && !streamLive) notes.push(warnLine('Live updates are off: values may be stale.'));
+  if (tcpNote.id === tcpId && tcpNote.text) notes.push(warnLine(tcpNote.text));
+  $('#tcpSends').textContent = sends;
+  $('#tcpBytes').textContent = count;
+  setHTML($('#tcpNote'), notes.join(''));
+  const btn = $('#tcpSendBtn'), waiting = si && si.state === 'connected' ? Number(si.waiting) || 0 : 0, mine = !!tcpSending && tcpSending.id === tcpId;
+  btn.textContent = waiting ? 'Waiting for reply…' : mine ? 'Sending…' + (si ? ' ' + fmtSize(Math.max(0, (Number(si.bytesOut) || 0) - tcpSending.out)) : '') : 'Send';
+  btn.disabled = fs !== 'ok' || !sendable || !si || si.state !== 'connected' || !!waiting || mine;
+  $('#tcpCancelWait').hidden = !waiting;
+  $('#tcpCancelWait').disabled = fs !== 'ok';
+  $('#tcpReply').textContent = waiting ? '' : replyText(si);
+}
+function setTcpMsg(text, bad = false) {
+  tcpMsg = { id: tcpId, text, bad };
+  renderTcpSession();
+}
+function applyTcpInfo(si) {
+  if (tcpReduce(tcpRT, 'tcp.state', si) !== null) renderTcpList();
+}
+const ensureNoteText = (notes, names, envId) => { const n = topNote(notes); return n ? noteText(n, names, envId) : ''; };
+
+// ---------------------------------------------------------------- TCP: actions
+// tcpConnect opens the connection shown with the environment of this tab.
+// The program reads the variables from the data file, so what this tab
+// changed is saved first, and the values schedules set are refreshed
+// (ensure). The program dials in the background: the result comes as an
+// event, or with the next poll.
+async function tcpConnect() {
+  const id = tcpId, d = findTcp(id), envId = state.activeEnv;
+  if (featureState() !== 'ok' || !d || tcpBusy) return null;
+  const names = referencedVars([d.host, d.port]);
+  let res = null;
+  tcpBusy = true;
+  setTcpMsg('');
+  try {
+    await flushPersist();
+    const { notes } = await freshVars(names, envId, () => setTcpMsg('Refreshing token…'));
+    tcpNote = { id, text: ensureNoteText(notes, names, envId) };
+    const check = connectCheck(d, envId);
+    if (check.error) { tcpMsg = { id, text: check.error, bad: true }; return null; }
+    res = await postJSON(`/api/tcp/${encodeURIComponent(id)}/connect`, {
+      envId, host: d.host, port: d.port, timeoutMs: d.connectTimeoutMs, framing: { preset: d.framing.preset }, idleMs: d.idleMs,
+    }, 15000);
+  } finally {
+    tcpBusy = false;
+    if (!res) renderTcpSession();
+  }
+  tcpMsg = { id, text: '', bad: false };
+  if (res.status === 202) applyTcpInfo(res.body);
+  else if (res.status === 409 && str(res.body.error) === 'already connected') toast('Already connected (another tab or computer?)');
+  else tcpMsg = { id, text: actionError(res), bad: true };
+  renderTcpSession(); renderTcpEditor();
+  if (!streamLive) tick(true);
+  return res;
+}
+async function tcpDisconnect(id = tcpId) {
+  if (featureState() !== 'ok' || !id || tcpBusy) return null;
+  let res;
+  tcpBusy = true;
+  try { res = await postJSON(`/api/tcp/${encodeURIComponent(id)}/disconnect`, {}, 15000); } finally { tcpBusy = false; }
+  if (res.status === 200) { applyTcpInfo(res.body); tcpMsg = { id, text: '', bad: false }; }
+  else tcpMsg = { id, text: actionError(res), bad: true };
+  renderTcpSession(); renderTcpEditor();
+  if (!streamLive) tick(true);
+  return res;
+}
+// tcpReconnect applies the changes of the definition: Disconnect, then
+// Connect in the environment of this tab.
+async function tcpReconnect() {
+  const res = await tcpDisconnect();
+  return res && res.status === 200 ? tcpConnect() : res;
+}
+// tcpSend sends text (the editor, or a saved message in its own mode) over
+// the connection shown. The program fills the variables in from the
+// environment the connection was opened with, so this tab saves first and
+// refreshes the values schedules set there (ensure). The answer comes once
+// the bytes are written, the entry itself as an event.
+async function tcpSend(text = $('#tcpData').value, mode = '') {
+  const id = tcpId, d = findTcp(id), si = tcpRT.sessions.get(id);
+  if (featureState() !== 'ok' || !d || (tcpSending && tcpSending.id === id)) return null;
+  if (!si || si.state !== 'connected') { setTcpMsg('Not connected: press Connect first.', true); return null; }
+  if (Number(si.waiting)) { setTcpMsg(`Waiting for the reply to #${si.waiting}. Press Cancel to stop waiting.`, true); return null; }
+  const enc = tcpEncode(text, { mode: mode || d.mode, newline: d.newline, escapes: d.escapes });
+  if (enc.error) { setTcpMsg(enc.error, true); return null; }
+  const names = [...new Set(enc.parts.filter(p => p.v).map(p => p.v))], envId = str(si.envId);
+  let res;
+  tcpSending = { id, out: Number(si.bytesOut) || 0 };
+  tcpNote = { id, text: '' };
+  setTcpMsg('');
+  renderTcpEditor();
+  try {
+    await flushPersist();
+    const { notes } = await freshVars(names, envId, () => setTcpMsg('Refreshing token…'));
+    tcpNote = { id, text: ensureNoteText(notes, names, envId) };
+    const body = { parts: enc.parts, wrap: d.wrap, waitReply: d.waitReply, replyTimeoutMs: d.replyTimeoutMs };
+    if (enc.src) body.src = enc.src;
+    res = await postJSON(`/api/tcp/${encodeURIComponent(id)}/send`, body, 600000);
+  } finally { tcpSending = null; }
+  const a = res.body;
+  tcpMsg = res.status === 200 && !a.error ? { id, text: '', bad: false }
+    : { id, text: res.status === 200 ? 'Send failed: ' + str(a.error) : actionError(res), bad: true };
+  renderTcpSession(); renderTcpEditor();
+  if (!streamLive) tick(true);
+  return res;
+}
+async function tcpCancelWait() {
+  if (featureState() !== 'ok' || !tcpId) return;
+  try { await fetch(`/api/tcp/${encodeURIComponent(tcpId)}/wait`, { method: 'DELETE' }); } catch (e) { toast('Could not stop waiting: ' + e.message); }
+  if (!streamLive) tick(true);
+}
+// tcpClearLog empties the log of the connection shown in the program, so
+// for every tab.
+async function tcpClearLog() {
+  const id = tcpId;
+  if (featureState() !== 'ok' || !id) return;
+  let r;
+  try { r = await fetch(`/api/tcp/${encodeURIComponent(id)}/log`, { method: 'DELETE' }); } catch (e) { toast('Could not clear the log: ' + e.message); return; }
+  if (r.status !== 204 && r.status !== 404) { toast('Could not clear the log: ' + (r.status === 503 ? 'simple-rest is shutting down.' : 'HTTP ' + r.status)); return; }
+  const log = tcpRT.logs.get(id);
+  if (log) { log.clearedAt = Math.max(log.clearedAt, log.last); log.entries = []; }
+  tcpRT.replies.delete(id);
+  renderTcpLog(); renderTcpEditor();
+}
+// tcpSaveAs saves the message in the editor with the connection shown,
+// under a name the user gives (Save as…, Ctrl+S in the console).
+function tcpSaveAs() {
+  const d = findTcp(tcpId), text = $('#tcpData').value;
+  if (!d || featureState() !== 'ok') return null;
+  if (!text) { setTcpMsg('Type a message first.'); return null; }
+  const name = prompt('Message name', text.split(/\r\n|\r|\n/)[0].trim().slice(0, 40) || 'Message');
+  if (name === null) return null;
+  const m = normalizeTcpMessage({ id: uid(), name: name.trim() || 'Message', mode: d.mode, data: text });
+  d.messages.push(m);
+  persist();
+  renderTcpSaved(d, false);
+  return m;
+}
+function tcpMessageAction(act, msgId) {
+  const d = findTcp(tcpId), m = d && d.messages.find(x => x.id === msgId), ok = featureState() === 'ok';
+  if (!m) return;
+  if (act === 'send') { tcpSend(m.data, m.mode); return; }
+  if (act === 'del') {
+    if (!ok || !confirm(`Delete the saved message "${m.name || 'Untitled'}"?`)) return;
+    d.messages = d.messages.filter(x => x !== m);
+    persist();
+  } else if (act === 'load') {
+    if (ok && d.mode !== m.mode) { d.mode = m.mode; persist(); }
+    $('#tcpData').value = m.data;
+    saveDraft(tcpId, m.data);
+  }
+  renderTcpView();
+}
+// tcpToEditor puts a message of the log into the editor: the template it
+// was sent from, or else its bytes, without the framing a send added, as
+// hex in Hex mode and as escapes in Text mode.
+function tcpToEditor(e) {
+  const d = findTcp(tcpId), ok = featureState() === 'ok';
+  if (!d) return;
+  let text = str(e.src);
+  if (text) {
+    // A template typed in Text mode is no hex.
+    if (d.mode === 'hex' && encodeChunks(text, { mode: 'hex' }).error && ok) { d.mode = 'text'; persist(); }
+  } else {
+    let b = b64ToBytes(e.data);
+    if (e.wrapped) { const si = tcpRT.sessions.get(tcpId); b = tcpUnwrap(b, si ? str(obj(si.framing).preset) : d.framing.preset); }
+    if (d.mode === 'hex') text = hexText(b);
+    else {
+      text = escapeBytes(b);
+      if (!d.escapes && text.includes('\\') && ok) { d.escapes = true; persist(); }
+    }
+  }
+  $('#tcpData').value = text;
+  saveDraft(tcpId, text);
+  renderTcpView();
+}
+function addTcp() {
+  if (featureState() !== 'ok') return null;
+  const d = normalizeTcp({ name: 'New TCP connection' }, new Set(state.tcp.map(x => x.id)));
+  state.tcp.push(d);
+  persist();
+  setSideTab('tcp');
+  setView('tcp', d.id);
+  $('#tcpName').focus(); $('#tcpName').select();
+  return d;
+}
+function tcpDuplicate() {
+  const d = findTcp(tcpId);
+  if (!d || featureState() !== 'ok') return null;
+  const c = normalizeTcp(Object.assign(clone(d), { id: '', name: (d.name || 'Untitled') + ' copy' }), new Set(state.tcp.map(x => x.id)));
+  for (const m of c.messages) m.id = uid();
+  state.tcp.splice(state.tcp.indexOf(d) + 1, 0, c);
+  persist();
+  setView('tcp', c.id);
+  return c;
+}
+// tcpDelete deletes the definition shown and, when the program has its
+// connection, the connection with its log (DELETE /api/tcp/{id}), which
+// closes it. A connection whose definition is gone goes the same way.
+async function tcpDelete() {
+  const id = tcpId, d = findTcp(id), si = tcpRT.sessions.get(id);
+  if (featureState() !== 'ok' || (!d && !si)) return;
+  const ask = d ? `Delete TCP connection "${d.name || 'Untitled'}"?` + (isOpenInfo(si) ? ' It is open and gets disconnected.' : '')
+    : 'Close this connection and remove it with its log from simple-rest?';
+  if (!confirm(ask)) return;
+  if (si) {
+    let r;
+    try { r = await fetch(`/api/tcp/${encodeURIComponent(id)}`, { method: 'DELETE' }); } catch (e) { toast('Could not remove the connection: ' + e.message); return; }
+    if (r.status !== 204 && r.status !== 404) { toast('Could not remove the connection: ' + (r.status === 503 ? 'simple-rest is shutting down.' : 'HTTP ' + r.status)); return; }
+    applyTcpEvent('tcp.removed', { id });
+  }
+  if (d) { state.tcp = state.tcp.filter(x => x !== d); persist(); saveDraft(id, ''); }
+  setView('tcp', state.tcp[0] ? state.tcp[0].id : null);
+}
+// wireTcp: the fields of the definition write to it on change, which a save
+// takes to the data file; the buttons ask the program directly.
+function wireTcp() {
+  $('#tcpFraming').innerHTML = Object.entries(TCP_PRESETS).map(([k, p]) => `<option value="${k}">${esc(p.label)}</option>`).join('');
+  $('#addTcpBtn').addEventListener('click', addTcp);
+  $('#tcpList').addEventListener('click', e => {
+    const it = e.target.closest('[data-tcp]');
+    if (it) { setView('tcp', it.dataset.tcp); $('#sidebar').classList.remove('open'); }
+  });
+  const edit = fn => e => {
+    if (e && e.target && e.target.dataset) delete e.target.dataset.held;
+    const d = findTcp(tcpId);
+    if (d && featureState() === 'ok') { fn(d); persist(); renderTcpList(); }
+    renderTcpView();
+  };
+  $('#tcpName').addEventListener('change', edit(d => { d.name = $('#tcpName').value; }));
+  $('#tcpHost').addEventListener('change', edit(d => {
+    const v = $('#tcpHost').value, t = splitTarget(v);
+    d.host = t ? t.host : v.trim();
+    if (t && t.port) d.port = t.port;
+  }));
+  $('#tcpPort').addEventListener('change', edit(d => { d.port = $('#tcpPort').value.trim(); }));
+  $('#tcpFraming').addEventListener('change', edit(d => { d.framing.preset = $('#tcpFraming').value; }));
+  $('#tcpWrapOut').addEventListener('change', edit(d => { d.wrap = $('#tcpWrapOut').checked; }));
+  $('#tcpIdle').addEventListener('change', edit(d => { const v = $('#tcpIdle').value; d.idleMs = secs(v === '' ? null : +v, d.idleMs, 0, 5000); }));
+  $('#tcpWait').addEventListener('change', edit(d => { d.waitReply = $('#tcpWait').checked; }));
+  $('#tcpWaitSec').addEventListener('change', edit(d => {
+    const v = parseFloat($('#tcpWaitSec').value);
+    d.replyTimeoutMs = secs(Number.isFinite(v) ? Math.round(v * 1000) : null, d.replyTimeoutMs, 100, 60000);
+  }));
+  $$('input[name=tcpMode]').forEach(r => r.addEventListener('change', edit(d => { d.mode = r.value; })));
+  $('#tcpNewline').addEventListener('change', edit(d => { d.newline = $('#tcpNewline').value; }));
+  $('#tcpEscapes').addEventListener('change', edit(d => { d.escapes = $('#tcpEscapes').checked; }));
+  $('#tcpCharset').addEventListener('change', edit(d => { d.rxCharset = $('#tcpCharset').value; }));
+  $('#tcpData').addEventListener('input', () => { if (tcpId) saveDraft(tcpId, $('#tcpData').value); renderTcpEditor(); });
+  $('#tcpConnBtn').addEventListener('click', () => { if (isOpenInfo(tcpRT.sessions.get(tcpId))) tcpDisconnect(); else tcpConnect(); });
+  $('#tcpSendBtn').addEventListener('click', () => tcpSend());
+  $('#tcpCancelWait').addEventListener('click', tcpCancelWait);
+  $('#tcpClearBtn').addEventListener('click', tcpClearLog);
+  $('#tcpSaveAsBtn').addEventListener('click', tcpSaveAs);
+  $('#tcpDupBtn').addEventListener('click', tcpDuplicate);
+  $('#tcpDelBtn').addEventListener('click', tcpDelete);
+  $('#tcpLogWrapBtn').addEventListener('click', () => $('#tcpLog').classList.toggle('wrap'));
+  $$('[data-logview]').forEach(b => b.addEventListener('click', () => {
+    tcpLogHex = b.dataset.logview === 'hex';
+    $$('[data-logview]').forEach(x => x.classList.toggle('active', x === b));
+    renderTcpLog();
+  }));
+  $('#tcpHints').addEventListener('click', e => { if (e.target.dataset && e.target.dataset.act === 'reconnect') tcpReconnect(); });
+  $('#tcpChips').addEventListener('click', e => {
+    const act = e.target.dataset && e.target.dataset.act, chip = e.target.closest('[data-msg]');
+    if (act && chip) tcpMessageAction(act, chip.dataset.msg);
+  });
+  $('#tcpLog').addEventListener('click', e => {
+    const act = e.target.dataset && e.target.dataset.act, row = e.target.closest('[data-seq]'), log = tcpRT.logs.get(tcpId);
+    const entry = act && row && log && log.entries.find(x => String(x.seq) === row.dataset.seq);
+    if (!entry) return;
+    const b = b64ToBytes(entry.data);
+    if (act === 'copy') copyText(decodeBytes(b, entry.dir === 'rx' ? tcpLogCtx().charset : 'utf-8'));
+    else if (act === 'copyesc') copyText(escapeBytes(b));
+    else if (act === 'edit') tcpToEditor(entry);
+  });
 }
 
 // ---------------------------------------------------------------- import / export
@@ -877,50 +3178,140 @@ function download(name, content, type) {
   document.body.appendChild(a); a.click(); a.remove();
   setTimeout(() => URL.revokeObjectURL(a.href), 2000);
 }
-function exportAll() {
-  download('simple-rest-export.json', JSON.stringify({ app: 'simple-rest', version: 1, exportedAt: new Date().toISOString(), collections: state.collections, envs: state.envs }, null, 2), 'application/json');
+// The top-level keys of our own format that this version knows: those of an
+// export and those of the data file, which imports too. Any other key of such
+// a file comes from a newer version and is skipped.
+const EXPORT_KEYS = ['app', 'exportedAt', ...STATE_KEYS];
+// exportData is what Export writes: a copy, so the caller may change it. The
+// schedules go as definitions, the overlay stays in the program; the TCP
+// connections go with their saved messages, but without their log.
+function exportData() {
+  return {
+    app: 'simple-rest', version: 1, exportedAt: new Date().toISOString(),
+    collections: clone(state.collections), envs: clone(state.envs), schedules: clone(state.schedules), tcp: clone(state.tcp),
+  };
 }
+function exportAll() {
+  download('simple-rest-export.json', JSON.stringify(exportData(), null, 2), 'application/json');
+}
+// importFiles reads every file before it touches the state: a sync while a
+// file is read replaces the state and would drop what earlier files added.
+// It alone tells the user what came in and what did not, files it could not
+// import included, in one toast that stays longer the more it says.
 async function importFiles(files) {
-  let nc = 0, ne = 0;
-  for (const f of files) {
-    let data; try { data = JSON.parse(await f.text()); } catch (e) { toast('Not a JSON file: ' + f.name); continue; }
-    const [c, e] = importData(data, f.name); nc += c; ne += e;
-  }
-  persist(); renderCollections(); renderEnvSelect();
-  if (nc || ne) toast(`Imported ${nc} collection(s), ${ne} environment(s)`);
+  const texts = await Promise.all(files.map(f => f.text().catch(() => '')));
+  let nc = 0, ne = 0, ns = 0, nt = 0, orphans = 0, unsupported = 0;
+  const skipped = [], failed = [];
+  files.forEach((f, i) => {
+    let data; try { data = JSON.parse(texts[i]); } catch (e) { failed.push('Not a JSON file: ' + f.name); return; }
+    // importData leaves the state alone, so a file it throws on adds nothing.
+    let got = null; try { got = importData(data); } catch (e) { /* reported below */ }
+    if (!got || (!got.collections.length && !got.envs.length && !got.schedules.length && !got.tcp.length && !got.orphans && !got.skipped.length)) { failed.push('Unrecognized format: ' + f.name); return; }
+    state.collections.push(...got.collections); state.envs.push(...got.envs); state.schedules.push(...got.schedules); state.tcp.push(...got.tcp);
+    nc += got.collections.length; ne += got.envs.length; ns += got.schedules.length; nt += got.tcp.length; orphans += got.orphans; unsupported += got.unsupported;
+    for (const k of got.skipped) if (!skipped.includes(k)) skipped.push(k);
+  });
+  persist(); renderCollections(); renderEnvSelect(); renderTcpList();
+  const msg = [];
+  if (nc || ne || ns || nt) msg.push(`Imported ${nc} collection(s), ${ne} environment(s)` + (ns ? `, ${ns} schedule(s)` : '') + (nt ? `, ${nt} TCP connection(s)` : ''));
+  if (orphans) msg.push(`${orphans} schedule(s) not imported: their request or environment is not in the file`);
+  if (unsupported) msg.push(`${unsupported} request(s) use OAuth 2.0 or pre-request scripts, which are not imported`);
+  if (skipped.length) msg.push(`Skipped: ${skipped.join(', ')} (needs a newer simple-rest)`);
+  msg.push(...failed);
+  const text = msg.join('. ');
+  if (text) toast(text, Math.max(2500, text.length * 60));
 }
 function paramsFromUrl(r) {
   const disabled = r.params.filter(p => !p.enabled);
   r.params = parseQuery(splitUrl(r.url)[1]).concat(disabled);
 }
-function importData(d, fname) {
-  let nc = 0, ne = 0;
-  if (!d || typeof d !== 'object') { toast('Unrecognized format: ' + fname); return [0, 0]; }
-  if (Array.isArray(d.collections)) for (const c of d.collections) {
-    state.collections.push({ id: uid(), name: c.name || 'Imported', open: true, requests: (c.requests || []).map(r => { r = normalizeRequest(r); r.id = uid(); return r; }) }); nc++;
+// importData reads one parsed file: our export (or data file), a Postman
+// collection (v2.0 or v2.1) or a Postman environment. It leaves the state
+// alone and gives back what to add, with new ids. A schedule comes along with
+// the request and the environment it uses, by their new ids; orphans counts
+// the schedules whose request or environment is not in the file, which stay
+// out. A TCP connection comes with its saved messages; its host and port
+// name variables, not an environment, so nothing ties it to the file.
+// skipped names the top-level keys of our format that only a newer
+// version knows; unsupported counts the Postman requests that use OAuth 2.0
+// or pre-request scripts, which are not imported. Nothing recognized gives
+// empty lists.
+function importData(d) {
+  const out = { collections: [], envs: [], schedules: [], tcp: [], skipped: [], unsupported: 0, orphans: 0 };
+  if (!d || typeof d !== 'object' || Array.isArray(d)) return out;
+  if (d.app === 'simple-rest' || Array.isArray(d.collections) || Array.isArray(d.envs)) {
+    // Other files with a collections or envs array import too, but only an
+    // export or a data file of ours (which always has history and settings)
+    // has keys that a newer simple-rest would know.
+    const ours = d.app === 'simple-rest' || (Object.hasOwn(d, 'history') && Object.hasOwn(d, 'settings'));
+    // Old id to new id; a schedule, like the program, takes the first request
+    // of an id across all collections.
+    const reqIds = new Map(), envIds = new Map();
+    for (const x of arr(d.collections)) {
+      const c = obj(x);
+      out.collections.push({ id: uid(), name: str(c.name) || 'Imported', open: true, requests: arr(c.requests).map(r => {
+        const n = normalizeRequest(r), id = uid(), old = str(obj(r).id);
+        if (old && !reqIds.has(old)) reqIds.set(old, id);
+        return Object.assign(n, { id });
+      }) });
+    }
+    for (const x of arr(d.envs)) {
+      const e = obj(x), id = uid(), old = str(e.id);
+      if (old && !envIds.has(old)) envIds.set(old, id);
+      out.envs.push({ id, name: str(e.name) || 'env', vars: arr(e.vars).map(normalizeRow) });
+    }
+    for (const x of arr(d.schedules)) {
+      const s = normalizeSchedule(x);
+      if (!reqIds.has(s.requestId) || !envIds.has(s.envId)) { out.orphans++; continue; }
+      out.schedules.push(Object.assign(s, { id: uid(), requestId: reqIds.get(s.requestId), envId: envIds.get(s.envId) }));
+    }
+    for (const x of arr(d.tcp)) {
+      const c = normalizeTcp(x);
+      for (const m of c.messages) m.id = uid();
+      out.tcp.push(Object.assign(c, { id: uid() }));
+    }
+    if (ours) out.skipped = Object.keys(d).filter(k => !EXPORT_KEYS.includes(k));
+  } else if (d.info && Array.isArray(d.item)) {
+    const c = importPostmanCollection(d, out);
+    out.collections.push(c);
+    // Collection variables become an environment of their own.
+    const vars = arr(d.variable).map(v => normalizeRow({ enabled: !obj(v).disabled, name: obj(v).key, value: obj(v).value }));
+    if (vars.length) out.envs.push({ id: uid(), name: c.name + ' variables', vars });
+  } else if (Array.isArray(d.values) && d.name && !d.item) {
+    out.envs.push({ id: uid(), name: str(d.name), vars: d.values.map(v => normalizeRow({ enabled: obj(v).enabled !== false, name: obj(v).key, value: obj(v).value })) });
   }
-  if (Array.isArray(d.envs)) for (const e of d.envs) {
-    state.envs.push({ id: uid(), name: e.name || 'env', vars: (e.vars || []).map(v => Object.assign(newRow(), v)) }); ne++;
-  }
-  if (d.info && Array.isArray(d.item)) { state.collections.push(importPostmanCollection(d)); nc++; }
-  if (Array.isArray(d.values) && d.name && !d.item) {
-    state.envs.push({ id: uid(), name: d.name, vars: d.values.map(v => ({ enabled: v.enabled !== false, name: v.key || '', value: String(v.value ?? '') })) }); ne++;
-  }
-  if (!nc && !ne) toast('Unrecognized format: ' + fname);
-  return [nc, ne];
+  return out;
 }
-function importPostmanCollection(d) {
+// pmAuth is the auth a Postman request, folder or collection sets itself, or
+// null when it has none or inherits it. noauth is an auth of its own: none.
+const pmAuth = a => (a && typeof a === 'object' && a.type && a.type !== 'inherit' ? a : null);
+// preRequest tells whether a Postman item, folder or collection has a
+// pre-request script that does something.
+const preRequest = x => arr(x.event).some(e => e && e.listen === 'prerequest' && !e.disabled && [].concat(obj(e.script).exec ?? []).join('\n').trim() !== '');
+// importPostmanCollection turns a Postman collection into one of ours. A
+// request without auth of its own takes the auth of the nearest folder that
+// has one, else of the collection. OAuth 2.0 and pre-request scripts (of the
+// request, a folder or the collection) have no counterpart here: the requests
+// that use them come in without and are counted in stats.unsupported.
+function importPostmanCollection(d, stats = { unsupported: 0 }) {
   const reqs = [];
-  const walk = (items, prefix) => {
-    for (const it of items || []) {
-      if (Array.isArray(it.item)) walk(it.item, prefix + (it.name ? it.name + ' / ' : ''));
-      else if (it.request) reqs.push(fromPostmanRequest(it, prefix));
+  const walk = (items, prefix, auth, script) => {
+    for (const it of arr(items)) {
+      const x = obj(it), scripted = script || preRequest(x);
+      if (Array.isArray(x.item)) walk(x.item, prefix + (x.name ? x.name + ' / ' : ''), pmAuth(x.auth) || auth, scripted);
+      else if (x.request) {
+        const a = pmAuth(obj(x.request).auth) || auth;
+        if (scripted || (a && a.type === 'oauth2')) stats.unsupported++;
+        reqs.push(fromPostmanRequest(x, prefix, auth));
+      }
     }
   };
-  walk(d.item, '');
-  return { id: uid(), name: (d.info && d.info.name) || 'Postman import', open: true, requests: reqs };
+  walk(d.item, '', pmAuth(d.auth), preRequest(d));
+  return { id: uid(), name: str(obj(d.info).name) || 'Postman import', open: true, requests: reqs };
 }
-function fromPostmanRequest(it, prefix) {
+// fromPostmanRequest maps one Postman request; parentAuth is the auth it
+// inherits when it has none of its own.
+function fromPostmanRequest(it, prefix, parentAuth = null) {
   const pr = typeof it.request === 'string' ? { method: 'GET', url: it.request } : it.request;
   const r = newRequest();
   r.name = prefix + (it.name || 'Untitled');
@@ -939,7 +3330,10 @@ function fromPostmanRequest(it, prefix) {
     r.body.mode = 'form';
     r.body.form = (b.urlencoded || []).map(f => ({ enabled: !f.disabled, name: f.key || '', value: String(f.value ?? '') }));
   }
-  const a = pr.auth, get = (arr, k) => { const x = (arr || []).find(y => y.key === k); return x ? String(x.value ?? '') : ''; };
+  // Postman v2.1 keeps the auth attributes as a list of {key, value}, v2.0 as
+  // an object; anything else gives empty values.
+  const a = pmAuth(pr.auth) || parentAuth;
+  const get = (list, k) => str(Array.isArray(list) ? obj(list.find(y => obj(y).key === k)).value : obj(list)[k]);
   if (a && a.type === 'basic') { r.auth.type = 'basic'; r.auth.username = get(a.basic, 'username'); r.auth.password = get(a.basic, 'password'); }
   else if (a && a.type === 'bearer') { r.auth.type = 'bearer'; r.auth.token = get(a.bearer, 'token'); }
   else if (a && a.type === 'apikey') { r.auth.type = 'apikey'; r.auth.keyName = get(a.apikey, 'key'); r.auth.keyValue = get(a.apikey, 'value'); r.auth.keyIn = get(a.apikey, 'in') === 'query' ? 'query' : 'header'; }
@@ -947,8 +3341,16 @@ function fromPostmanRequest(it, prefix) {
 }
 
 // ---------------------------------------------------------------- cURL
-function toCurl(r = cur) {
-  const e = buildEffective(r);
+// copyCurl copies the request in the editor as Send would send it, with the
+// values of schedules refreshed first.
+async function copyCurl() {
+  const r = clone(cur), envId = state.activeEnv, names = referencedVars(requestTexts(r));
+  const { vars, notes } = await freshVars(names, envId);
+  await copyText(toCurl(r, vars));
+  noteToast(notes, names, envId);
+}
+function toCurl(r = cur, vars = activeVars()) {
+  const e = buildEffective(r, vars);
   const q = s => "'" + String(s).replace(/'/g, "'\\''") + "'";
   const parts = ['curl'];
   if (e.method === 'HEAD') parts.push('-I'); else if (e.method !== 'GET') parts.push('-X ' + e.method);
@@ -1006,6 +3408,13 @@ async function checkUpdate() {
   btn.disabled = false; renderUpdate();
 }
 async function installUpdate() {
+  // Every start of the program turns the schedules off and finds no TCP
+  // connection open.
+  const on = jobsOn(), open = tcpOpenCount();
+  const lost = [on && `${on} schedule(s) turn off`, open && `${open} TCP connection(s) close`].filter(Boolean);
+  if (lost.length && !confirm(`Installing restarts the program: ${lost.join(' and ')}. Continue?`)) return;
+  // The restart must not take unsaved changes with it.
+  if (!(await persistNow())) { toast('Update not installed: your last changes could not be saved.'); return; }
   try {
     const r = await fetch('/api/update/install', { method: 'POST' });
     const s = await r.json();
@@ -1014,7 +3423,9 @@ async function installUpdate() {
   } catch (e) { toast('Update failed: ' + e.message); }
 }
 // pollUpdate follows the download, then waits for the new binary to answer
-// with another version number and reloads the page.
+// with another version number and reloads the page. The program that served
+// this page let its address in, so a 403 can only come from the new one, whose
+// Host rule refuses the name the page was opened by.
 function pollUpdate() {
   clearInterval(updPoll);
   const oldVersion = updStatus.version;
@@ -1022,6 +3433,11 @@ function pollUpdate() {
   updPoll = setInterval(async () => {
     try {
       const r = await fetch('/api/update', { cache: 'no-store' });
+      if (r.status === 403) {
+        clearInterval(updPoll);
+        $('#updBox').innerHTML = '<div class="hint" style="color:var(--err)">simple-rest restarted but refuses the address you opened it with. Open it by its IP address or start it with -allow-host.</div>';
+        return;
+      }
       if (!r.ok) throw new Error('HTTP ' + r.status);
       const s = await r.json();
       if (s.version !== oldVersion) { clearInterval(updPoll); location.reload(); return; }
@@ -1037,6 +3453,27 @@ function pollUpdate() {
 }
 
 // ---------------------------------------------------------------- events
+// Closing a modal is also a moment to pick up what changed elsewhere.
+function closeModal(m) { m.classList.remove('open'); syncIfBehind(); }
+const isEnter = e => e.key === 'Enter' || e.keyCode === 13;
+// keyAction runs the shortcuts of the page for view: Ctrl+Enter sends and
+// Ctrl+S saves, in the TCP console the message (Save as…) and never the HTTP
+// request. It returns what it did.
+function keyAction(e, v = view) {
+  const mod = e.ctrlKey || e.metaKey;
+  if (mod && isEnter(e)) {
+    e.preventDefault();
+    if (v === 'tcp') tcpSend(); else sendRequest();
+    return 'send';
+  }
+  if (mod && str(e.key).toLowerCase() === 's') {
+    e.preventDefault();
+    if (v === 'tcp') tcpSaveAs(); else save();
+    return 'save';
+  }
+  if (e.key === 'Escape') { $$('.modal-bg.open').forEach(m => closeModal(m)); return 'close'; }
+  return '';
+}
 function wire() {
   $('#setAutoUpdate').addEventListener('change', async e => {
     try {
@@ -1066,17 +3503,12 @@ function wire() {
   $('#optCookies').addEventListener('change', e => { cur.options.cookies = e.target.checked; markDirty(); });
 
   $('#sendBtn').addEventListener('click', sendRequest);
-  $('#curlBtn').addEventListener('click', () => copyText(toCurl()));
+  $('#curlBtn').addEventListener('click', copyCurl);
   $('#saveBtn').addEventListener('click', save);
   $('#saveAsBtn').addEventListener('click', () => saveAs());
   $('#newBtn').addEventListener('click', startNew);
-  const isEnter = e => e.key === 'Enter' || e.keyCode === 13;
   $('#url').addEventListener('keydown', e => { if (isEnter(e)) { e.preventDefault(); sendRequest(); } });
-  document.addEventListener('keydown', e => {
-    if ((e.ctrlKey || e.metaKey) && isEnter(e)) { e.preventDefault(); sendRequest(); }
-    else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') { e.preventDefault(); save(); }
-    else if (e.key === 'Escape') $$('.modal-bg.open').forEach(m => m.classList.remove('open'));
-  });
+  document.addEventListener('keydown', e => keyAction(e, view));
 
   $$('.tabs.inner button').forEach(b => b.addEventListener('click', () => {
     $$('.tabs.inner button').forEach(x => x.classList.toggle('active', x === b));
@@ -1091,7 +3523,7 @@ function wire() {
   $('#dlRespBtn').addEventListener('click', downloadResponse);
 
   $$('[data-side]').forEach(b => b.addEventListener('click', () => setSideTab(b.dataset.side)));
-  $('#sideSearch').addEventListener('input', () => { renderCollections(); renderHistory(); });
+  $('#sideSearch').addEventListener('input', () => { renderCollections(); renderHistory(); renderTcpList(); });
   $('#addCollBtn').addEventListener('click', () => {
     const n = prompt('Collection name', 'New collection'); if (n === null) return;
     state.collections.push({ id: uid(), name: n.trim() || 'New collection', open: true, requests: [] }); persist(); renderCollections();
@@ -1099,11 +3531,11 @@ function wire() {
   $('#clearHistBtn').addEventListener('click', () => { if (confirm('Clear the whole history?')) { state.history = []; persist(); renderHistory(); } });
   $('#menuBtn').addEventListener('click', () => $('#sidebar').classList.toggle('open'));
 
-  $('#envSelect').addEventListener('change', e => { state.activeEnv = e.target.value; persist(); });
+  $('#envSelect').addEventListener('change', e => setActiveEnv(e.target.value));
   $('#envBtn').addEventListener('click', openEnvModal);
   $('#addEnvBtn').addEventListener('click', () => {
     const e = { id: uid(), name: 'New environment', vars: [] }; state.envs.push(e); envEditId = e.id;
-    if (!state.activeEnv) state.activeEnv = e.id;
+    if (!state.activeEnv) setActiveEnv(e.id);
     renderEnvModal(); renderEnvSelect(); persist(); $('#envName').focus(); $('#envName').select();
   });
   $('#envName').addEventListener('input', e => {
@@ -1113,12 +3545,55 @@ function wire() {
     renderEnvSelect(); persist();
   });
   $('#delEnvBtn').addEventListener('click', () => {
-    const env = state.envs.find(x => x.id === envEditId); if (!env || !confirm(`Delete environment "${env.name}"?`)) return;
+    const env = state.envs.find(x => x.id === envEditId); if (!env || !confirm(`Delete environment "${env.name}"?` + usedBy(schedulesUsing({ envId: env.id })))) return;
     state.envs = state.envs.filter(x => x !== env);
-    if (state.activeEnv === env.id) state.activeEnv = '';
+    if (state.activeEnv === env.id) setActiveEnv('');
     envEditId = state.envs[0] ? state.envs[0].id : null;
     renderEnvModal(); renderEnvSelect(); persist();
   });
+  $('#envOverlay').addEventListener('click', e => {
+    const d = e.target.dataset || {};
+    if (d.copy) copyValue(d.copy, d.name);
+    else if (d.clear && envEditId) clearVar(envEditId, d.clear);
+  });
+
+  // Schedules: the fields write to the definition on change, which a save
+  // takes to the program; the buttons ask the program directly.
+  $('#schedBtn').addEventListener('click', () => openSchedModal());
+  $('#addSchedBtn').addEventListener('click', () => addSchedule(null));
+  $('#schedOffAllBtn').addEventListener('click', turnAllOff);
+  $('#schedList').addEventListener('click', e => {
+    const it = e.target.closest('[data-id]');
+    if (it) { schedEditId = it.dataset.id; renderSchedModal(); }
+  });
+  $('#delSchedBtn').addEventListener('click', () => { const s = findSched(schedEditId); if (s) deleteSched(s); });
+  $('#schedEnabled').addEventListener('change', e => { const s = findSched(schedEditId); if (s) schedAction(s.id, e.target.checked ? 'enable' : 'disable'); });
+  $('#schedRunBtn').addEventListener('click', () => { const s = findSched(schedEditId); if (s) schedAction(s.id, 'run'); });
+  $('#schedHints').addEventListener('click', e => {
+    const s = findSched(schedEditId);
+    if (s && e.target.dataset && e.target.dataset.act === 'selectEnv') { setActiveEnv(s.envId); renderEnvSelect(); renderSchedHints(); }
+  });
+  $('#schedRun').addEventListener('click', e => { const d = e.target.dataset || {}; if (d.copy) copyValue(d.copy, d.name); });
+  const editSched = fn => () => {
+    const s = findSched(schedEditId);
+    if (!s || featureState() !== 'ok') return;
+    fn(s); persist(); renderSchedList(); renderSchedHints();
+  };
+  $('#schedName').addEventListener('change', editSched(s => { s.name = $('#schedName').value; }));
+  $('#schedReq').addEventListener('change', editSched(s => { s.requestId = $('#schedReq').value; }));
+  $('#schedEnv').addEventListener('change', editSched(s => { s.envId = $('#schedEnv').value; renderSchedRun(); }));
+  const setEvery = editSched(s => {
+    const n = parseFloat($('#schedEvery').value);
+    if (Number.isFinite(n)) s.everySec = secs(Math.round(n * +$('#schedUnit').value), s.everySec, 10, 86400);
+    showEvery(s);
+  });
+  $('#schedEvery').addEventListener('change', setEvery);
+  $('#schedUnit').addEventListener('change', setEvery);
+  $('#schedExp').addEventListener('change', editSched(s => { s.expiresPath = $('#schedExp').value.trim(); $('#schedExp').value = s.expiresPath; }));
+  $('#schedLead').addEventListener('change', editSched(s => {
+    const v = $('#schedLead').value;
+    s.leadSec = secs(v === '' ? null : +v, 60, 0, 3600); $('#schedLead').value = s.leadSec;
+  }));
 
   $('#settingsBtn').addEventListener('click', () => {
     const s = state.settings;
@@ -1140,8 +3615,13 @@ function wire() {
   $('#importBtn').addEventListener('click', () => $('#importFile').click());
   $('#importFile').addEventListener('change', e => { importFiles(Array.from(e.target.files)); e.target.value = ''; });
   $('#exportBtn').addEventListener('click', exportAll);
-  $$('[data-close]').forEach(b => b.addEventListener('click', () => b.closest('.modal-bg').classList.remove('open')));
-  $$('.modal-bg').forEach(m => m.addEventListener('mousedown', e => { if (e.target === m) m.classList.remove('open'); }));
+  $$('[data-close]').forEach(b => b.addEventListener('click', () => closeModal(b.closest('.modal-bg'))));
+  $$('.modal-bg').forEach(m => m.addEventListener('mousedown', e => { if (e.target === m) closeModal(m); }));
+  $$('[data-reload]').forEach(b => b.addEventListener('click', () => location.reload()));
+  // A field that writes to the model on change holds what is typed into it
+  // until then, and a sync waits for it (heldField).
+  document.addEventListener('input', e => { const d = e.target.dataset; if (d && d.commit === 'change') d.held = '1'; });
+  document.addEventListener('change', e => { const d = e.target.dataset; if (d) delete d.held; });
 
   const sp = $('#splitter'), work = $('.work'); let drag = false;
   const move = y => { const r = work.getBoundingClientRect(); const h = Math.min(Math.max(y - r.top, 120), r.height - 140); document.documentElement.style.setProperty('--req-h', h + 'px'); };
@@ -1151,6 +3631,7 @@ function wire() {
   sp.addEventListener('touchstart', e => { drag = true; }, { passive: true });
   window.addEventListener('touchmove', e => { if (drag) move(e.touches[0].clientY); }, { passive: true });
   window.addEventListener('touchend', () => { drag = false; });
+  wireTcp();
 }
 
 // ---------------------------------------------------------------- init
@@ -1163,15 +3644,53 @@ async function init() {
   renderEnvSelect();
   loadRequest(newRequest(), null);
   renderHistory();
-  setSideTab('coll');
+  // The view and the TCP connection shown outlive a reload of the tab, as
+  // after an update.
+  const tv = loadTabView();
+  if (tv.view === 'tcp' && findTcp(str(tv.tcpId))) { setSideTab('tcp'); setView('tcp', str(tv.tcpId)); }
+  else { setSideTab('coll'); setView('http'); }
   showRespTab('body');
+  renderSchedBtn();
   fetchUpdateStatus();
   setInterval(fetchUpdateStatus, 15 * 60 * 1000);
+  // Another tab or computer may save the data file, the program runs the
+  // schedules and keeps the TCP connections: the event stream brings every
+  // change (openEvents). Without it the tab asks every 10 s while it is
+  // visible (every 2 s with Schedules or Environments open or in the TCP
+  // console; see tick) and whenever the user comes back to it. The snapshot
+  // of the schedules carries the ETag of the file.
+  if (MODE === 'server') { setInterval(tick, 2000); tick(true); openEvents(); setInterval(tcpClock, 1000); }
+  else window.addEventListener('storage', e => { if (e.key === 'simple-rest') syncIfBehind(); });
+  document.addEventListener('visibilitychange', onVisibility);
+  window.addEventListener('focus', () => { syncIfBehind(); retryEvents(); });
+  window.addEventListener('online', retryEvents);
+}
+// onVisibility: a hidden tab closes its event stream; one that comes back
+// opens it again and catches up.
+function onVisibility() {
+  if (document.visibilityState === 'visible') { syncIfBehind(); checkPageVersion(); retryEvents(); tick(true); }
+  else closeEvents();
 }
 
 // The pure parts are exposed for the Node tests in tests/; the page itself
-// starts only when the markup is there.
-globalThis.__sr = { state, splitUrl, parseQuery, encName, encValue, subst, activeVars, buildEffective, highlightJSON, normalizeRequest, newRequest, paramsFromUrl, importPostmanCollection, fromPostmanRequest, toCurl };
+// starts only when the markup is there. saveInfo, editorInfo, schedInfo and
+// tcpInfo let the tests look at the save, editor, schedule and TCP state.
+globalThis.__sr = {
+  state, splitUrl, parseQuery, encName, encValue, subst, activeVars, buildEffective, highlightJSON, normalizeRequest, newRequest, paramsFromUrl, importPostmanCollection, fromPostmanRequest, toCurl,
+  importData, exportData,
+  str, normalizeRow, normalizeDoc, applyState, serializeState, findEnv, varsOf, setActiveEnv, detectMode, loadState, loadRequest,
+  persist, persistNow, flushPersist, syncIfBehind, installUpdate, sendRequest, importFiles,
+  renderBody,
+  normalizeSchedule, findRequest, requestTexts, referencedVars, schedulesSetting, schedulesUsing, varConflicts, missingVars, effectiveVars,
+  maskValue, isExpired, featureState, applySnapshot, tick, ensureVars, sendFlow, copyCurl, schedAction, turnAllOff, deleteSched, addSchedule, clearVar, openSchedModal,
+  TCP_PRESETS, normalizeTcp, tcpEncode, parseHex, escapeBytes, decodeBytes, tcpVisible, hexDump, hexText, bytesToB64, b64ToBytes, tcpTarget, splitTarget, tcpWrap, tcpUnwrap,
+  previewBytes, newTcpRT, tcpReduce, tcpMergeLog, tcpEntryHTML, setView, keyAction, openRequest, openEvents, closeEvents, onVisibility, applyTcpEvent, pollTcp, loadTcpLog,
+  tcpConnect, tcpDisconnect, tcpReconnect, tcpSend, tcpCancelWait, tcpClearLog, tcpSaveAs, tcpToEditor, addTcp, tcpDuplicate, tcpDelete, renderTcpView, renderTcpList,
+  saveInfo: () => ({ saveState, lastTag, lastSynced, pending: savePending() }),
+  editorInfo: () => ({ cur, collId: curCollId, saved: savedSnapshot }),
+  schedInfo: () => ({ snap: schedSnap, ovl, skew, seenTag, down: schedDown }),
+  tcpInfo: () => ({ rt: tcpRT, view, tcpId, live: streamLive, lastEventId, busy: tcpBusy, msg: tcpMsg.text, note: tcpNote.text }),
+};
 if (typeof document !== 'undefined' && document.querySelector('#url')) init();
 })();
 </script>

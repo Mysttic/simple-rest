@@ -29,7 +29,8 @@
   <h1>A REST client<br>that is one file</h1>
   <p class="lead">
     Collections, environments, history and a response viewer, like the big
-    tools, without the installer, the account or the cloud.
+    tools, without the installer, the account or the cloud. Schedules keep
+    tokens fresh, and a TCP console talks to devices on your network.
   </p>
   <p class="claim">Download one file, run it, the browser opens. That is the whole setup.</p>
   <img class="banner" src="img/promo.png" alt="simple-rest with a collection on the left and a JSON answer filling the window">
@@ -66,8 +67,9 @@
     <div class="tile">
       <h3>Raspberry Pi</h3>
       <p class="what">
-        For a Pi 3, 4 or 5 running a 64-bit system. Start it there and reach the
-        UI from any machine on the network.
+        For a Pi 3, 4 or 5 running a 64-bit system. Start it there with
+        <code>-listen 0.0.0.0:8787</code> and reach the UI from any machine on a
+        network you trust.
       </p>
       <a class="button" id="download-rpi" href="#" aria-disabled="true">Download for Raspberry Pi (64-bit)</a>
       <span class="size" id="size-rpi"></span>
@@ -100,13 +102,13 @@
       binary.
     </p>
 
-    <div class="features">
+    <!-- Eight cards: two columns keep the rows even, the shared grid would lay out 3, 3 and 2. -->
+    <div class="features" style="grid-template-columns: repeat(auto-fit, minmax(min(400px, 100%), 1fr))">
       <div class="feature">
         <h3>No CORS in the way</h3>
         <p>
-          The page in your browser only talks to the program on localhost. The
-          program sends the real request, so any API answers, with every header
-          visible.
+          The page in your browser talks only to the program. The program sends
+          the real request, so any API answers, with every header visible.
         </p>
       </div>
       <div class="feature">
@@ -123,6 +125,25 @@
           Saved requests in collections, a history of what you sent, and
           <code>{{variables}}</code> from the active environment substituted in
           URL, headers, body and auth.
+        </p>
+      </div>
+      <div class="feature">
+        <h3>Schedules keep a token fresh</h3>
+        <p>
+          The program sends a saved login request every few minutes, also with
+          no browser open, and puts the token from the answer into
+          <code>{{token}}</code>. Values stay in memory, and every start of the
+          program turns the schedules off.
+        </p>
+      </div>
+      <div class="feature">
+        <h3>A TCP console for devices</h3>
+        <p>
+          The program connects as a client to a device or system anywhere on
+          your local network and keeps the connection open until you
+          disconnect. Framing presets None, MLLP, STX/ETX, LF and CR LF,
+          <code>{{variables}}</code> in messages, and Wait for reply that times
+          the answer.
         </p>
       </div>
       <div class="feature">
@@ -161,7 +182,7 @@
       <figcaption>Variables per environment</figcaption>
     </figure>
     <figure>
-      <img src="img/update.png" alt="The update card in settings, offering release 1.1.0" loading="lazy" decoding="async">
+      <img src="img/update.png" alt="The update card in settings, offering a newer release" loading="lazy" decoding="async">
       <figcaption>A newer release, found and installed by the app</figcaption>
     </figure>
   </div>
@@ -169,23 +190,35 @@
     <img src="img/request.png" alt="The request editor with a JSON body and variables in the address" loading="lazy" decoding="async">
     <figcaption>Collections on the left, the request you are editing on the right</figcaption>
   </figure>
+  <figure class="shot-wide">
+    <img src="img/schedules.png" alt="The Schedules window with a token refresh that is on, its last run and the values it set" loading="lazy" decoding="async">
+    <figcaption>A schedule that logs in and keeps {{token}} fresh</figcaption>
+  </figure>
+  <figure class="shot-wide">
+    <img src="img/tcp.png" alt="The TCP console connected to a lab analyzer: an HL7 order sent over MLLP and the ACK that came back" loading="lazy" decoding="async">
+    <figcaption>The TCP console: an HL7 order over MLLP and the ACK it got back</figcaption>
+  </figure>
 </section>
 
 <section class="band">
   <div class="wrap">
     <h2 id="privacy">Privacy</h2>
     <p class="intro">
-      The program listens on 127.0.0.1 only and refuses requests from other
-      origins and hosts, so nothing else on the machine or the network can use
-      it as a proxy.
+      By default the program listens on 127.0.0.1 only and refuses requests
+      that other websites in your browser send to it. It has no password:
+      other programs on the same machine can use it, and once started with
+      <code>-listen 0.0.0.0:8787</code> so can anyone on your network, who then
+      sees your variables and the tokens your schedules set. Do that only on a
+      network you trust.
     </p>
     <div class="features">
       <div class="feature">
         <h3>Nothing leaves on its own</h3>
         <p>
-          No telemetry, no account, nothing collected. The only outbound
-          request the app makes by itself is the check for a newer release,
-          and it stays off until you turn it on.
+          No telemetry, no account, nothing collected. The app sends requests
+          by itself only for what you turn on: the check for a newer release
+          and the schedules you enable. Both start off, and every start of the
+          program turns the schedules off again.
         </p>
       </div>
       <div class="feature">
