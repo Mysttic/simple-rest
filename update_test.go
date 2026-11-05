@@ -74,8 +74,9 @@ func TestPlatformSuffix(t *testing.T) {
 		"windows/amd64": "windows-amd64.exe",
 		"linux/amd64":   "linux-amd64",
 		"linux/arm64":   "linux-arm64",
+		"linux/arm":     "linux-armhf",
 		// One build per system: everything else has no release file.
-		"windows/arm64": "", "linux/arm": "", "darwin/arm64": "", "darwin/amd64": "",
+		"windows/arm64": "", "darwin/arm64": "", "darwin/amd64": "",
 		"android/arm64": "", "plan9/386": "", "linux/riscv64": "",
 	}
 	for in, want := range cases {
