@@ -1,0 +1,25 @@
+{
+    "version": "@VERSION@",
+    "description": "REST and TCP client in one file, with its UI in the browser",
+    "homepage": "https://github.com/Mysttic/simple-rest",
+    "license": "MIT",
+    "notes": "simple-rest keeps its data in %APPDATA%\\simple-rest. Update it with: scoop update simple-rest",
+    "architecture": {
+        "64bit": {
+            "url": "https://github.com/Mysttic/simple-rest/releases/download/v@VERSION@/simple-rest-@VERSION@-windows-amd64.exe#/simple-rest.exe",
+            "hash": "@SHA256_WINDOWS_AMD64_EXE@"
+        }
+    },
+    "bin": "simple-rest.exe",
+    "checkver": "github",
+    "autoupdate": {
+        "architecture": {
+            "64bit": {
+                "url": "https://github.com/Mysttic/simple-rest/releases/download/v$version/simple-rest-$version-windows-amd64.exe#/simple-rest.exe"
+            }
+        },
+        "hash": {
+            "url": "https://github.com/Mysttic/simple-rest/releases/download/v$version/simple-rest-$version-checksums.txt"
+        }
+    }
+}

@@ -39,6 +39,7 @@ case "$goos/$goarch" in
   windows/amd64) suffix="windows-amd64.exe"; ext=.exe ;;
   linux/amd64)   suffix="linux-amd64" ;;
   linux/arm64)   suffix="linux-arm64" ;;
+  linux/arm)     suffix="linux-armhf" ;;
   *) echo "no release build for $goos/$goarch, nothing to walk here"; exit 0 ;;
 esac
 asset="$project-$version-$suffix"

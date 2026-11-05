@@ -7,14 +7,14 @@
 # for the Actions minutes this account has left, not a gap to be plugged with
 # a gate job that fails the run.
 #
-# The three-platform build stays: on a linux/amd64 runner neither go vet nor
-# go test ever compiles restart_windows.go (//go:build windows), and gofmt only
-# reads the source, so "sh build.sh" is the only step here that proves the
-# windows/amd64 and linux/arm64 targets still build. What went is the dist/
-# artifact it used to upload - that upload, not the build itself, was this
-# repository's largest consumer of the account-wide Actions storage.
+# The build of every platform stays: on a linux/amd64 runner neither go vet
+# nor go test ever compiles restart_windows.go (//go:build windows), and gofmt
+# only reads the source, so "sh build.sh" is the only step here that proves the
+# windows/amd64, linux/arm64 and linux/arm targets still build and the .deb
+# packages still pack. What went is the dist/ artifact it used to upload.
 #
-# A pull request into master also gets a preview of what merging it publishes.
+# A pull request into master also gets a preview of what merging it publishes
+# (scripts/next-version.sh). The commit messages are checked by commits.yml.
 name: CI
 
 on:
@@ -77,10 +77,13 @@ jobs:
       - name: UI tests
         run: node --test "tests/**/*.test.mjs"
 
-      # Cross-compiles windows/amd64, linux/amd64 and linux/arm64 into dist/.
-      # Nothing uploads dist/ any more; the point is that the build fails here,
-      # on the pull request, instead of in release.yml after the merge.
+      # Cross-compiles windows/amd64, linux/amd64, linux/arm64 and linux/arm
+      # into dist/ and packs the .deb packages. Nothing uploads dist/; the point
+      # is that the build fails here, on the pull request, instead of in
+      # release.yml after the merge.
       - name: Build every platform
+        env:
+          REQUIRE_DEB: '1'
         run: sh build.sh
 
   e2e:
@@ -113,30 +116,22 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Compare VERSION.md with the newest tag
+      # HEAD is the test merge of this PR into master, so the commits read are
+      # the ones the merge brings to master.
+      - name: Read the commits since the newest tag
         id: v
         run: |
           set -o pipefail
-          sh scripts/release-version.sh | tee -a "$GITHUB_OUTPUT"
+          sh scripts/next-version.sh | tee -a "$GITHUB_OUTPUT"
 
       - name: What merging does
         env:
-          VERSION: ${{ steps.v.outputs.version }}
           PREVIOUS: ${{ steps.v.outputs.previous }}
-          PUBLISHING: ${{ steps.v.outputs.publishing }}
-        # release.yml starts on a push to master only when that push changes
-        # VERSION.md. HEAD here is the test merge of this PR into master, so
-        # HEAD^1 is master and this diff is what the merge pushes. A version
-        # left unreleased by an earlier failed (or never started) run is not
-        # published by a merge that leaves VERSION.md alone.
+          BUMP: ${{ steps.v.outputs.bump }}
+          NEXT: ${{ steps.v.outputs.next }}
         run: |
-          touched=$(git diff --name-only HEAD^1 HEAD -- VERSION.md)
-          if [ "$PUBLISHING" != "true" ]; then
-            echo "VERSION.md holds $VERSION, the same as the newest release: merging publishes nothing." >> "$GITHUB_STEP_SUMMARY"
-          elif [ -z "$touched" ]; then
-            msg="VERSION.md holds $VERSION, not released yet (newest release: $PREVIOUS), but this PR does not change VERSION.md: merging it starts no release. After the merge use Run workflow on the Release workflow, on master."
-            echo "::warning::$msg"
-            echo "$msg" >> "$GITHUB_STEP_SUMMARY"
+          if [ -z "$NEXT" ]; then
+            echo "No feat, fix, perf or breaking change since $PREVIOUS: merging publishes nothing." >> "$GITHUB_STEP_SUMMARY"
           else
-            echo "Merging this PR publishes **v$VERSION** (newest release so far: $PREVIOUS) and copies it to the site." >> "$GITHUB_STEP_SUMMARY"
+            echo "Merging this PR publishes **v$NEXT** ($BUMP, newest release so far: $PREVIOUS), copies it to the site and hands it to the package channels." >> "$GITHUB_STEP_SUMMARY"
           fi

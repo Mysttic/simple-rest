@@ -9,14 +9,35 @@ może rozmawiać z urządzeniem po surowym gnieździe, czego przeglądarka nie u
 
 ## Uruchomienie
 
-Program otwiera przeglądarkę pod adresem `http://127.0.0.1:8787/`. Jedno wydanie to trzy
-pliki, po jednym na system, plus sumy kontrolne.
+Program otwiera przeglądarkę pod adresem `http://127.0.0.1:8787/`. Jedno wydanie
+([Releases](https://github.com/Mysttic/simple-rest/releases)) to cztery pliki, po jednym na
+system, paczki `.deb` i sumy kontrolne SHA-256 wszystkich plików.
 
 | System | Plik | Jak |
 |---|---|---|
 | Windows x64 | `simple-rest-<wersja>-windows-amd64.exe` | dwuklik lub z konsoli |
 | Linux x64 | `simple-rest-<wersja>-linux-amd64` | `chmod +x plik && ./plik` |
 | Raspberry Pi (system 64-bit) | `simple-rest-<wersja>-linux-arm64` | jak wyżej |
+| Raspberry Pi (system 32-bit, każdy model) | `simple-rest-<wersja>-linux-armhf` | jak wyżej |
+| Debian, Ubuntu, Raspberry Pi OS | `simple-rest_<wersja>_<amd64\|arm64\|armhf>.deb` | `sudo apt install ./plik.deb` |
+
+### Instalacja z menedżera pakietów
+
+Kanały dostają każde wydanie same, z workflowa `Release` (patrz „Wydania”). Kanał działa,
+odkąd właściciel repozytorium raz go skonfigurował; do tego czasu zostają pliki wyżej.
+
+```
+winget install Mysttic.SimpleRest                                  # Windows
+scoop bucket add mysttic https://github.com/Mysttic/scoop-bucket   # Windows, raz
+scoop install mysttic/simple-rest
+choco install simple-rest                                          # Windows
+sudo snap install simple-rest                                      # Linux, Raspberry Pi
+yay -S simple-rest-bin                                             # Arch Linux (AUR)
+```
+
+Kopia z menedżera pakietów albo z paczki `.deb` trzyma dane w katalogu użytkownika (patrz
+„Dane”) i nie aktualizuje się sama: aktualizuje ją ten sam menedżer (`winget upgrade`,
+`scoop update`, `choco upgrade`, `snap refresh`, pomocnik AUR albo nowa paczka `.deb`).
 
 Z innego urządzenia w sieci (telefon, tablet, druga maszyna) wystarczy uruchomić program
 z `-listen 0.0.0.0:8787` i wejść na `http://<ip-maszyny>:8787/`. Interfejs jest zwykłą
@@ -34,8 +55,8 @@ kart i komputerów (patrz „Konsola TCP”). Wersje linuksowe są budowane bez 
 rozwiązują nazw `.local` (mDNS): na Linuksie i Raspberry Pi podaj adres IP albo nazwę
 z DNS sieci. Na Windows nazwy `.local` działają tak jak w systemie.
 
-Inne systemy (macOS, Windows na ARM, 32-bitowe Raspberry Pi) nie mają gotowego pliku, ale
-budują się jedną komendą, patrz „Budowanie”. Taka kopia mówi w ustawieniach, że nie ma dla
+Inne systemy (macOS, Windows na ARM) nie mają gotowego pliku, ale budują się jedną komendą,
+patrz „Budowanie”. Taka kopia mówi w ustawieniach, że nie ma dla
 niej pliku wydania, i nie próbuje się aktualizować.
 
 Flagi:
@@ -44,7 +65,8 @@ Flagi:
 -listen 127.0.0.1:8787   adres nasłuchu (0.0.0.0:8787 udostępnia UI w sieci lokalnej)
 -allow-host <nazwy>      dodatkowe nazwy hosta, pod którymi wolno otworzyć UI przy nasłuchu
                          poza 127.0.0.1, po przecinku; "*" przyjmuje każdą nazwę
--data <plik>             plik z danymi (domyślnie simple-rest-data.json obok binarki)
+-data <plik>             plik z danymi (domyślnie simple-rest-data.json obok binarki,
+                         a w kopii z menedżera pakietów w katalogu użytkownika, patrz „Dane”)
 -no-browser              nie otwieraj przeglądarki automatycznie
 -version                 wypisz wersję i zakończ
 -update-url <adres>      skąd updater pobiera listę wydań (tylko do testów)
@@ -222,7 +244,10 @@ Ustawienia (ikona koła zębatego), sekcja Updates:
   ponownie.
 - Kopia, która nie może się zaktualizować (katalog bez prawa zapisu, uruchomienie przez
   `go run`, brak pliku wydania dla tego systemu), mówi to wprost i linkuje do strony
-  pobierania.
+  pobierania. Kopia zainstalowana przez winget, Scoop, Chocolatey, Snap, AUR albo z paczki
+  `.deb` sprawdza wydania jak każda inna, ale zamiast Install and restart podaje komendę
+  swojego menedżera, np. `scoop update simple-rest`. Program poznaje taką kopię po miejscu,
+  w którym leży plik wykonywalny (`install.go`).
 - Stan updatera trzymany jest w `simple-rest-update.json` obok pliku danych.
 
 Pełne przejście ścieżki na prawdziwej binarce (kopia 0.9.0, fałszywy hub, podmiana,
@@ -233,6 +258,13 @@ restart) uruchamia `sh scripts/e2e-update.sh`; to samo robi CI.
 Wszystko (kolekcje, historia, środowiska, ustawienia, definicje harmonogramów i połączeń
 TCP) trafia do jednego pliku JSON obok binarki: `simple-rest-data.json`. Wystarczy przenieść
 katalog, żeby przenieść dane. Aktualizacja nie dotyka tego pliku.
+
+Kopia z menedżera pakietów albo z paczki `.deb` trzyma ten plik w katalogu użytkownika, bo
+obok binarki nie przetrwałby aktualizacji albo nie dałoby się go zapisać: `%APPDATA%\simple-rest`
+na Windows, `~/.config/simple-rest` na Linuksie i `~/snap/simple-rest/common` w Snapie. Tak
+samo robi pobrana binarka w katalogu bez prawa zapisu (np. `C:\Program Files`). Plik danych,
+który już leży obok binarki, zawsze wygrywa, a flaga `-data` wskazuje dowolne miejsce.
+Ustawienia updatera (`simple-rest-update.json`) leżą zawsze obok pliku danych.
 
 Z tym samym plikiem może pracować kilka kart naraz, także z innych komputerów przy
 `-listen 0.0.0.0:8787`. Widoczna karta dostaje od programu znak, gdy plik się zmienił
@@ -274,12 +306,15 @@ wersji jest wkompilowany z `VERSION.md`.
 go build -ldflags "-s -w" -o simple-rest.exe .
 ```
 
-Całe wydanie do `dist/` (trzy binarki i plik z sumami SHA-256):
+Całe wydanie do `dist/` (cztery binarki, paczki `.deb` i plik z sumami SHA-256):
 
 ```
-sh build.sh        # Linux/macOS/Git Bash
-build.cmd          # Windows cmd
+sh build.sh        # Linux/macOS/Git Bash; paczki .deb tylko tam, gdzie jest dpkg-deb
+build.cmd          # Windows cmd, bez paczek .deb
 ```
+
+Paczki `.deb` składa `scripts/deb.sh`, który `build.sh` woła sam, gdy znajdzie `dpkg-deb`.
+CI i wydanie ustawiają `REQUIRE_DEB=1`, więc tam brak `dpkg-deb` jest błędem.
 
 Dla systemu spoza tej trójki wystarczy podać cel Go, na przykład macOS na Apple Silicon:
 
@@ -292,9 +327,27 @@ Kopia zgłaszająca inny numer, do testów updatera:
 
 ## Rozwój i testy
 
-Gałęzie: `develop` (praca) i `master` (wydania). CI nie odpala się na `develop`, więc testy
-uruchamiaj lokalnie (komendy niżej) albo ręcznie z zakładki Actions (`workflow_dispatch`);
-automatycznie sprawdzany jest dopiero PR `develop` → `master`.
+Gałęzie: `develop` (praca) i `master` (wydania). Pełne CI nie odpala się na `develop`, więc
+testy uruchamiaj lokalnie (komendy niżej) albo ręcznie z zakładki Actions
+(`workflow_dispatch`); automatycznie sprawdzany jest dopiero PR `develop` → `master`.
+
+Commity piszemy w konwencji [Conventional Commits](https://www.conventionalcommits.org/pl/v1.0.0/),
+bo z nich powstają numer wersji i opis wydania (patrz „Wydania”). Temat może być po polsku
+i trafia do `CHANGELOG.md` tak, jak go napiszesz:
+
+```
+feat: harmonogram pokazuje czas do następnego przebiegu   # nowa funkcja: wersja minor
+fix: konsola TCP nie gubi ramki MLLP                      # poprawka: patch
+perf: szybszy podgląd dużego JSON-a                       # patch
+feat!: ... albo stopka "BREAKING CHANGE: ..."             # zmiana niezgodna wstecz: major
+docs: / test: / refactor: / ci: / build: / chore: ...     # bez wydania
+```
+
+Workflow `Commits` (`.github/workflows/commits.yml`, commitlint z `commitlint.config.mjs`)
+sprawdza każdy commit PR do `develop` i `master`, a commit spoza konwencji oblewa PR. Commity
+scalające (`Merge ...`) są pomijane. Sprawdzenie przed pushem: `npm ci`, potem
+`npx commitlint --from origin/develop`. Paczki npm (`package.json`) to tylko narzędzia
+wydania; aplikacja i jej testy ich nie potrzebują.
 
 ```
 go test ./... -count=1                 # serwer, proxy, guard, updater (z fałszywym hubem), harmonogramy, TCP
@@ -327,15 +380,16 @@ zmianie interfejsu. Zrzut promo wysyła prawdziwe zapytanie do `api.github.com`,
 skrypt potrzebuje sieci.
 
 Workflow `CI` (`.github/workflows/ci.yml`) uruchamia to wszystko, razem z `gofmt` i
-`go vet`, wyłącznie przy PR z `develop` do `master`. Push do `develop` i PR do `develop`
-nie odpalają już nic; awaryjnie zostaje ręczne uruchomienie z zakładki Actions
-(`workflow_dispatch`). PR do `master` z innej gałęzi niż `develop` pomija wszystkie joby,
-więc GitHub pokaże taki przebieg jako zielony. To świadoma decyzja, a nie przeoczenie:
-konto jest na limicie minut Actions. Build wszystkich platform (`sh build.sh`) zostaje w CI,
-bo na runnerze linuksowym `go vet` i `go test` nie kompilują `restart_windows.go`, więc jest
-to jedyny krok sprawdzający cele windows/amd64 i linux/arm64; zniknął tylko upload `dist/`
-jako artefakt przebiegu. PR z `develop` dostaje dodatkowo job „Release preview” z informacją,
-czy merge opublikuje wydanie.
+`go vet`, wyłącznie przy PR z `develop` do `master`. Push do `develop` nie uruchamia nic,
+a PR do `develop` tylko sprawdzenie commitów (`Commits`); awaryjnie zostaje ręczne
+uruchomienie CI z zakładki Actions (`workflow_dispatch`). PR do `master` z innej gałęzi niż
+`develop` pomija wszystkie joby CI, więc GitHub pokaże taki przebieg jako zielony. To
+świadoma decyzja z czasów limitu minut Actions, a nie przeoczenie. Build wszystkich platform
+(`sh build.sh` z `REQUIRE_DEB=1`) zostaje w CI, bo na runnerze linuksowym `go vet` i
+`go test` nie kompilują `restart_windows.go`, więc jest to jedyny krok sprawdzający cele
+windows/amd64, linux/arm64 i linux/arm oraz paczki `.deb`; zniknął tylko upload `dist/`
+jako artefakt przebiegu. PR z `develop` dostaje dodatkowo job „Release preview” z wersją,
+którą opublikuje merge (`scripts/next-version.sh` czyta commity tak jak semantic-release).
 
 W repozytorium nie ma już żadnego przebiegu cyklicznego ani sprzątania Actions storage.
 Artefaktów przebiegów nie wysyła teraz nic, ale logi każdego przebiegu nadal liczą się do
@@ -344,41 +398,60 @@ z zakładki Actions albo `gh api -X DELETE /repos/Mysttic/simple-rest/actions/ru
 
 ## Wydania
 
-- `VERSION.md` trzyma numer wersji (jedna linia, `major.minor.patch`). Program wkompilowuje
-  go przy budowaniu, więc binarka i tag zawsze się zgadzają.
-- `CHANGELOG.md` opisuje zmiany w każdej wersji (format Keep a Changelog). Wydanie wymaga
-  sekcji `## [x.y.z]` dla numeru z `VERSION.md`; jej treść staje się opisem release.
-- Workflow `Release` (`.github/workflows/release.yml`) startuje po push do `master`, który
-  zmienia `VERSION.md` (czyli po merge PR z `develop` z podbitym numerem); zmiana samego
-  `CHANGELOG.md`, kodu lub workflowa przy niewydanym numerze (np. po nieudanym przebiegu)
-  nie uruchamia nic i wymaga ręcznego „Run workflow” na `master`, i to tylko z `master`: z innej
-  gałęzi workflow pomija wszystkie joby. Publikuje tylko wtedy, gdy `VERSION.md` jest wyższy od
-  najnowszego tagu `v*`. Wtedy: testy, build, tag `v<wersja>` i release w tym repozytorium
-  z plikami z `dist/`, a potem job `site` kopiuje te same pliki do Mysttic/Mysttic pod
-  tagiem `simple-rest-v<wersja>` i usuwa tam starsze wydania projektu. Bez podniesienia
-  `VERSION.md` merge nie publikuje nic. Obniżenie numeru zatrzymuje workflow z błędem.
-  Pełnego CI tu nie ma: te same testy poszły już na PR `develop` → `master`, na tym
-  samym drzewie.
-  Zostaje krótki job `Tests` (`go test` i testy UI, ok. 2 min) przed buildem: `master` nie
-  jest gałęzią chronioną, więc push prosto na `master` omija PR, a job `site` kasuje
-  poprzednie wydanie ze strony bezpowrotnie i nie ma do czego wrócić.
+Wydanie publikuje się samo po każdym push do `master` (zwykle merge PR `develop` → `master`),
+bez ręcznych kroków. Workflow `Release` (`.github/workflows/release.yml`):
+
+1. Job `release` uruchamia testy jednostkowe Go i UI, a potem semantic-release
+   (`release.config.mjs`). Ten czyta commity od ostatniego tagu `v*`: `feat` podnosi wersję
+   minor, `fix` i `perf` patch, `!` albo `BREAKING CHANGE` major. Same `docs`, `test`,
+   `refactor`, `ci`, `build` i `chore` nie wydają nic i wtedy reszta workflowa jest pomijana.
+2. Przy wydaniu semantic-release dopisuje sekcję na górze `CHANGELOG.md`, wpisuje numer do
+   `VERSION.md` i uruchamia `sh build.sh`, więc binarki, paczki `.deb` i sumy SHA-256 mają
+   nowy numer. Potem commituje `CHANGELOG.md` i `VERSION.md` na `master` jako
+   `chore(release): x.y.z [skip ci]`, taguje ten commit `vx.y.z` i tworzy release na GitHubie
+   ze wszystkimi plikami z `dist/`.
+3. Joby po nim biorą pliki z tego release:
+   - `hub` kopiuje binarki i sumy do Mysttic/Mysttic pod tagiem `simple-rest-v<wersja>`
+     i usuwa tam starsze wydania projektu. Tam szukają wydań updater w aplikacji i strona
+     projektu;
+   - `develop` scala `master` z powrotem do `develop`, żeby commit wydania był też tam;
+   - `scoop`, `winget`, `chocolatey`, `aur`, `snap` i `sourceforge` publikują w kanałach
+     z tabeli niżej. Kanał bez swojego sekretu jest pomijany, a nie oblany, a podsumowanie
+     przebiegu mówi, które kanały poszły.
+4. Błąd dowolnego joba otwiera issue z etykietą `release-failed` (albo dopisuje komentarz do
+   otwartego) z listą jobów i linkiem do przebiegu. Po poprawce: „Re-run failed jobs” w tym
+   przebiegu albo nowy push do `master`.
+
+`VERSION.md` i nowe sekcje `CHANGELOG.md` pisze workflow, więc ręcznie się ich nie zmienia.
+Nagłówek `CHANGELOG.md` (wszystko nad pierwszym `## `) zostaje na górze pliku. Ponowne
+„Run workflow” na `master` bez nowych commitów nie publikuje nic. `master` nie jest gałęzią
+chronioną, bo semantic-release wypycha na nią commit wydania tokenem workflowa.
+
+| Kanał | Co robi job | Sekret (Settings, Secrets and variables, Actions) | Jednorazowo, ręcznie |
+|---|---|---|---|
+| Strona (hub) | release w Mysttic/Mysttic | `HUB_TOKEN`: fine-grained, Contents: Read and write na `Mysttic/Mysttic` | gotowe |
+| Scoop | manifest `bucket/simple-rest.json` w `Mysttic/scoop-bucket` | `SCOOP_BUCKET_TOKEN`: fine-grained, Contents: Read and write na `Mysttic/scoop-bucket` (może to być token `HUB_TOKEN` z dopisanym repozytorium) | publiczne repozytorium `Mysttic/scoop-bucket` |
+| winget | PR do `microsoft/winget-pkgs` (`vedantmgoyal9/winget-releaser`) | `WINGET_TOKEN`: classic PAT ze scope `public_repo` i `workflow` | fork `microsoft/winget-pkgs` na koncie Mysttic; pierwsza wersja `Mysttic.SimpleRest` zgłoszona ręcznie (`wingetcreate new` albo `komac new`) |
+| Chocolatey | `choco pack` i `choco push` na runnerze Windows | `CHOCO_API_KEY` | konto na community.chocolatey.org; każda wersja przechodzi moderację |
+| AUR | `PKGBUILD` i `.SRCINFO` paczki `simple-rest-bin` | `AUR_SSH_KEY`: prywatny klucz SSH | konto AUR z kluczem publicznym; pierwszy push zakłada paczkę |
+| Snap Store | `snap pack` dla amd64, arm64 i armhf, upload do kanału stable | `SNAPCRAFT_STORE_CREDENTIALS`: plik z `snapcraft export-login --snaps=simple-rest --acls package_access,package_push,package_update,package_release plik.txt` | konto Snapcraft i `snapcraft register simple-rest` |
+| SourceForge | pliki wydania przez rsync do `/home/frs/project/<projekt>/<wersja>/` | `SF_SSH_KEY`: prywatny klucz SSH; zmienne (Variables) `SF_USER` (login) i opcjonalnie `SF_PROJECT` (domyślnie `simple-rest`) | projekt na SourceForge i klucz publiczny w koncie |
+
+Szablony paczek leżą w `packaging/`, a wypełnia je `scripts/render.sh` numerem wersji i sumami
+SHA-256 z pliku `...-checksums.txt` wydania; snapy składa `scripts/snap.sh`. Poza workflowem
+zostają wpis na AlternativeTo (jako alternatywa dla Postmana i Insomnii) i ogłoszenia (Show HN,
+r/selfhosted, r/raspberry_pi).
 
 Procedura wydania:
 
-1. Na `develop`: podnieść `VERSION.md`, dopisać sekcję w `CHANGELOG.md`.
-2. PR `develop` → `master`, poczekać na zielone CI i podgląd „Release preview”.
-3. Merge. Release i kopia plików wydania na hub dzieją się same.
+1. Na `develop` albo w gałęzi z PR do `develop`: commity w konwencji Conventional Commits.
+2. PR `develop` → `master`, poczekać na zielone CI, `Commits` i podgląd „Release preview”.
+3. Merge. Numer wersji, `CHANGELOG.md`, release, kopia na hub i kanały dzieją się same.
 4. Gdy wydanie zmienia stronę projektu (opis, zrzuty), skopiować ją ręcznie na hub,
    patrz `site/README.md`.
 
-Wymagany sekret: `HUB_TOKEN` w ustawieniach repozytorium (Settings, Secrets and variables,
-Actions): fine-grained token dla właściciela `Mysttic`, dostęp tylko do `Mysttic/Mysttic`,
-uprawnienie Contents: Read and write. Bez niego release w tym repozytorium powstanie, a job
-`site` zakończy się czytelnym błędem.
-
 Strona projektu na hubie leży gotowa w `site/simple-rest/`; jak ją podpiąć i odświeżać
-opisuje `site/README.md`. Job `site` kopiuje na hub tylko pliki wydania, a nie treść
-strony.
+opisuje `site/README.md`. Job `hub` kopiuje na hub tylko pliki wydania, a nie treść strony.
 
 ## Tryb bez binarki
 
@@ -438,3 +511,7 @@ wydania i żeby wysłać zapytanie harmonogramu. Połączenie TCP otwiera wyłą
 z UI. Harmonogram włączony z innego komputera działa dalej po zamknięciu tamtej karty;
 okno Schedules pokazuje, od kiedy jest włączony i z jakiego adresu. Tak samo połączenie
 TCP zostaje otwarte po zamknięciu karty, a konsola pokazuje, z jakiego adresu je otwarto.
+
+## Licencja
+
+MIT, patrz [LICENSE](LICENSE).
