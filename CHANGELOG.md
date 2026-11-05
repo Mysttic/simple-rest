@@ -7,6 +7,20 @@ ostatniego wydanego tagu.
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-11-05
+
+### Dodane
+
+- Licencja MIT (`LICENSE`). Repozytorium jest publiczne.
+- `README.pl.md`: opis programu po polsku.
+
+### Zmienione
+
+- `README.md` jest po angielsku i krótko przedstawia program: opis, zrzuty, pobieranie,
+  funkcje i prywatność. Szczegóły przeszły do `docs/` (użytkowanie, harmonogramy, konsola TCP,
+  aktualizacje i dane, bezpieczeństwo), a budowanie, testy, CI i wydania do `CONTRIBUTING.md`.
+- Program działa tak samo jak w 1.2.0: to wydanie zmienia tylko licencję i dokumentację.
+
 ## [1.2.0] - 2026-10-02
 
 ### Dodane
