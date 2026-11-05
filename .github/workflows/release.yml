@@ -3,7 +3,7 @@
 # otherwise every job after "Version" is skipped.
 # Then the same files are copied to Mysttic/Mysttic, the public site, under
 # the tag simple-rest-v<version>, and that project's older releases there are
-# removed. Needs the HUB_TOKEN secret (see README, "Wydania").
+# removed. Needs the HUB_TOKEN secret (see CONTRIBUTING.md, "Releases").
 # The full CI suite is not repeated here: the pull request from develop into
 # master ran it on this very tree a few minutes earlier (see ci.yml). What does
 # run is a short "Tests" job, and only when a version is actually being
