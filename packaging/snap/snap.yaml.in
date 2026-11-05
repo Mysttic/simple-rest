@@ -1,0 +1,22 @@
+name: simple-rest
+version: '@VERSION@'
+summary: REST and TCP client in one file, with its UI in the browser
+description: |
+  simple-rest is a Postman-like REST client that is a single program. It
+  serves its interface on http://127.0.0.1:8787/ and sends the requests
+  itself, so CORS never gets in the way: collections, history, environments
+  with variables, schedules that keep a token fresh, and a TCP console for
+  devices on the network (LF, CR LF, MLLP and STX/ETX framing).
+
+  The snap keeps its data in ~/snap/simple-rest/common. Start it with
+  `simple-rest -listen 0.0.0.0:8787` to reach the UI from another machine on
+  a network you trust.
+license: MIT
+base: core24
+confinement: strict
+grade: stable
+architectures: [@ARCH@]
+apps:
+  simple-rest:
+    command: simple-rest
+    plugs: [network, network-bind, desktop]

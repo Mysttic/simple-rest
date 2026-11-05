@@ -9,3 +9,4 @@
 *.old
 *.part
 /.e2e/
+/node_modules/

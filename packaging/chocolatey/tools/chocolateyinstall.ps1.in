@@ -1,0 +1,15 @@
+$ErrorActionPreference = 'Stop'
+
+# Downloads the release file into the package folder; Chocolatey puts a shim
+# for simple-rest.exe on the PATH. Filled in by scripts/render.sh.
+$toolsDir = Split-Path -Parent $MyInvocation.MyCommand.Definition
+
+$packageArgs = @{
+  packageName    = $env:ChocolateyPackageName
+  fileFullPath   = Join-Path $toolsDir 'simple-rest.exe'
+  url64bit       = 'https://github.com/Mysttic/simple-rest/releases/download/v@VERSION@/simple-rest-@VERSION@-windows-amd64.exe'
+  checksum64     = '@SHA256_WINDOWS_AMD64_EXE@'
+  checksumType64 = 'sha256'
+}
+
+Get-ChocolateyWebFile @packageArgs

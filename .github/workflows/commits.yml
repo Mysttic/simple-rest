@@ -1,0 +1,37 @@
+# Checks that every commit of a pull request into develop or master follows
+# Conventional Commits (commitlint.config.mjs). semantic-release reads these
+# messages to pick the next version and to write the release notes, so a
+# commit it cannot read is left out of both. Merge commits are skipped.
+name: Commits
+
+on:
+  pull_request:
+    branches: [develop, master]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  commitlint:
+    name: Conventional Commits
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - name: Tools
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: commitlint
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+        run: npx --no-install commitlint --from "$BASE" --to "$HEAD" --verbose
