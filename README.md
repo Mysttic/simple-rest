@@ -438,3 +438,7 @@ wydania i żeby wysłać zapytanie harmonogramu. Połączenie TCP otwiera wyłą
 z UI. Harmonogram włączony z innego komputera działa dalej po zamknięciu tamtej karty;
 okno Schedules pokazuje, od kiedy jest włączony i z jakiego adresu. Tak samo połączenie
 TCP zostaje otwarte po zamknięciu karty, a konsola pokazuje, z jakiego adresu je otwarto.
+
+## Licencja
+
+MIT, patrz [LICENSE](LICENSE).
