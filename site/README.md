@@ -38,7 +38,7 @@ Podpięcie (w repozytorium Mysttic/Mysttic):
 ```
 
 Pliki release trafiają na hub automatycznie z workflow `Release` w tym repozytorium
-(job `hub`), pod tagiem `simple-rest-v<wersja>`, a strona sama pokazuje najnowsze
+(job `site`), pod tagiem `simple-rest-v<wersja>`, a strona sama pokazuje najnowsze
 z nich. Treści strony job nie kopiuje. Po każdej zmianie `site/simple-rest/` (opis,
 zrzuty), zwykle przy wydaniu z nowymi funkcjami, trzeba po udanym Release skopiować
 katalog jeszcze raz (krok 1), a po zmianie karty wyżej podmienić ją w głównym

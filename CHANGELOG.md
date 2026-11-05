@@ -1,10 +1,11 @@
 # Changelog
 
-Wszystkie istotne zmiany w projekcie, numeracja według [SemVer](https://semver.org/lang/pl/).
-Nowe sekcje dopisuje sam workflow `Release` (semantic-release) z commitów w konwencji
-[Conventional Commits](https://www.conventionalcommits.org/pl/v1.0.0/): `feat` trafia do „Dodane”,
-`fix` do „Poprawione”, `perf` do „Wydajność”. Sekcje do 1.2.0 włącznie są pisane ręcznie według
-[Keep a Changelog](https://keepachangelog.com/pl/1.1.0/).
+Wszystkie istotne zmiany w projekcie. Format według [Keep a Changelog](https://keepachangelog.com/pl/1.1.0/),
+numeracja według [SemVer](https://semver.org/lang/pl/). Numer bieżącej wersji jest w `VERSION.md`;
+release powstaje po merge do `master`, który zmienia `VERSION.md`, gdy ten numer jest wyższy od
+ostatniego wydanego tagu.
+
+## [Unreleased]
 
 ## [1.2.0] - 2026-10-02
 

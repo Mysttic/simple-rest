@@ -109,10 +109,9 @@ func isNewer(candidate, running string) bool {
 // ---- platform and file names ------------------------------------------------------
 
 // platformSuffix maps GOOS/GOARCH to the platform part of a release file name.
-// The names are a contract shared with build.sh, the package templates in
-// packaging/ and the hub page. One build per system, so anything else (macOS,
-// Windows on ARM, a self-built copy) gets an empty suffix and is told there is
-// no release file for it. linux/arm is the 32-bit Raspberry Pi build (GOARM=6).
+// The names are a contract shared with build.sh and the hub page. One build per
+// system, so anything else (macOS, 32-bit ARM, a self-built copy) gets an empty
+// suffix and is told there is no release file for it.
 func platformSuffix(goos, goarch string) string {
 	switch goos + "/" + goarch {
 	case "windows/amd64":
@@ -121,8 +120,6 @@ func platformSuffix(goos, goarch string) string {
 		return "linux-amd64"
 	case "linux/arm64":
 		return "linux-arm64"
-	case "linux/arm":
-		return "linux-armhf"
 	}
 	return ""
 }
@@ -283,31 +280,14 @@ func (u *updater) checkInstallable() (bool, string) {
 	if isTempPath(u.exePath, os.TempDir()) {
 		return false, "it runs from a temporary directory (go run?)"
 	}
-	if dir := filepath.Dir(u.exePath); !dirWritable(dir) {
-		return false, "the directory " + dir + " is not writable"
-	}
-	return true, ""
-}
-
-// managedBy turns self-update off for a copy that a package manager put in
-// place. Swapping the file behind the manager's back would leave it with a
-// wrong idea of the installed version, and its next upgrade would undo the
-// swap. Checking for a newer release still works.
-func (u *updater) managedBy(p packager) {
-	if p.Name != "" {
-		u.installable, u.installReason = false, p.Reason
-	}
-}
-
-// dirWritable reports whether a new file can be created in dir.
-func dirWritable(dir string) bool {
+	dir := filepath.Dir(u.exePath)
 	f, err := os.CreateTemp(dir, ".write-test-*")
 	if err != nil {
-		return false
+		return false, "the directory " + dir + " is not writable"
 	}
 	f.Close()
 	_ = os.Remove(f.Name())
-	return true
+	return true, ""
 }
 
 func (u *updater) loadSettings() {

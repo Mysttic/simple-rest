@@ -862,6 +862,14 @@ func executablePath() string {
 	return exe
 }
 
+func defaultDataPath() string {
+	exe := executablePath()
+	if exe == "" {
+		return projectName + "-data.json"
+	}
+	return filepath.Join(filepath.Dir(exe), projectName+"-data.json")
+}
+
 func openBrowser(u string) {
 	var cmd *exec.Cmd
 	switch runtime.GOOS {
@@ -899,7 +907,7 @@ func restartProcess(srv *http.Server, exe string) {
 func main() {
 	listen := flag.String("listen", "127.0.0.1:8787", "listen address; use 0.0.0.0:8787 to reach the UI from other devices (e.g. a phone)")
 	allowHost := flag.String("allow-host", "", "comma-separated host names the UI may also be opened by when listening beyond loopback, besides IP addresses and local names; * allows any name and turns the DNS rebinding protection off")
-	dataPath := flag.String("data", "", "data file (default: simple-rest-data.json next to the executable, or in the user's config directory for a copy installed by a package manager)")
+	dataPath := flag.String("data", "", "data file (default: simple-rest-data.json next to the executable)")
 	noBrowser := flag.Bool("no-browser", false, "do not open the browser automatically")
 	showVersion := flag.Bool("version", false, "print the version and exit")
 	updateURL := flag.String("update-url", hubAPI, "where the updater asks for releases (a testing aid, see scripts/e2e-update.sh)")
@@ -909,19 +917,13 @@ func main() {
 		fmt.Printf("%s %s (%s/%s)\n", projectName, version, runtime.GOOS, runtime.GOARCH)
 		return
 	}
-	exePath := executablePath()
-	sys := realSystem()
-	pkg := detectPackager(exePath, sys)
 	if *dataPath == "" {
-		*dataPath = dataFileFor(exePath, pkg, sys)
+		*dataPath = defaultDataPath()
 	}
 	if abs, err := filepath.Abs(*dataPath); err == nil {
 		*dataPath = abs
 	}
-	// The user's configuration directory may not have a simple-rest folder yet.
-	if err := os.MkdirAll(filepath.Dir(*dataPath), 0o700); err != nil {
-		log.Printf("cannot create the folder of the data file: %v", err)
-	}
+	exePath := executablePath()
 
 	ln, err := net.Listen("tcp", *listen)
 	if err != nil {
@@ -946,7 +948,6 @@ func main() {
 	a.hosts = newHostPolicy(osHostname(), strings.Split(*allowHost, ","))
 	u := newUpdater(version, exePath, filepath.Join(filepath.Dir(*dataPath), projectName+"-update.json"))
 	u.logf = log.Printf
-	u.managedBy(pkg)
 	if *updateURL != hubAPI {
 		u.apiURL = *updateURL
 		log.Printf("update checks go to %s", *updateURL)
@@ -978,9 +979,6 @@ func main() {
 	log.Printf("%s %s (%s/%s)", projectName, version, runtime.GOOS, runtime.GOARCH)
 	log.Printf("UI:   %s", uiURL)
 	log.Printf("data: %s", *dataPath)
-	if pkg.Name != "" {
-		log.Printf("installed by %s, which also updates it", pkg.Name)
-	}
 	// Nothing turns a schedule on by itself: not a flag, not the data file,
 	// not a restart after an update.
 	if v := a.sched.sync(); v.err != "" {
