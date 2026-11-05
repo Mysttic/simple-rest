@@ -25,7 +25,6 @@ on:
       - 'README.pl.md'
       - 'CONTRIBUTING.md'
       - 'docs/**'
-      - 'site/**'
       - '.gitignore'
       - 'LICENSE'
   workflow_call:
@@ -102,7 +101,7 @@ jobs:
           path: ~/.cache/go-build
           key: ${{ runner.os }}-gobuild-e2e-${{ hashFiles('go.mod', '**/*.go') }}
           restore-keys: ${{ runner.os }}-gobuild-e2e-
-      - name: A 0.9.0 copy updates itself from a fake hub
+      - name: A 0.9.0 copy updates itself from a fake GitHub
         run: sh scripts/e2e-update.sh
 
   release-preview:
@@ -140,5 +139,5 @@ jobs:
             echo "::warning::$msg"
             echo "$msg" >> "$GITHUB_STEP_SUMMARY"
           else
-            echo "Merging this PR publishes **v$VERSION** (newest release so far: $PREVIOUS) and copies it to the site." >> "$GITHUB_STEP_SUMMARY"
+            echo "Merging this PR publishes **v$VERSION** (newest release so far: $PREVIOUS)." >> "$GITHUB_STEP_SUMMARY"
           fi
