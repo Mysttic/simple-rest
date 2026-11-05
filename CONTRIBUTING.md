@@ -34,11 +34,11 @@ tests locally (commands below) or by hand from the Actions tab (`workflow_dispat
 request `develop` → `master` is checked automatically.
 
 ```
-go test ./... -count=1                 # server, proxy, guard, updater (with a fake hub), schedules, TCP
+go test ./... -count=1                 # server, proxy, guard, updater (with a fake GitHub), schedules, TCP
 go test -race ./... -count=1           # the same with the race detector (needs gcc); CI does not do this
 node --test "tests/**/*.test.mjs"      # UI: params/URL, variables, auth, Postman import, cURL, saving, schedules, TCP
 sh scripts/e2e-update.sh               # the update path end to end on a real binary
-node scripts/screenshots.mjs           # screenshots into site/simple-rest/img/ (Edge or Chrome)
+node scripts/screenshots.mjs           # screenshots into docs/img/ (Edge or Chrome)
 ```
 
 The UI tests load the script from `ui.html` through `tests/load-ui.mjs`, without a browser:
@@ -58,7 +58,7 @@ and the console's actions. Framing and the host and port checks have counterpart
 Linux only, so from Windows it runs only in CI on the release pull request, or on a Raspberry Pi.
 
 `scripts/screenshots.mjs` builds the app, starts it with a sample collection and a second copy
-that reports an older version, and takes the screenshots over the DevTools protocol. A fake hub
+that reports an older version, and takes the screenshots over the DevTools protocol. A fake GitHub
 offers a release with the number from `VERSION.md` and hands out a token that a schedule turned
 on by the script keeps fresh. So the pictures are real and can be made again after every change
 to the UI. The promo screenshot sends a real request to `api.github.com`, so the script needs the
@@ -75,7 +75,7 @@ compile `restart_windows.go`, so it is the only step that checks the windows/amd
 linux/arm64 targets; only the upload of `dist/` as a run artifact went. A pull request from
 `develop` also gets a "Release preview" job that says whether the merge publishes a release.
 Changes to documentation only (`README.md`, `README.pl.md`, `CONTRIBUTING.md`, `docs/`,
-`site/`, `LICENSE`) do not start CI.
+`LICENSE`) do not start CI.
 
 Nothing in the repository runs on a schedule any more, and nothing cleans the Actions storage.
 No run uploads artifacts now, but the logs of every run still count towards the account's
@@ -95,29 +95,24 @@ storage limit. If it fills up, clear it by hand: from the Actions tab or with
   not released yet (after a failed run, for instance) starts nothing and needs a manual "Run
   workflow" on `master`, and on `master` only: from another branch the workflow skips every
   job. It publishes only when `VERSION.md` is above the newest `v*` tag. Then come the tests,
-  the build, the tag `v<version>` and a release in this repository with the files from `dist/`,
-  and after that the `site` job copies the same files to Mysttic/Mysttic under the tag
-  `simple-rest-v<version>` and deletes the project's older releases there. Without a raised
-  `VERSION.md` a merge publishes nothing. A lowered number stops the workflow with an error.
-  There is no full CI here: the same tests already ran on the pull request `develop` → `master`,
-  on the same tree. A short `Tests` job (`go test` and the UI tests, about 2 minutes) stays
-  before the build: `master` is not a protected branch, so a push straight to `master` bypasses
-  the pull request, and the `site` job deletes the previous release from the site for good, with
-  nothing to go back to.
+  the build, the tag `v<version>` and a release in this repository with the files from `dist/`.
+  The updater inside the app (1.4.0 and newer) finds new versions among these releases. Without
+  a raised `VERSION.md` a merge publishes nothing. A lowered number stops the workflow with an
+  error. There is no full CI here: the same tests already ran on the pull request
+  `develop` → `master`, on the same tree. A short `Tests` job (`go test` and the UI tests, about
+  2 minutes) stays before the build: `master` is not a protected branch, so a push straight to
+  `master` bypasses the pull request, and a published release reaches every copy that checks
+  for updates.
 
 Release procedure:
 
 1. On `develop`: raise `VERSION.md` and add a section to `CHANGELOG.md`.
 2. A pull request `develop` → `master`; wait for green CI and the "Release preview".
-3. Merge. The release and the copy of its files to the hub happen by themselves.
-4. When a release changes the project page (description, screenshots), copy the page to the hub
-   by hand, see `site/README.md`.
+3. Merge. The release happens by itself and needs no secret: the workflow's own token makes
+   the tag and the release.
+4. When a release changes the interface, run `node scripts/screenshots.mjs` and commit the new
+   pictures in `docs/img/`.
 
-Required secret: `HUB_TOKEN` in the repository settings (Settings, Secrets and variables,
-Actions): a fine-grained token for the owner `Mysttic`, with access to `Mysttic/Mysttic` only
-and the permission Contents: Read and write. Without it the release in this repository is made,
-and the `site` job ends with a readable error.
-
-The project page for the hub is ready in `site/simple-rest/`; `site/README.md` describes how to
-hook it up and refresh it. The `site` job copies only the release files to the hub, not the
-content of the page.
+Up to 1.3.0 every release was also copied to a separate hub repository, and the copies of those
+versions look for updates there only. The hub stays at 1.3.0, so they are updated by hand once
+(see [Updates and data](docs/updates-and-data.md)).

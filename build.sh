@@ -2,8 +2,8 @@
 # Cross-compiles simple-rest into dist/ as one static file per system, named
 # <project>-<version>-<platform>[.exe], plus a sha256 checksums file. One build
 # per system: Windows x64, Linux x64 and 64-bit ARM for the Raspberry Pi.
-# The names are a contract: the updater inside the app and the hub page read
-# them, so they change only together with a release that reads the new names.
+# The names are a contract: the updater inside the app reads them, so they
+# change only together with a release that reads the new names.
 # Requires only the Go toolchain (https://go.dev/dl/). Run: sh build.sh
 set -eu
 cd "$(dirname "$0")"

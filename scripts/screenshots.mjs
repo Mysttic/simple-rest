@@ -1,9 +1,9 @@
-// Captures the screenshots used by the project page in site/simple-rest/.
+// Captures the screenshots used by the README and docs/, into docs/img/.
 //
 // It builds the app, starts two copies with prepared data (one current, one
-// reporting 0.9.0 against a fake hub so the update card has something to show),
+// reporting 0.9.0 against a fake GitHub so the update card has something to show),
 // drives a headless Edge or Chrome over the DevTools protocol and writes the
-// PNGs. The fake hub also hands out a token, which a schedule of the current
+// PNGs. The fake GitHub also hands out a token, which a schedule of the current
 // copy fetches, and a small lab device answers the TCP console with HL7 ACKs
 // over MLLP. No dependencies: Node's own WebSocket talks to the browser.
 //
@@ -19,8 +19,8 @@ import path from 'node:path';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const work = path.join(root, '.e2e', 'shots');
-const outDir = path.join(root, 'site', 'simple-rest', 'img');
-const APP_PORT = 8795, OLD_PORT = 8796, HUB_PORT = 8797, LAB_PORT = 8798, CDP_PORT = 9333;
+const outDir = path.join(root, 'docs', 'img');
+const APP_PORT = 8795, OLD_PORT = 8796, GH_PORT = 8797, LAB_PORT = 8798, CDP_PORT = 9333;
 const WIDTH = 1600, HEIGHT = 1000;
 const exe = n => (process.platform === 'win32' ? n + '.exe' : n);
 
@@ -48,12 +48,12 @@ const demoData = {
     { id: ENV_ID, name: 'github', vars: [
       { enabled: true, name: 'base', value: 'https://api.github.com' },
       { enabled: true, name: 'owner', value: 'Mysttic' },
-      { enabled: true, name: 'repo', value: 'Mysttic' },
+      { enabled: true, name: 'repo', value: 'simple-rest' },
       { enabled: true, name: 'token', value: 'ghp_tu_wklej_swoj_token' },
       { enabled: false, name: 'base', value: 'http://localhost:3000' },
     ] },
     { id: 'env-local', name: 'local', vars: [
-      { enabled: true, name: 'base', value: `http://127.0.0.1:${HUB_PORT}` },
+      { enabled: true, name: 'base', value: `http://127.0.0.1:${GH_PORT}` },
       { enabled: true, name: 'user', value: 'demo' },
       { enabled: true, name: 'password', value: 'demo-password' },
       { enabled: true, name: 'patient_id', value: '100234' },
@@ -78,7 +78,7 @@ const demoData = {
       }),
     ] },
   ],
-  // The schedule logs in against the fake hub and keeps {{token}} fresh.
+  // The schedule logs in against the fake GitHub and keeps {{token}} fresh.
   schedules: [{
     id: SCHED_ID, name: 'Token refresh', requestId: 'r7', envId: 'env-local',
     everySec: 600, expiresPath: 'expires_in', leadSec: 60,
@@ -101,9 +101,9 @@ const demoData = {
   settings: { timeoutMs: 30000, followRedirects: true, verifyTls: true, cookies: true, history: true },
 };
 
-// ---- a hub with one release, for the update card ---------------------------------------
+// ---- a fake GitHub with one release, for the update card -----------------------------
 // readVersion reads VERSION.md the way main.go does: the first non-empty line,
-// without heading marks or a leading "v". The hub offers that release, the
+// without heading marks or a leading "v". The fake GitHub offers that release, the
 // one being made.
 function readVersion() {
   for (const line of readFileSync(path.join(root, 'VERSION.md'), 'utf8').split('\n')) {
@@ -122,16 +122,16 @@ const LOGIN = JSON.stringify({
   token_type: 'Bearer', expires_in: 300, refresh_token: 'rt_' + Buffer.from('demo refresh token').toString('hex'),
 });
 
-function fakeHub() {
+function fakeGitHub() {
   const version = readVersion();
   const asset = `simple-rest-${version}-${process.platform === 'win32' ? 'windows-amd64.exe' : 'linux-amd64'}`;
   const body = JSON.stringify([{
-    tag_name: `simple-rest-v${version}`, draft: false, prerelease: false,
+    tag_name: `v${version}`, draft: false, prerelease: false,
     published_at: new Date().toISOString(), html_url: 'https://example.invalid/release',
-    body: `simple-rest ${version}\n\nhttps://mysttic.github.io/Mysttic/simple-rest/`,
+    body: `simple-rest ${version}`,
     assets: [
-      { name: asset, size: 7159296, browser_download_url: `http://127.0.0.1:${HUB_PORT}/dl/${asset}` },
-      { name: `simple-rest-${version}-checksums.txt`, size: 294, browser_download_url: `http://127.0.0.1:${HUB_PORT}/dl/sums` },
+      { name: asset, size: 7159296, browser_download_url: `http://127.0.0.1:${GH_PORT}/dl/${asset}` },
+      { name: `simple-rest-${version}-checksums.txt`, size: 294, browser_download_url: `http://127.0.0.1:${GH_PORT}/dl/sums` },
     ],
   }]);
   const srv = createServer((r, w) => {
@@ -144,7 +144,7 @@ function fakeHub() {
     w.writeHead(r.url.startsWith('/releases') ? 200 : 404, { 'Content-Type': 'application/json' });
     w.end(r.url.startsWith('/releases') ? body : '[]');
   });
-  return new Promise(res => srv.listen(HUB_PORT, '127.0.0.1', () => res(srv)));
+  return new Promise(res => srv.listen(GH_PORT, '127.0.0.1', () => res(srv)));
 }
 
 // ---- a lab device for the TCP console ---------------------------------------------------
@@ -305,12 +305,12 @@ async function main() {
   const dataFile = path.join(work, 'app-data.json');
   writeFileSync(dataFile, JSON.stringify(demoData));
 
-  console.log('starting the app, an older copy, a fake hub and a lab device');
-  const hub = await fakeHub();
+  console.log('starting the app, an older copy, a fake GitHub and a lab device');
+  const gh = await fakeGitHub();
   const lab = await labDevice();
   start(path.join(work, exe('simple-rest-shots')), ['-no-browser', '-listen', `127.0.0.1:${APP_PORT}`, '-data', dataFile], 'app');
   start(path.join(work, exe('simple-rest-shots-old')), ['-no-browser', '-listen', `127.0.0.1:${OLD_PORT}`,
-    '-data', path.join(work, 'old-data.json'), '-update-url', `http://127.0.0.1:${HUB_PORT}/releases`], 'old');
+    '-data', path.join(work, 'old-data.json'), '-update-url', `http://127.0.0.1:${GH_PORT}/releases`], 'old');
   await waitForHTTP(`http://127.0.0.1:${APP_PORT}/api/info`, 'the app');
   await waitForHTTP(`http://127.0.0.1:${OLD_PORT}/api/info`, 'the older copy');
   // Every start turns the schedules off, so the token refresh is turned on
@@ -412,7 +412,7 @@ async function main() {
   // Only the Updates part: the rest of the dialog carries this machine's paths.
   await page.shot(path.join(outDir, 'update.png'), { clip: '#updSection', pad: 20, padTop: 2 });
 
-  hub.close();
+  gh.close();
   lab.close();
   console.log('done');
 }

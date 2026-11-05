@@ -1,10 +1,10 @@
 #!/bin/sh
 # Walks the update path end to end on a real binary, the way the handover
-# document asks for: a copy that reports 0.9.0 is started next to a fake hub
+# document asks for: a copy that reports 0.9.0 is started next to a fake GitHub
 # that serves the version from VERSION.md, and the script watches the copy
 # check, download, verify, swap its own executable and come back on the same
 # port with the new number. Before the update a schedule of the data file is
-# turned on and fetches a token from the fake hub, and the TCP console
+# turned on and fetches a token from the fake GitHub, and the TCP console
 # connects to a fake device that answers MLLP frames with an ACK; after it
 # the schedule must be off, the overlay empty, no TCP connection open, the
 # device must have seen the FIN and the data file must be untouched. Needs
@@ -15,7 +15,7 @@ cd "$(dirname "$0")/.."
 
 # need stops right away, naming the tool, when none of its alternatives is on
 # the PATH; without it a missing python or curl shows up much later as a fake
-# hub that never started.
+# GitHub that never started.
 need() {
   for tool in "$@"; do command -v "$tool" >/dev/null 2>&1 && return 0; done
   echo "FAIL: this test needs $(echo "$*" | sed 's/ / or /g') on the PATH" >&2
@@ -29,7 +29,7 @@ need sha256sum shasum
 project=simple-rest
 version=$(grep -m1 -v '^[[:space:]]*$' VERSION.md | sed 's/^[#[:space:]]*//; s/[[:space:]]*$//; s/^v//')
 root="$(pwd)/.e2e"
-hubport=8791
+ghport=8791
 appport=8792
 devport=8793
 goos=$(go env GOOS)
@@ -52,17 +52,17 @@ sha256() {
 }
 
 rm -rf "$root"
-mkdir -p "$root/app" "$root/hub/dl"
+mkdir -p "$root/app" "$root/gh/dl"
 
-# The token server is the fake hub itself: it serves token.json like any file.
+# The token server is the fake GitHub itself: it serves token.json like any file.
 # The data file holds a request for it, an environment and a schedule that
 # sets {{token}} from access_token; nothing in the file turns it on. It also
 # holds a TCP connection to the fake device, whose port comes from the
 # environment; nothing in the file connects it.
-printf '%s\n' '{"access_token":"e2e","expires_in":300}' > "$root/hub/token.json"
+printf '%s\n' '{"access_token":"e2e","expires_in":300}' > "$root/gh/token.json"
 cat > "$root/app/data.json" <<EOF
 {"version":1,"collections":[{"id":"c1","name":"E2E","open":true,"requests":[
-  {"id":"r1","name":"Token","method":"GET","url":"http://127.0.0.1:$hubport/token.json"}]}],
+  {"id":"r1","name":"Token","method":"GET","url":"http://127.0.0.1:$ghport/token.json"}]}],
  "envs":[{"id":"e1","name":"local","vars":[{"enabled":true,"name":"dev_port","value":"$devport"}]}],"activeEnv":"e1",
  "schedules":[{"id":"s1","name":"Token refresh","requestId":"r1","envId":"e1","everySec":240,"leadSec":60,
   "expiresPath":"expires_in","extract":[{"enabled":true,"optional":false,"var":"token","from":"json","path":"access_token"}]}],
@@ -107,29 +107,29 @@ datasum=$(sha256 "$root/app/data.json")
 
 echo "building a copy that reports 0.9.0 and the real $version"
 go build -ldflags "-X main.versionOverride=0.9.0" -o "$exe" .
-go build -o "$root/hub/dl/$asset" .
+go build -o "$root/gh/dl/$asset" .
 (
-  cd "$root/hub/dl"
+  cd "$root/gh/dl"
   if command -v sha256sum >/dev/null 2>&1; then sha256sum "$asset" > "$sums"; else shasum -a 256 "$asset" > "$sums"; fi
 )
-size=$(wc -c < "$root/hub/dl/$asset" | tr -d ' ')
-csize=$(wc -c < "$root/hub/dl/$sums" | tr -d ' ')
-cat > "$root/hub/releases" <<EOF
+size=$(wc -c < "$root/gh/dl/$asset" | tr -d ' ')
+csize=$(wc -c < "$root/gh/dl/$sums" | tr -d ' ')
+cat > "$root/gh/releases" <<EOF
 [{"tag_name":"chatt-v9.9.9","draft":false,"prerelease":false,"published_at":"2030-01-01T00:00:00Z","assets":[]},
- {"tag_name":"$project-v$version","draft":false,"prerelease":false,"published_at":"2026-09-10T12:00:00Z",
-  "html_url":"http://127.0.0.1:$hubport/rel","body":"$project $version\n\nhttps://mysttic.github.io/Mysttic/$project/",
-  "assets":[{"name":"$asset","size":$size,"browser_download_url":"http://127.0.0.1:$hubport/dl/$asset"},
-            {"name":"$sums","size":$csize,"browser_download_url":"http://127.0.0.1:$hubport/dl/$sums"}]}]
+ {"tag_name":"v$version","draft":false,"prerelease":false,"published_at":"2026-09-10T12:00:00Z",
+  "html_url":"http://127.0.0.1:$ghport/rel","body":"$project $version",
+  "assets":[{"name":"$asset","size":$size,"browser_download_url":"http://127.0.0.1:$ghport/dl/$asset"},
+            {"name":"$sums","size":$csize,"browser_download_url":"http://127.0.0.1:$ghport/dl/$sums"}]}]
 EOF
 
-$py -m http.server "$hubport" --bind 127.0.0.1 --directory "$root/hub" > "$root/hub.log" 2>&1 &
-hubpid=$!
+$py -m http.server "$ghport" --bind 127.0.0.1 --directory "$root/gh" > "$root/gh.log" 2>&1 &
+ghpid=$!
 $py "$root/device.py" "$devport" "$root/device.log" > "$root/device.out" 2>&1 &
 devpid=$!
 apppid=""
 
 cleanup() {
-  kill "$hubpid" 2>/dev/null || true
+  kill "$ghpid" 2>/dev/null || true
   kill "$devpid" 2>/dev/null || true
   [ -n "$apppid" ] && kill "$apppid" 2>/dev/null || true
   if [ "$goos" = windows ]; then taskkill //F //IM "$project-e2e.exe" >/dev/null 2>&1 || true
@@ -139,18 +139,18 @@ trap cleanup EXIT
 fail() {
   echo "FAIL: $*"
   echo "--- app.log"; cat "$root/app.log" 2>/dev/null || true
-  echo "--- hub.log"; cat "$root/hub.log"
+  echo "--- gh.log"; cat "$root/gh.log"
   echo "--- device.log"; cat "$root/device.log" "$root/device.out" 2>/dev/null || true
   exit 1
 }
 
 tries=60
-until curl -s -o /dev/null "http://127.0.0.1:$hubport/releases"; do
+until curl -s -o /dev/null "http://127.0.0.1:$ghport/releases"; do
   tries=$((tries - 1))
-  [ "$tries" -gt 0 ] || fail "the fake hub did not start on port $hubport"
+  [ "$tries" -gt 0 ] || fail "the fake GitHub did not start on port $ghport"
   sleep 0.25
 done
-echo "fake hub is up"
+echo "fake GitHub is up"
 tries=60
 until grep -q '^listening$' "$root/device.log" 2>/dev/null; do
   tries=$((tries - 1))
@@ -160,7 +160,7 @@ done
 echo "fake TCP device is up"
 
 "$exe" -no-browser -listen "127.0.0.1:$appport" -data "$root/app/data.json" \
-  -update-url "http://127.0.0.1:$hubport/releases" > "$root/app.log" 2>&1 &
+  -update-url "http://127.0.0.1:$ghport/releases" > "$root/app.log" 2>&1 &
 apppid=$!
 
 api="http://127.0.0.1:$appport/api"
@@ -178,7 +178,7 @@ wait_for_version 0.9.0 30 || fail "the 0.9.0 copy did not start on port $appport
 echo "0.9.0 is up"
 
 boot_of() { curl -s "$api/info" | sed -n 's/.*"boot":"\([0-9a-f]*\)".*/\1/p'; }
-token_gets() { grep -c 'GET /token.json' "$root/hub.log" || true; }
+token_gets() { grep -c 'GET /token.json' "$root/gh.log" || true; }
 oldboot=$(boot_of)
 [ -n "$oldboot" ] || fail "/api/info has no boot"
 case "$(curl -s "$api/schedules")" in
@@ -192,8 +192,8 @@ until curl -s "$api/schedules" | grep -q '"value":"e2e"'; do
   [ "$tries" -gt 0 ] || fail "the schedule did not set the token: $(curl -s "$api/schedules")"
   sleep 0.5
 done
-[ "$(token_gets)" -ge 1 ] || fail "the hub log shows no GET /token.json"
-echo "the schedule is on and set {{token}} from the fake hub"
+[ "$(token_gets)" -ge 1 ] || fail "the fake GitHub log shows no GET /token.json"
+echo "the schedule is on and set {{token}} from the fake GitHub"
 
 # The TCP console: no connection after the start; Connect takes the port from
 # the environment, and a message with Wait for reply gets the device's ACK.

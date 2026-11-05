@@ -6,8 +6,8 @@ Part of the [simple-rest documentation](../README.md#documentation).
 
 Settings (the gear icon), section Updates:
 
-- **Check for updates** asks the public repository Mysttic/Mysttic for the newest release with
-  the `simple-rest-v` prefix, compares its number with the running one and shows one of three
+- **Check for updates** asks the [releases of this repository](https://github.com/Mysttic/simple-rest/releases)
+  for the newest one, compares its number with the running one and shows one of three
   states: a newer version is out (a card with the number, a note and a button), this is the
   newest version, or the check failed (a connection problem, with a message of its own).
 - **Automatic checks** are off by default. Once turned on, the program asks once a day (a timer
@@ -32,8 +32,12 @@ Settings (the gear icon), section Updates:
 - A copy that cannot update itself (a directory it cannot write to, a start through `go run`, no
   release file for this system) says so plainly and links to the download page.
 - The updater keeps its state in `simple-rest-update.json` next to the data file.
+- Copies up to 1.3.0 look for updates in a separate hub repository, whose last release is
+  1.3.0, so they never offer 1.4.0 or newer. Download the new file once from the
+  [releases page](https://github.com/Mysttic/simple-rest/releases/latest) and put it in place
+  of the old one, next to the same data file; from then on the app updates itself again.
 
-The whole path on a real binary (a 0.9.0 copy, a fake hub, the swap, the restart) is walked by
+The whole path on a real binary (a 0.9.0 copy, a fake GitHub, the swap, the restart) is walked by
 `sh scripts/e2e-update.sh`; CI does the same.
 
 ## Data
