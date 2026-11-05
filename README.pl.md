@@ -8,12 +8,14 @@ a konsola TCP rozmawia z urządzeniami w Twojej sieci.
 
 Pobierz jeden plik, uruchom go, otworzy się przeglądarka. To cała instalacja.
 
-![simple-rest: kolekcja po lewej, odpowiedź JSON na całe okno](site/simple-rest/img/promo.png)
+![simple-rest: kolekcja po lewej, odpowiedź JSON na całe okno](docs/img/promo.png)
 
 ## Pobieranie
 
 Plik dla swojego systemu weź z [najnowszego wydania](https://github.com/Mysttic/simple-rest/releases/latest).
-Program otwiera interfejs w przeglądarce pod adresem `http://127.0.0.1:8787/`.
+Program otwiera interfejs w przeglądarce pod adresem `http://127.0.0.1:8787/`. Masz wersję 1.3.0
+albo starszą? Taka kopia nie widzi w aplikacji nowszych wydań, więc pobierz nowy plik raz ręcznie,
+patrz [Updates and data](docs/updates-and-data.md).
 
 | System | Plik | Uruchomienie |
 |---|---|---|
@@ -53,9 +55,9 @@ Raspberry Pi z systemem 32-bit) budują się jedną komendą, patrz [Building](C
 
 | | |
 |---|---|
-| ![Edytor zapytania z body JSON i zmiennymi w adresie](site/simple-rest/img/request.png) | ![Okno Schedules: włączone odświeżanie tokenu, ostatni przebieg i ustawione wartości](site/simple-rest/img/schedules.png) |
+| ![Edytor zapytania z body JSON i zmiennymi w adresie](docs/img/request.png) | ![Okno Schedules: włączone odświeżanie tokenu, ostatni przebieg i ustawione wartości](docs/img/schedules.png) |
 | Kolekcje po lewej, edytowane zapytanie po prawej | Harmonogram, który loguje się i odświeża `{{token}}` |
-| ![Konsola TCP połączona z analizatorem: zamówienie HL7 wysłane po MLLP i ACK w odpowiedzi](site/simple-rest/img/tcp.png) | ![Karta aktualizacji w ustawieniach z nowszym wydaniem](site/simple-rest/img/update.png) |
+| ![Konsola TCP połączona z analizatorem: zamówienie HL7 wysłane po MLLP i ACK w odpowiedzi](docs/img/tcp.png) | ![Karta aktualizacji w ustawieniach z nowszym wydaniem](docs/img/update.png) |
 | Konsola TCP: zamówienie HL7 po MLLP i ACK, które przyszło w odpowiedzi | Nowsze wydanie znalezione i zainstalowane przez aplikację |
 
 ## Prywatność

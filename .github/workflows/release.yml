@@ -1,16 +1,13 @@
 # Runs after a push to master that changes VERSION.md (see the trigger below).
 # Publishes a release only when VERSION.md is above the newest v* tag;
-# otherwise every job after "Version" is skipped.
-# Then the same files are copied to Mysttic/Mysttic, the public site, under
-# the tag simple-rest-v<version>, and that project's older releases there are
-# removed. Needs the HUB_TOKEN secret (see CONTRIBUTING.md, "Releases").
+# otherwise every job after "Version" is skipped. The releases of this
+# repository are where the updater inside the app (1.4.0 and newer) looks for
+# a newer version, so a published release reaches every such copy.
 # The full CI suite is not repeated here: the pull request from develop into
 # master ran it on this very tree a few minutes earlier (see ci.yml). What does
 # run is a short "Tests" job, and only when a version is actually being
-# published. master is not a protected branch, so a direct push can reach this
-# workflow without ever passing through a pull request, and the "site" job
-# below deletes the previous release from Mysttic/Mysttic for good - there is
-# nothing to roll back to once a broken build is published.
+# published: master is not a protected branch, so a direct push can reach this
+# workflow without ever passing through a pull request.
 name: Release
 
 on:
@@ -30,8 +27,8 @@ on:
   #   from develop the "Release preview" in ci.yml warns about it): use
   #   "Run workflow" (workflow_dispatch) on master, which compares VERSION.md
   #   with the newest tag the same way and publishes only while v<version>
-  #   does not exist yet. A run that failed after creating the tag
-  #   (for instance in "site") is retried with "Re-run failed jobs" instead.
+  #   does not exist yet. A run that failed after creating the tag is
+  #   retried with "Re-run failed jobs" instead.
   # - a push of more than 3,000 changed files may not start the workflow even
   #   when VERSION.md is one of them (GitHub's limit on path filters): use
   #   "Run workflow" on master.
@@ -52,7 +49,7 @@ jobs:
   version:
     name: Version
     # "Run workflow" lets anyone pick a branch; releasing from anything but
-    # master would tag an unreviewed commit and replace the site's release.
+    # master would tag and publish an unreviewed commit.
     # Skipping this job skips every job after it.
     if: github.ref == 'refs/heads/master'
     runs-on: ubuntu-latest
@@ -146,11 +143,7 @@ jobs:
       - name: Release notes from CHANGELOG.md
         run: |
           set -euo pipefail
-          {
-            sh scripts/changelog-section.sh "$VERSION"
-            echo
-            echo "Pobieranie: https://mysttic.github.io/Mysttic/simple-rest/"
-          } > notes.md
+          sh scripts/changelog-section.sh "$VERSION" > notes.md
           cat notes.md
 
       - name: Tag and release
@@ -169,81 +162,3 @@ jobs:
             --notes-file notes.md \
             --target "$GITHUB_SHA"
           echo "Released $TAG with $count files." >> "$GITHUB_STEP_SUMMARY"
-
-  site:
-    name: Copy to the site
-    needs: [version, release]
-    if: needs.version.outputs.publishing == 'true'
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    env:
-      HUB: Mysttic/Mysttic
-      PROJECT: simple-rest
-      NAME: simple-rest
-      SITE: https://mysttic.github.io/Mysttic/simple-rest/
-      VERSION: ${{ needs.version.outputs.version }}
-      TAG: ${{ needs.version.outputs.tag }}
-      HUB_TAG: simple-rest-v${{ needs.version.outputs.version }}
-    steps:
-      - name: Credential for the site repository
-        env:
-          HUB_TOKEN: ${{ secrets.HUB_TOKEN }}
-        run: |
-          set -uo pipefail
-          if [ -z "${HUB_TOKEN:-}" ]; then
-            echo "::error::No HUB_TOKEN secret. Release $TAG was made, the copy to the site was not."
-            echo "::error::Needs a personal token with Contents: read and write on $HUB."
-            exit 1
-          fi
-
-      - name: Files from the release
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-          mkdir -p copy
-          gh release download "$TAG" --repo "$GITHUB_REPOSITORY" \
-            --dir copy --pattern "$PROJECT-*"
-          ls -la copy
-          if [ "$(ls -1 copy | wc -l)" -ne 4 ]; then
-            echo "::error::Expected four files in release $TAG."
-            exit 1
-          fi
-
-      - name: Release notes
-        run: |
-          set -euo pipefail
-          {
-            echo "$NAME $VERSION"
-            echo
-            echo "$SITE"
-          } > notes.md
-          cat notes.md
-
-      - name: Release on the site
-        env:
-          GH_TOKEN: ${{ secrets.HUB_TOKEN }}
-        run: |
-          set -euo pipefail
-          if gh release view "$HUB_TAG" --repo "$HUB" >/dev/null 2>&1; then
-            gh release delete "$HUB_TAG" --repo "$HUB" --cleanup-tag --yes
-          fi
-          gh release create "$HUB_TAG" copy/* \
-            --repo "$HUB" \
-            --title "$NAME $VERSION" \
-            --notes-file notes.md \
-            --target master
-
-      - name: The site keeps one version
-        env:
-          GH_TOKEN: ${{ secrets.HUB_TOKEN }}
-        run: |
-          set -euo pipefail
-          gh release list --repo "$HUB" --limit 100 --json tagName -q '.[].tagName' \
-            | { grep -E "^$PROJECT-v" || true; } \
-            | { grep -vxF "$HUB_TAG" || true; } \
-            | while read -r old; do
-                echo "Deleting $old"
-                gh release delete "$old" --repo "$HUB" --cleanup-tag --yes
-              done
-          echo "$HUB_TAG stays on the site" >> "$GITHUB_STEP_SUMMARY"

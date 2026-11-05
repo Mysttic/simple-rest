@@ -7,7 +7,7 @@ answer, usually a token, and set a variable with it in a chosen environment. The
 button on the top bar opens the schedules window and shows how many of them are on; a red frame
 means one of them has stopped, and `?` that the program does not answer.
 
-![The Schedules window: a token refresh that is on, its last run and the values it set](../site/simple-rest/img/schedules.png)
+![The Schedules window: a token refresh that is on, its last run and the values it set](img/schedules.png)
 
 - **+ Schedule** takes the request open in the editor, as long as it is saved in a collection.
   The ⟳ button next to a request in the sidebar does the same, and the ⟳ mark shows the requests

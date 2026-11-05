@@ -910,7 +910,7 @@ func main() {
 	dataPath := flag.String("data", "", "data file (default: simple-rest-data.json next to the executable)")
 	noBrowser := flag.Bool("no-browser", false, "do not open the browser automatically")
 	showVersion := flag.Bool("version", false, "print the version and exit")
-	updateURL := flag.String("update-url", hubAPI, "where the updater asks for releases (a testing aid, see scripts/e2e-update.sh)")
+	updateURL := flag.String("update-url", releasesAPI, "where the updater asks for releases (a testing aid, see scripts/e2e-update.sh)")
 	flag.Parse()
 
 	if *showVersion {
@@ -948,7 +948,7 @@ func main() {
 	a.hosts = newHostPolicy(osHostname(), strings.Split(*allowHost, ","))
 	u := newUpdater(version, exePath, filepath.Join(filepath.Dir(*dataPath), projectName+"-update.json"))
 	u.logf = log.Printf
-	if *updateURL != hubAPI {
+	if *updateURL != releasesAPI {
 		u.apiURL = *updateURL
 		log.Printf("update checks go to %s", *updateURL)
 	}

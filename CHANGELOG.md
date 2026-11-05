@@ -7,6 +7,22 @@ ostatniego wydanego tagu.
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-11-05
+
+### Zmienione
+
+- Updater pyta o wydania tego repozytorium (GitHub Releases Mysttic/simple-rest, tagi
+  `v<wersja>`), a link Download page prowadzi do jego strony wydań.
+- Kopie do 1.3.0 szukają wydań na hubie Mysttic/Mysttic, gdzie ostatnim wydaniem zostaje 1.3.0,
+  więc 1.4.0 trzeba raz zainstalować ręcznie: pobrać plik z
+  https://github.com/Mysttic/simple-rest/releases/latest i podmienić stary, obok tego samego
+  pliku danych. Od 1.4.0 aktualizacje znowu działają z aplikacji.
+
+### Usunięte
+
+- Kopia wydań na hub Mysttic/Mysttic, sekret `HUB_TOKEN` w workflowie `Release` i strona
+  projektu w `site/`. Zrzuty ekranu przeszły do `docs/img/`.
+
 ## [1.3.0] - 2026-11-05
 
 ### Dodane

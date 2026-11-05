@@ -1,10 +1,14 @@
 // update.go: the updater inside the app.
 //
-// It asks the public hub repository (Mysttic/Mysttic) which release of this
-// project is newest, compares the number with the running one, downloads the
+// It asks the GitHub releases of this repository (Mysttic/simple-rest) which
+// release is newest, compares the number with the running one, downloads the
 // file for this platform, verifies it and swaps the running executable. Every
 // step can stop without harming the one before it, and the check never panics:
 // a timeout or a broken answer ends as the "failed" state and the app carries on.
+//
+// Copies up to 1.3.0 asked a separate hub repository instead, for tags named
+// simple-rest-v<version>. The hub keeps 1.3.0 as its last release, so such a
+// copy is updated by hand once, to 1.4.0 or newer.
 package main
 
 import (
@@ -29,10 +33,10 @@ import (
 
 const (
 	projectName   = "simple-rest"
-	hubRepo       = "Mysttic/Mysttic"
-	hubAPI        = "https://api.github.com/repos/" + hubRepo + "/releases?per_page=30"
-	tagPrefix     = projectName + "-v"
-	projectPage   = "https://mysttic.github.io/Mysttic/" + projectName + "/"
+	releaseRepo   = "Mysttic/" + projectName
+	releasesAPI   = "https://api.github.com/repos/" + releaseRepo + "/releases?per_page=30"
+	tagPrefix     = "v"
+	projectPage   = "https://github.com/" + releaseRepo + "/releases"
 	checkEvery    = 24 * time.Hour
 	tickEvery     = time.Hour
 	updateDirName = "." + projectName + "-update"
@@ -46,7 +50,7 @@ const (
 	updateFailed   = "failed"
 )
 
-var errNoRelease = errors.New("no release of this project on the hub")
+var errNoRelease = errors.New("no release of this project yet")
 
 // ---- versions -----------------------------------------------------------------
 
@@ -109,9 +113,9 @@ func isNewer(candidate, running string) bool {
 // ---- platform and file names ------------------------------------------------------
 
 // platformSuffix maps GOOS/GOARCH to the platform part of a release file name.
-// The names are a contract shared with build.sh and the hub page. One build per
-// system, so anything else (macOS, 32-bit ARM, a self-built copy) gets an empty
-// suffix and is told there is no release file for it.
+// The names are a contract shared with build.sh and every published release.
+// One build per system, so anything else (macOS, 32-bit ARM, a self-built
+// copy) gets an empty suffix and is told there is no release file for it.
 func platformSuffix(goos, goarch string) string {
 	switch goos + "/" + goarch {
 	case "windows/amd64":
@@ -135,7 +139,7 @@ func isTempPath(path, tmp string) bool {
 	return path == tmp || strings.HasPrefix(path, tmp+string(filepath.Separator))
 }
 
-// ---- hub answer ---------------------------------------------------------------------
+// ---- the release list -----------------------------------------------------------------
 
 type ghAsset struct {
 	Name string `json:"name"`
@@ -154,7 +158,7 @@ type ghRelease struct {
 	Assets      []ghAsset `json:"assets"`
 }
 
-// latestRelease is what the rest of the program sees of a hub release.
+// latestRelease is what the rest of the program sees of a release.
 type latestRelease struct {
 	Version      string `json:"version"`
 	Tag          string `json:"tag"`
@@ -169,8 +173,7 @@ type latestRelease struct {
 }
 
 // pickRelease drops drafts and prereleases, keeps the tags with our prefix and
-// takes the one published last. A copy job that failed halfway can leave two
-// releases of ours on the hub, so the order the API returns is not trusted.
+// takes the one published last. The order the API returns is not trusted.
 func pickRelease(all []ghRelease, suffix string) (*latestRelease, error) {
 	var ours []ghRelease
 	for _, r := range all {
@@ -256,7 +259,7 @@ type updater struct {
 
 func newUpdater(version, exePath, settingsPath string) *updater {
 	u := &updater{
-		apiURL:       hubAPI,
+		apiURL:       releasesAPI,
 		client:       &http.Client{Transport: http.DefaultTransport.(*http.Transport).Clone()},
 		version:      version,
 		suffix:       platformSuffix(runtime.GOOS, runtime.GOARCH),
@@ -355,7 +358,7 @@ func (u *updater) setAutoCheck(on bool) {
 
 // ---- step 1 and 2: ask and compare ------------------------------------------------------
 
-// check asks the hub once. It never panics and never returns an error: the
+// check asks for the releases once. It never panics and never returns an error: the
 // outcome lands in the status as newer, uptodate or failed. The timestamp is
 // written after a failed attempt too, so a machine without a connection does
 // not turn the daily check into hourly knocking.
@@ -411,11 +414,11 @@ func (u *updater) fetchLatest(ctx context.Context) (rel *latestRelease, err erro
 	}
 	defer res.Body.Close()
 	if res.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("the hub answered HTTP %d", res.StatusCode)
+		return nil, fmt.Errorf("the release list answered HTTP %d", res.StatusCode)
 	}
 	var all []ghRelease
 	if err := json.NewDecoder(io.LimitReader(res.Body, 8<<20)).Decode(&all); err != nil {
-		return nil, fmt.Errorf("unreadable answer from the hub: %v", err)
+		return nil, fmt.Errorf("unreadable release list: %v", err)
 	}
 	return pickRelease(all, u.suffix)
 }

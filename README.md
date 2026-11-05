@@ -8,12 +8,14 @@ fresh, and a TCP console talks to devices on your network.
 
 Download one file, run it, the browser opens. That is the whole setup.
 
-![simple-rest with a collection on the left and a JSON answer filling the window](site/simple-rest/img/promo.png)
+![simple-rest with a collection on the left and a JSON answer filling the window](docs/img/promo.png)
 
 ## Download
 
 Take the file for your system from the [latest release](https://github.com/Mysttic/simple-rest/releases/latest).
-It opens the UI in your browser at `http://127.0.0.1:8787/`.
+It opens the UI in your browser at `http://127.0.0.1:8787/`. Running 1.3.0 or older? Those copies
+do not see newer releases in the app, so download the new file once, see
+[Updates and data](docs/updates-and-data.md).
 
 | System | File | Run |
 |---|---|---|
@@ -53,9 +55,9 @@ with one command, see [Building](CONTRIBUTING.md#building).
 
 | | |
 |---|---|
-| ![The request editor with a JSON body and variables in the address](site/simple-rest/img/request.png) | ![The Schedules window with a token refresh that is on, its last run and the values it set](site/simple-rest/img/schedules.png) |
+| ![The request editor with a JSON body and variables in the address](docs/img/request.png) | ![The Schedules window with a token refresh that is on, its last run and the values it set](docs/img/schedules.png) |
 | Collections on the left, the request you are editing on the right | A schedule that logs in and keeps `{{token}}` fresh |
-| ![The TCP console connected to a lab analyzer: an HL7 order sent over MLLP and the ACK that came back](site/simple-rest/img/tcp.png) | ![The update card in settings, offering a newer release](site/simple-rest/img/update.png) |
+| ![The TCP console connected to a lab analyzer: an HL7 order sent over MLLP and the ACK that came back](docs/img/tcp.png) | ![The update card in settings, offering a newer release](docs/img/update.png) |
 | The TCP console: an HL7 order over MLLP and the ACK it got back | A newer release, found and installed by the app |
 
 ## Privacy

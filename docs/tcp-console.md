@@ -7,7 +7,7 @@ on the network, a laboratory analyser for instance, sends messages and shows wha
 program works only as a client: it connects to the host and port you give and never listens.
 The counter on the tab shows the open connections.
 
-![The TCP console: an HL7 order sent over MLLP to an analyser and the ACK that came back](../site/simple-rest/img/tcp.png)
+![The TCP console: an HL7 order sent over MLLP to an analyser and the ACK that came back](img/tcp.png)
 
 - **A connection** is a definition in the data file: a name, Host and Port (both may contain
   `{{variables}}`, such as `{{lab_host}}`), the framing and the editor settings. Host is a name,
