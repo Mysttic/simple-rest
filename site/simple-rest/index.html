@@ -76,19 +76,9 @@
     </div>
 
     <div class="tile">
-      <h3>Raspberry Pi, 32-bit</h3>
-      <p class="what">
-        For any Pi, from the Zero and the Pi 1 up, running a 32-bit system
-        such as Raspberry Pi OS (32-bit).
-      </p>
-      <a class="button" id="download-rpi32" href="#" aria-disabled="true">Download for Raspberry Pi (32-bit)</a>
-      <span class="size" id="size-rpi32"></span>
-    </div>
-
-    <div class="tile">
       <h3>Checksums</h3>
       <p class="what">
-        SHA-256 of the four files above, the same list the updater inside the
+        SHA-256 of the three files above, the same list the updater inside the
         app verifies a download against.
       </p>
       <a class="button" id="download-sums" href="#" aria-disabled="true">Download checksums</a>
@@ -101,18 +91,6 @@
     “Windows protected your PC”. Choose “More info”, then “Run anyway”. Once
     running, the app can tell you when a newer release is out and install it
     for you; that check stays off until you turn it on in Settings.
-  </p>
-
-  <p class="note">
-    Prefer a package manager? <code>winget install Mysttic.SimpleRest</code>,
-    <code>scoop install mysttic/simple-rest</code> (after
-    <code>scoop bucket add mysttic https://github.com/Mysttic/scoop-bucket</code>),
-    <code>choco install simple-rest</code>, <code>sudo snap install simple-rest</code>,
-    <code>yay -S simple-rest-bin</code>, or a <code>.deb</code> package for Debian,
-    Ubuntu and Raspberry Pi OS from the
-    <a href="https://github.com/Mysttic/simple-rest/releases">release page</a>.
-    Such a copy keeps its data in your user folder and is updated by the
-    package manager.
   </p>
 </div>
 
@@ -258,7 +236,7 @@
 <footer>
   <div class="wrap">
     <span>simple-rest, MIT licence</span>
-    <span>Windows 10 or 11, Linux, Raspberry Pi with a 64-bit or 32-bit system</span>
+    <span>Windows 10 or 11, Linux, Raspberry Pi with a 64-bit system</span>
     <a href="../">More projects by Mysttic</a>
   </div>
 </footer>
@@ -273,7 +251,6 @@ initDownloads({
     { id: 'win', match: /-windows-amd64\.exe$/ },
     { id: 'linux', match: /-linux-amd64$/ },
     { id: 'rpi', match: /-linux-arm64$/ },
-    { id: 'rpi32', match: /-linux-armhf$/ },
     { id: 'sums', match: /-checksums\.txt$/ }
   ]
 });

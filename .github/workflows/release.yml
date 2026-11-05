@@ -1,151 +1,197 @@
-# Publishes a release after a push to master, without manual steps.
-#
-# "release" runs the unit tests and then semantic-release (release.config.mjs).
-# The Conventional Commits since the newest v* tag decide whether there is a
-# release and which number it gets: feat raises the minor number, fix and perf
-# the patch, "!" or a BREAKING CHANGE footer the major one. chore, ci, docs,
-# test and refactor alone publish nothing, and every job after "release" is
-# skipped. A release builds dist/ with the new number (four binaries, three
-# .deb packages, the checksums), commits CHANGELOG.md and VERSION.md back to
-# master as "chore(release): x.y.z [skip ci]", tags it vx.y.z and creates the
-# GitHub release with every file from dist/.
-#
-# The jobs after it take the files from that GitHub release:
-# - hub copies the binaries and the checksums to Mysttic/Mysttic, where the
-#   updater inside the app and the project page look for releases (HUB_TOKEN);
-# - develop merges master back into develop, so the release commit is there too;
-# - scoop, winget, chocolatey, aur, snap and sourceforge are the package
-#   channels. A channel whose secret is not set is skipped, not failed; README,
-#   "Wydania", lists the secrets and the one-time setup of every channel.
-# A failure in any job opens an issue labelled release-failed, or comments on
-# the one that is still open.
-#
-# Running the workflow again ("Run workflow" on master) publishes nothing
-# without new commits since the tag. To retry the channels of a release that
-# went out, use "Re-run failed jobs" on its run.
+# Runs after a push to master that changes VERSION.md (see the trigger below).
+# Publishes a release only when VERSION.md is above the newest v* tag;
+# otherwise every job after "Version" is skipped.
+# Then the same files are copied to Mysttic/Mysttic, the public site, under
+# the tag simple-rest-v<version>, and that project's older releases there are
+# removed. Needs the HUB_TOKEN secret (see README, "Wydania").
+# The full CI suite is not repeated here: the pull request from develop into
+# master ran it on this very tree a few minutes earlier (see ci.yml). What does
+# run is a short "Tests" job, and only when a version is actually being
+# published. master is not a protected branch, so a direct push can reach this
+# workflow without ever passing through a pull request, and the "site" job
+# below deletes the previous release from Mysttic/Mysttic for good - there is
+# nothing to roll back to once a broken build is published.
 name: Release
 
 on:
+  # The push trigger is limited to VERSION.md, the only file the "Version" job
+  # reads the version from (scripts/release-version.sh). A merge that leaves it
+  # alone can never publish anything, yet it used to start a runner just to
+  # find that out - a billed minute with no build and no release.
+  # What follows from the filter:
+  # - a push to master that does not touch VERSION.md starts nothing at all,
+  #   not even "Version";
+  # - a push that edits VERSION.md without raising the number still costs the
+  #   one-minute "Version" job, and everything after it is skipped;
+  # - an edit to this workflow alone, a CHANGELOG.md fix pushed after a run
+  #   that stopped for a missing "## [x.y.z]" section, or any merge or push
+  #   without VERSION.md (a code fix, say) after a run that failed before the
+  #   tag or never started, starts no release by itself (on a pull request
+  #   from develop the "Release preview" in ci.yml warns about it): use
+  #   "Run workflow" (workflow_dispatch) on master, which compares VERSION.md
+  #   with the newest tag the same way and publishes only while v<version>
+  #   does not exist yet. A run that failed after creating the tag
+  #   (for instance in "site") is retried with "Re-run failed jobs" instead.
+  # - a push of more than 3,000 changed files may not start the workflow even
+  #   when VERSION.md is one of them (GitHub's limit on path filters): use
+  #   "Run workflow" on master.
   push:
     branches: [master]
+    paths:
+      - 'VERSION.md'
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: release
   cancel-in-progress: false
 
 jobs:
-  release:
-    name: Version and GitHub release
-    # "Run workflow" lets anyone pick a branch. semantic-release publishes from
-    # master only, and this keeps the jobs after it from starting at all.
+  version:
+    name: Version
+    # "Run workflow" lets anyone pick a branch; releasing from anything but
+    # master would tag an unreviewed commit and replace the site's release.
+    # Skipping this job skips every job after it.
     if: github.ref == 'refs/heads/master'
     runs-on: ubuntu-latest
-    timeout-minutes: 20
-    permissions:
-      contents: write # the release commit, the tag and the GitHub release
-      issues: write # @semantic-release/github; its comments are turned off
-      pull-requests: write
+    timeout-minutes: 5
     outputs:
-      version: ${{ steps.release.outputs.version }}
-      scoop: ${{ steps.channels.outputs.scoop }}
-      winget: ${{ steps.channels.outputs.winget }}
-      chocolatey: ${{ steps.channels.outputs.chocolatey }}
-      aur: ${{ steps.channels.outputs.aur }}
-      snap: ${{ steps.channels.outputs.snap }}
-      sourceforge: ${{ steps.channels.outputs.sourceforge }}
+      version: ${{ steps.v.outputs.version }}
+      tag: ${{ steps.v.outputs.tag }}
+      previous: ${{ steps.v.outputs.previous }}
+      publishing: ${{ steps.v.outputs.publishing }}
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
+      - name: Compare VERSION.md with the newest tag
+        id: v
+        run: |
+          set -o pipefail
+          sh scripts/release-version.sh | tee -a "$GITHUB_OUTPUT"
+
+      - name: Decision
+        env:
+          VERSION: ${{ steps.v.outputs.version }}
+          PUBLISHING: ${{ steps.v.outputs.publishing }}
+        run: |
+          if [ "$PUBLISHING" = "true" ]; then
+            echo "Publishing v$VERSION." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "VERSION.md was not raised ($VERSION is already released), nothing to publish." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+  test:
+    name: Tests
+    needs: version
+    if: needs.version.outputs.publishing == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
           cache: false
-      # setup-go caches modules, and this repository has none. What pays off
-      # is the compiler cache, here across four platforms.
       - name: Go build cache
         uses: actions/cache@v4
         with:
           path: ~/.cache/go-build
-          key: ${{ runner.os }}-gobuild-release-${{ hashFiles('go.mod', '**/*.go') }}
-          restore-keys: ${{ runner.os }}-gobuild-release-
+          key: ${{ runner.os }}-gobuild-release-test-${{ hashFiles('go.mod', '**/*.go') }}
+          restore-keys: ${{ runner.os }}-gobuild-release-test-
       - uses: actions/setup-node@v4
         with:
-          node-version: 24
-          cache: npm
+          node-version: 22
 
-      - name: Release tools
-        run: npm ci --ignore-scripts --no-audit --no-fund
-
-      # The pull request from develop ran the full CI on this tree. These unit
-      # tests guard a push straight to master, which skips that pull request:
-      # ui.html is embedded with //go:embed, so a broken interface still builds.
+      # Unit tests only: no end to end run and no build. The three-platform
+      # build happens in "release" right below, and ui.html is embedded with
+      # //go:embed, so a broken interface compiles cleanly and only these
+      # tests catch it.
       - name: Go tests
         run: go test ./... -count=1
 
       - name: UI tests
         run: node --test "tests/**/*.test.mjs"
 
-      - name: semantic-release
-        id: release
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-          REQUIRE_DEB: '1'
-          GIT_AUTHOR_NAME: github-actions[bot]
-          GIT_AUTHOR_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
-          GIT_COMMITTER_NAME: github-actions[bot]
-          GIT_COMMITTER_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
-        run: npx --no-install semantic-release
+  release:
+    name: Release on GitHub
+    needs: [version, test]
+    if: needs.version.outputs.publishing == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      VERSION: ${{ needs.version.outputs.version }}
+      TAG: ${{ needs.version.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: false
+      # setup-go caches modules, and this repository has none. What pays off
+      # is the compiler cache, here across three platforms.
+      - name: Go build cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/go-build
+          key: ${{ runner.os }}-gobuild-release-${{ hashFiles('go.mod', '**/*.go') }}
+          restore-keys: ${{ runner.os }}-gobuild-release-
 
-      # Job-level "if" cannot read secrets, so their presence becomes outputs.
-      - name: Channels with their secrets set
-        id: channels
-        if: steps.release.outputs.version != ''
-        env:
-          VERSION: ${{ steps.release.outputs.version }}
+      - name: Build every platform
+        run: sh build.sh
+
+      - name: Release notes from CHANGELOG.md
         run: |
+          set -euo pipefail
           {
-            echo "scoop=${{ secrets.SCOOP_BUCKET_TOKEN != '' }}"
-            echo "winget=${{ secrets.WINGET_TOKEN != '' }}"
-            echo "chocolatey=${{ secrets.CHOCO_API_KEY != '' }}"
-            echo "aur=${{ secrets.AUR_SSH_KEY != '' }}"
-            echo "snap=${{ secrets.SNAPCRAFT_STORE_CREDENTIALS != '' }}"
-            echo "sourceforge=${{ secrets.SF_SSH_KEY != '' && vars.SF_USER != '' }}"
-          } > channels.txt
-          cat channels.txt >> "$GITHUB_OUTPUT"
-          {
-            echo "Published v$VERSION."
+            sh scripts/changelog-section.sh "$VERSION"
             echo
-            echo "| Channel | Runs |"
-            echo "|---|---|"
-            sed 's/=true$/ | yes |/; s/=false$/ | no: its secret is not set |/; s/^/| /' channels.txt
-          } >> "$GITHUB_STEP_SUMMARY"
+            echo "Pobieranie: https://mysttic.github.io/Mysttic/simple-rest/"
+          } > notes.md
+          cat notes.md
 
-  hub:
+      - name: Tag and release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          count=$(ls -1 dist | wc -l)
+          if [ "$count" -ne 4 ]; then
+            echo "::error::Expected 4 files in dist (3 binaries and the checksums), got $count."
+            exit 1
+          fi
+          gh release create "$TAG" dist/* \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "simple-rest $VERSION" \
+            --notes-file notes.md \
+            --target "$GITHUB_SHA"
+          echo "Released $TAG with $count files." >> "$GITHUB_STEP_SUMMARY"
+
+  site:
     name: Copy to the site
-    needs: release
-    if: needs.release.outputs.version != ''
+    needs: [version, release]
+    if: needs.version.outputs.publishing == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     env:
       HUB: Mysttic/Mysttic
       PROJECT: simple-rest
+      NAME: simple-rest
       SITE: https://mysttic.github.io/Mysttic/simple-rest/
-      VERSION: ${{ needs.release.outputs.version }}
-      HUB_TAG: simple-rest-v${{ needs.release.outputs.version }}
+      VERSION: ${{ needs.version.outputs.version }}
+      TAG: ${{ needs.version.outputs.tag }}
+      HUB_TAG: simple-rest-v${{ needs.version.outputs.version }}
     steps:
-      # Copies of 1.2.0 and older look for updates on the hub only, so a
-      # missing token fails the run instead of skipping the copy.
       - name: Credential for the site repository
         env:
           HUB_TOKEN: ${{ secrets.HUB_TOKEN }}
         run: |
+          set -uo pipefail
           if [ -z "${HUB_TOKEN:-}" ]; then
-            echo "::error::No HUB_TOKEN secret. Release v$VERSION was made, the copy to the site was not."
+            echo "::error::No HUB_TOKEN secret. Release $TAG was made, the copy to the site was not."
             echo "::error::Needs a personal token with Contents: read and write on $HUB."
             exit 1
           fi
@@ -155,17 +201,23 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          gh release download "v$VERSION" --repo "$GITHUB_REPOSITORY" \
-            --dir copy --pattern "$PROJECT-$VERSION-*"
+          mkdir -p copy
+          gh release download "$TAG" --repo "$GITHUB_REPOSITORY" \
+            --dir copy --pattern "$PROJECT-*"
           ls -la copy
-          if [ "$(ls -1 copy | wc -l)" -ne 5 ]; then
-            echo "::error::Expected five files in release v$VERSION: four binaries and the checksums."
+          if [ "$(ls -1 copy | wc -l)" -ne 4 ]; then
+            echo "::error::Expected four files in release $TAG."
             exit 1
           fi
 
       - name: Release notes
         run: |
-          printf '%s %s\n\n%s\n' "$PROJECT" "$VERSION" "$SITE" > notes.md
+          set -euo pipefail
+          {
+            echo "$NAME $VERSION"
+            echo
+            echo "$SITE"
+          } > notes.md
           cat notes.md
 
       - name: Release on the site
@@ -178,7 +230,7 @@ jobs:
           fi
           gh release create "$HUB_TAG" copy/* \
             --repo "$HUB" \
-            --title "$PROJECT $VERSION" \
+            --title "$NAME $VERSION" \
             --notes-file notes.md \
             --target master
 
@@ -195,231 +247,3 @@ jobs:
                 gh release delete "$old" --repo "$HUB" --cleanup-tag --yes
               done
           echo "$HUB_TAG stays on the site" >> "$GITHUB_STEP_SUMMARY"
-
-  develop:
-    name: Merge the release into develop
-    needs: release
-    if: needs.release.outputs.version != ''
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    permissions:
-      contents: write
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: develop
-          fetch-depth: 0
-      # Fast-forwards when develop has nothing new. A real merge commit is
-      # skipped by commitlint, which ignores merge commits.
-      - name: Merge master into develop
-        run: |
-          set -eu
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git fetch origin master
-          git merge --no-edit origin/master
-          git push origin HEAD:develop
-
-  scoop:
-    name: Scoop
-    needs: release
-    if: needs.release.outputs.scoop == 'true'
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    env:
-      VERSION: ${{ needs.release.outputs.version }}
-      GH_TOKEN: ${{ github.token }}
-    steps:
-      - uses: actions/checkout@v4
-      - name: Manifest
-        run: |
-          set -eu
-          gh release download "v$VERSION" --dir dist --pattern "simple-rest-$VERSION-checksums.txt"
-          sh scripts/render.sh packaging/scoop/simple-rest.json.in "$VERSION" > simple-rest.json
-          cat simple-rest.json
-      - name: Push to Mysttic/scoop-bucket
-        env:
-          TOKEN: ${{ secrets.SCOOP_BUCKET_TOKEN }}
-        run: |
-          set -eu
-          git clone --depth 1 "https://x-access-token:$TOKEN@github.com/Mysttic/scoop-bucket.git" bucket
-          mkdir -p bucket/bucket
-          cp simple-rest.json bucket/bucket/simple-rest.json
-          cd bucket
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add bucket/simple-rest.json
-          if git diff --cached --quiet; then
-            echo "The bucket already holds $VERSION."
-            exit 0
-          fi
-          git commit -m "simple-rest: Update to version $VERSION"
-          git push
-
-  winget:
-    name: winget
-    needs: release
-    if: needs.release.outputs.winget == 'true'
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    steps:
-      # Opens a pull request in microsoft/winget-pkgs from the Mysttic fork.
-      # The first version of the package has to be there already.
-      - uses: vedantmgoyal9/winget-releaser@b7370d4d152efdce803a26cc6ca9eee58cb2ad54 # main, 2026-11
-        with:
-          identifier: Mysttic.SimpleRest
-          version: ${{ needs.release.outputs.version }}
-          release-tag: v${{ needs.release.outputs.version }}
-          installers-regex: '-windows-amd64\.exe$'
-          token: ${{ secrets.WINGET_TOKEN }}
-
-  chocolatey:
-    name: Chocolatey
-    needs: release
-    if: needs.release.outputs.chocolatey == 'true'
-    runs-on: windows-latest
-    timeout-minutes: 15
-    defaults:
-      run:
-        shell: bash
-    env:
-      VERSION: ${{ needs.release.outputs.version }}
-      GH_TOKEN: ${{ github.token }}
-    steps:
-      - uses: actions/checkout@v4
-      - name: Package
-        run: |
-          set -eu
-          gh release download "v$VERSION" --dir dist --pattern "simple-rest-$VERSION-checksums.txt"
-          mkdir -p choco/tools
-          sh scripts/render.sh packaging/chocolatey/simple-rest.nuspec.in "$VERSION" > choco/simple-rest.nuspec
-          sh scripts/render.sh packaging/chocolatey/tools/chocolateyinstall.ps1.in "$VERSION" > choco/tools/chocolateyinstall.ps1
-          cd choco
-          choco pack simple-rest.nuspec --outputdirectory .
-      - name: Push to the community repository
-        env:
-          CHOCO_API_KEY: ${{ secrets.CHOCO_API_KEY }}
-        run: choco push "choco/simple-rest.$VERSION.nupkg" --source https://push.chocolatey.org/ --api-key "$CHOCO_API_KEY"
-
-  aur:
-    name: AUR
-    needs: release
-    if: needs.release.outputs.aur == 'true'
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    env:
-      VERSION: ${{ needs.release.outputs.version }}
-      GH_TOKEN: ${{ github.token }}
-    steps:
-      - uses: actions/checkout@v4
-      - name: PKGBUILD
-        run: |
-          set -eu
-          gh release download "v$VERSION" --dir dist --pattern "simple-rest-$VERSION-checksums.txt"
-          mkdir -p aur
-          sh scripts/render.sh packaging/aur/PKGBUILD.in "$VERSION" > aur/PKGBUILD
-          cat aur/PKGBUILD
-      # Writes .SRCINFO from the PKGBUILD and pushes both to the AUR; the first
-      # push creates simple-rest-bin there.
-      - uses: KSXGitHub/github-actions-deploy-aur@084b0d9b15415bf9cdb65d44dad1efe37a354050 # v4.2.0
-        with:
-          pkgname: simple-rest-bin
-          pkgbuild: aur/PKGBUILD
-          commit_username: Mysttic
-          commit_email: 19372942+Mysttic@users.noreply.github.com
-          ssh_private_key: ${{ secrets.AUR_SSH_KEY }}
-          commit_message: Update to ${{ needs.release.outputs.version }}
-          ssh_keyscan_types: rsa,ecdsa,ed25519
-
-  snap:
-    name: Snap Store
-    needs: release
-    if: needs.release.outputs.snap == 'true'
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    env:
-      VERSION: ${{ needs.release.outputs.version }}
-      GH_TOKEN: ${{ github.token }}
-    steps:
-      - uses: actions/checkout@v4
-      - name: Snaps for amd64, arm64 and armhf
-        run: |
-          set -eu
-          sudo apt-get install -y -q squashfs-tools >/dev/null
-          gh release download "v$VERSION" --dir files --pattern "simple-rest-$VERSION-linux-*"
-          sh scripts/snap.sh "$VERSION" files snaps
-      - name: Upload to the stable channel
-        env:
-          SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAPCRAFT_STORE_CREDENTIALS }}
-        run: |
-          set -eu
-          sudo snap install snapcraft --classic
-          for f in snaps/*.snap; do
-            snapcraft upload --release=stable "$f"
-          done
-
-  sourceforge:
-    name: SourceForge
-    needs: release
-    if: needs.release.outputs.sourceforge == 'true'
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    env:
-      VERSION: ${{ needs.release.outputs.version }}
-      GH_TOKEN: ${{ github.token }}
-      SF_USER: ${{ vars.SF_USER }}
-      SF_PROJECT: ${{ vars.SF_PROJECT || 'simple-rest' }}
-    steps:
-      - name: Files from the release
-        run: gh release download "v$VERSION" --repo "$GITHUB_REPOSITORY" --dir "files/$VERSION"
-      - name: Upload to the project's files
-        env:
-          SF_SSH_KEY: ${{ secrets.SF_SSH_KEY }}
-        run: |
-          set -eu
-          install -d -m 700 ~/.ssh
-          printf '%s\n' "$SF_SSH_KEY" > ~/.ssh/sourceforge
-          chmod 600 ~/.ssh/sourceforge
-          ssh-keyscan -t ed25519,ecdsa,rsa frs.sourceforge.net >> ~/.ssh/known_hosts 2>/dev/null
-          rsync -rtv -e "ssh -i $HOME/.ssh/sourceforge" "files/$VERSION" \
-            "$SF_USER@frs.sourceforge.net:/home/frs/project/$SF_PROJECT/"
-
-  report:
-    name: Report a failure
-    needs: [release, hub, develop, scoop, winget, chocolatey, aur, snap, sourceforge]
-    if: always() && (contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled'))
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    permissions:
-      issues: write
-    env:
-      GH_TOKEN: ${{ github.token }}
-      RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-      VERSION: ${{ needs.release.outputs.version }}
-      RESULTS: |
-        release ${{ needs.release.result }}
-        hub ${{ needs.hub.result }}
-        develop ${{ needs.develop.result }}
-        scoop ${{ needs.scoop.result }}
-        winget ${{ needs.winget.result }}
-        chocolatey ${{ needs.chocolatey.result }}
-        aur ${{ needs.aur.result }}
-        snap ${{ needs.snap.result }}
-        sourceforge ${{ needs.sourceforge.result }}
-    steps:
-      - name: Open or update the release-failed issue
-        run: |
-          set -eu
-          failed=$(printf '%s\n' "$RESULTS" | awk '$2 == "failure" || $2 == "cancelled" { printf "%s%s (%s)", sep, $1, $2; sep = ", " }')
-          gh label create release-failed --repo "$GITHUB_REPOSITORY" --color B60205 \
-            --description "Workflow Release zakończył się błędem" >/dev/null 2>&1 || true
-          body=$(printf 'Workflow Release nie dokończył pracy%s.\n\n- joby: %s\n- przebieg: %s\n- commit: %s\n\nPo poprawce: "Re-run failed jobs" w tym przebiegu albo nowy push do master.\n' \
-            "${VERSION:+ przy wydaniu v$VERSION}" "$failed" "$RUN_URL" "$GITHUB_SHA")
-          open=$(gh issue list --repo "$GITHUB_REPOSITORY" --label release-failed --state open \
-            --json number --jq '.[0].number // empty')
-          if [ -n "$open" ]; then
-            gh issue comment "$open" --repo "$GITHUB_REPOSITORY" --body "$body"
-          else
-            gh issue create --repo "$GITHUB_REPOSITORY" --label release-failed \
-              --title "Wydanie nie powiodło się${VERSION:+: v$VERSION}" --body "$body"
-          fi
