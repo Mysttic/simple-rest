@@ -196,9 +196,9 @@ func TestSwapExecutable(t *testing.T) {
 	}
 }
 
-// ---- a hub to talk to ------------------------------------------------------------
+// ---- a release list to talk to ---------------------------------------------------
 
-type fakeHub struct {
+type fakeReleases struct {
 	srv      *httptest.Server
 	releases []ghRelease
 	files    map[string][]byte
@@ -207,8 +207,8 @@ type fakeHub struct {
 	hits     atomic.Int32
 }
 
-func newFakeHub(t *testing.T) *fakeHub {
-	h := &fakeHub{files: map[string][]byte{}, status: http.StatusOK}
+func newFakeReleases(t *testing.T) *fakeReleases {
+	h := &fakeReleases{files: map[string][]byte{}, status: http.StatusOK}
 	h.srv = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
 		case r.URL.Path == "/releases":
@@ -245,7 +245,7 @@ func sha256hex(b []byte) string {
 }
 
 // addRelease publishes a release of ours with one binary for testSuffix.
-func (h *fakeHub) addRelease(version string, binary []byte, declaredSize int64, withChecksums bool, checksum string) {
+func (h *fakeReleases) addRelease(version string, binary []byte, declaredSize int64, withChecksums bool, checksum string) {
 	name := assetName(version, testSuffix)
 	h.files[name] = binary
 	assets := []ghAsset{{Name: name, Size: declaredSize, URL: h.srv.URL + "/dl/" + name}}
@@ -263,14 +263,14 @@ func (h *fakeHub) addRelease(version string, binary []byte, declaredSize int64, 
 	})
 }
 
-func newTestUpdater(t *testing.T, hub *fakeHub, running string) *updater {
+func newTestUpdater(t *testing.T, gh *fakeReleases, running string) *updater {
 	dir := t.TempDir()
 	exe := filepath.Join(dir, "simple-rest.exe")
 	if err := os.WriteFile(exe, []byte("old binary"), 0o755); err != nil {
 		t.Fatal(err)
 	}
 	u := newUpdater(running, exe, filepath.Join(dir, "update.json"))
-	u.apiURL = hub.srv.URL + "/releases"
+	u.apiURL = gh.srv.URL + "/releases"
 	u.suffix = testSuffix
 	u.installable, u.installReason = true, "" // t.TempDir() sits under the temp dir
 	return u
@@ -289,9 +289,9 @@ func waitFor(t *testing.T, what string, cond func() bool) {
 }
 
 func TestCheckNewer(t *testing.T) {
-	hub := newFakeHub(t)
-	hub.addRelease("1.1.0", []byte("new binary"), 10, true, "")
-	u := newTestUpdater(t, hub, "1.0.0")
+	gh := newFakeReleases(t)
+	gh.addRelease("1.1.0", []byte("new binary"), 10, true, "")
+	u := newTestUpdater(t, gh, "1.0.0")
 	s := u.check(context.Background())
 	if s.State != updateNewer || s.Latest == nil || s.Latest.Version != "1.1.0" {
 		t.Fatalf("status = %+v", s)
@@ -306,34 +306,34 @@ func TestCheckNewer(t *testing.T) {
 }
 
 func TestCheckUpToDateAndStrangers(t *testing.T) {
-	hub := newFakeHub(t)
-	hub.addRelease("1.1.0", []byte("new binary"), 10, true, "")
-	u := newTestUpdater(t, hub, "1.1.0")
+	gh := newFakeReleases(t)
+	gh.addRelease("1.1.0", []byte("new binary"), 10, true, "")
+	u := newTestUpdater(t, gh, "1.1.0")
 	if s := u.check(context.Background()); s.State != updateUpToDate || s.Latest == nil {
 		t.Errorf("same version: %+v", s)
 	}
-	hub.releases = []ghRelease{{TagName: "chatt-v0.7.0", PublishedAt: "2030-01-01T00:00:00Z"}}
+	gh.releases = []ghRelease{{TagName: "chatt-v0.7.0", PublishedAt: "2030-01-01T00:00:00Z"}}
 	if s := u.check(context.Background()); s.State != updateUpToDate || s.Latest != nil || s.Error != "" {
 		t.Errorf("only another project's release: %+v", s)
 	}
 }
 
 func TestCheckFailures(t *testing.T) {
-	hub := newFakeHub(t)
-	u := newTestUpdater(t, hub, "1.0.0")
+	gh := newFakeReleases(t)
+	u := newTestUpdater(t, gh, "1.0.0")
 
-	hub.status = http.StatusInternalServerError
+	gh.status = http.StatusInternalServerError
 	s := u.check(context.Background())
 	if s.State != updateFailed || !strings.Contains(s.Error, "HTTP 500") || s.LastCheck == "" {
 		t.Errorf("non-200: %+v", s)
 	}
 
-	hub.status, hub.rawBody = http.StatusOK, "{not json"
+	gh.status, gh.rawBody = http.StatusOK, "{not json"
 	if s := u.check(context.Background()); s.State != updateFailed || !strings.Contains(s.Error, "unreadable") {
 		t.Errorf("broken body: %+v", s)
 	}
 
-	hub.srv.Close()
+	gh.srv.Close()
 	before := u.snapshot().LastCheck
 	time.Sleep(1100 * time.Millisecond)
 	s = u.check(context.Background())
@@ -346,28 +346,28 @@ func TestCheckFailures(t *testing.T) {
 }
 
 func TestMaybeCheckRespectsSettingAndInterval(t *testing.T) {
-	hub := newFakeHub(t)
-	hub.addRelease("1.1.0", []byte("new binary"), 10, true, "")
-	u := newTestUpdater(t, hub, "1.0.0")
+	gh := newFakeReleases(t)
+	gh.addRelease("1.1.0", []byte("new binary"), 10, true, "")
+	u := newTestUpdater(t, gh, "1.0.0")
 
 	u.maybeCheck(context.Background())
-	if hub.hits.Load() != 0 {
-		t.Fatal("asked the hub while the setting is off")
+	if gh.hits.Load() != 0 {
+		t.Fatal("asked for releases while the setting is off")
 	}
 	u.setAutoCheck(true)
 	u.maybeCheck(context.Background())
-	if hub.hits.Load() != 1 {
-		t.Fatalf("expected one question, got %d", hub.hits.Load())
+	if gh.hits.Load() != 1 {
+		t.Fatalf("expected one question, got %d", gh.hits.Load())
 	}
 	u.maybeCheck(context.Background())
-	if hub.hits.Load() != 1 {
+	if gh.hits.Load() != 1 {
 		t.Fatal("asked again within a day")
 	}
 	u.mu.Lock()
 	u.settings.LastCheck = time.Now().Add(-25 * time.Hour)
 	u.mu.Unlock()
 	u.maybeCheck(context.Background())
-	if hub.hits.Load() != 2 {
+	if gh.hits.Load() != 2 {
 		t.Fatal("did not ask after a day")
 	}
 
@@ -379,9 +379,9 @@ func TestMaybeCheckRespectsSettingAndInterval(t *testing.T) {
 
 func TestInstallEndToEnd(t *testing.T) {
 	newBinary := []byte("new binary 1.1.0 " + strings.Repeat("x", 5000))
-	hub := newFakeHub(t)
-	hub.addRelease("1.1.0", newBinary, int64(len(newBinary)), true, "")
-	u := newTestUpdater(t, hub, "1.0.0")
+	gh := newFakeReleases(t)
+	gh.addRelease("1.1.0", newBinary, int64(len(newBinary)), true, "")
+	u := newTestUpdater(t, gh, "1.0.0")
 	restarted := make(chan struct{})
 	u.restart = func() { close(restarted) }
 
@@ -445,9 +445,9 @@ func assertUntouched(t *testing.T, u *updater) {
 }
 
 func TestInstallChecksumMismatch(t *testing.T) {
-	hub := newFakeHub(t)
-	hub.addRelease("1.1.0", []byte("new binary"), 10, true, strings.Repeat("0", 64))
-	u := newTestUpdater(t, hub, "1.0.0")
+	gh := newFakeReleases(t)
+	gh.addRelease("1.1.0", []byte("new binary"), 10, true, strings.Repeat("0", 64))
+	u := newTestUpdater(t, gh, "1.0.0")
 	s := installAndWait(t, u)
 	if s.Restarting || !strings.Contains(s.Error, "checksum") {
 		t.Errorf("status = %+v", s)
@@ -456,9 +456,9 @@ func TestInstallChecksumMismatch(t *testing.T) {
 }
 
 func TestInstallSizeMismatch(t *testing.T) {
-	hub := newFakeHub(t)
-	hub.addRelease("1.1.0", []byte("new binary"), 999, true, "")
-	u := newTestUpdater(t, hub, "1.0.0")
+	gh := newFakeReleases(t)
+	gh.addRelease("1.1.0", []byte("new binary"), 999, true, "")
+	u := newTestUpdater(t, gh, "1.0.0")
 	s := installAndWait(t, u)
 	if s.Restarting || !strings.Contains(s.Error, "received 10 bytes") {
 		t.Errorf("status = %+v", s)
@@ -467,9 +467,9 @@ func TestInstallSizeMismatch(t *testing.T) {
 }
 
 func TestInstallWithoutChecksums(t *testing.T) {
-	hub := newFakeHub(t)
-	hub.addRelease("1.1.0", []byte("new binary"), 10, false, "")
-	u := newTestUpdater(t, hub, "1.0.0")
+	gh := newFakeReleases(t)
+	gh.addRelease("1.1.0", []byte("new binary"), 10, false, "")
+	u := newTestUpdater(t, gh, "1.0.0")
 	s := installAndWait(t, u)
 	if s.Restarting || !strings.Contains(s.Error, "checksums file") {
 		t.Errorf("status = %+v", s)
@@ -478,9 +478,9 @@ func TestInstallWithoutChecksums(t *testing.T) {
 }
 
 func TestInstallRefusedWhenNotInstallable(t *testing.T) {
-	hub := newFakeHub(t)
-	hub.addRelease("1.1.0", []byte("new binary"), 10, true, "")
-	u := newTestUpdater(t, hub, "1.0.0")
+	gh := newFakeReleases(t)
+	gh.addRelease("1.1.0", []byte("new binary"), 10, true, "")
+	u := newTestUpdater(t, gh, "1.0.0")
 	u.installable, u.installReason = false, "it runs from a temporary directory (go run?)"
 	s := u.check(context.Background())
 	if s.State != updateNewer || s.CanInstall || !strings.Contains(s.CannotInstallReason, "temporary") {
@@ -490,7 +490,7 @@ func TestInstallRefusedWhenNotInstallable(t *testing.T) {
 		t.Errorf("install error = %v", err)
 	}
 
-	hub.releases[0].Assets = hub.releases[0].Assets[1:] // no file for this platform
+	gh.releases[0].Assets = gh.releases[0].Assets[1:] // no file for this platform
 	u.installable = true
 	s = u.check(context.Background())
 	if s.State != updateNewer || s.CanInstall || !strings.Contains(s.CannotInstallReason, "no file for") {
@@ -499,9 +499,9 @@ func TestInstallRefusedWhenNotInstallable(t *testing.T) {
 }
 
 func TestUpdateHTTPAPI(t *testing.T) {
-	hub := newFakeHub(t)
-	hub.addRelease("1.1.0", []byte("new binary"), 10, true, "")
-	u := newTestUpdater(t, hub, "1.0.0")
+	gh := newFakeReleases(t)
+	gh.addRelease("1.1.0", []byte("new binary"), 10, true, "")
+	u := newTestUpdater(t, gh, "1.0.0")
 	a := newApp(filepath.Join(t.TempDir(), "data.json"), true)
 	srv := httptest.NewServer(routes(a, u))
 	defer srv.Close()
